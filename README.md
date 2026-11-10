@@ -8,7 +8,7 @@ Requires Go, `git`, a C compiler (tree-sitter uses cgo) and an authenticated `gh
 
 ```sh
 just build   # generate Templ and build ./bin/scrutiny
-just test    # run the test suite
+just test    # run the test suite (Language Server tests run when gopls is on $PATH or $SCRUTINY_GOPLS is set)
 just run     # build and run `scrutiny serve`
 ```
 
