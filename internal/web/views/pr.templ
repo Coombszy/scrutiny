@@ -32,7 +32,6 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 				</nav>
 			}
 			@Checks(p.Checks)
-			@Reactions(p.PR.Ref, p.Review.PRID, p.Review.Reactions)
 		</header>
 		<details class="conversation-panel">
 			<summary>Conversation (<span id="conversation-count">{ itoa(len(p.Review.Conversation)) }</span>)</summary>
