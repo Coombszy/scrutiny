@@ -18,6 +18,7 @@ import (
 	"github.com/Coombszy/scrutiny/internal/cache/sqlite"
 	"github.com/Coombszy/scrutiny/internal/codehost/github"
 	"github.com/Coombszy/scrutiny/internal/highlight/treesitter"
+	"github.com/Coombszy/scrutiny/internal/live"
 	"github.com/Coombszy/scrutiny/internal/repostore/gitcli"
 	"github.com/Coombszy/scrutiny/internal/review"
 	"github.com/Coombszy/scrutiny/internal/settings/tomlfile"
@@ -79,13 +80,19 @@ func serve(portOverride int) error {
 		Settings:    settings,
 	})
 
+	hub := live.NewHub()
+	poller := &live.Poller{Source: svc, Hub: hub, Interval: 30 * time.Second, Now: time.Now}
+	go poller.Run(ctx)
+
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return err
 	}
 	srv := &http.Server{
-		Handler:           web.NewServer(web.NewCSRFToken(), svc, settings).Handler(),
+		Handler:           web.NewServer(web.NewCSRFToken(), svc, settings, hub).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
+		// Requests share ctx so that open event streams end on shutdown.
+		BaseContext: func(net.Listener) context.Context { return ctx },
 	}
 	slog.Info("scrutiny listening", "url", "http://"+ln.Addr().String())
 

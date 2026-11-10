@@ -7,6 +7,9 @@ import (
 
 templ PR(p review.PRPage, mode settings.ViewMode) {
 	@Layout(p.PR.Title) {
+		<div data-live={ p.PR.Ref.Path() + "/events" } hidden></div>
+		@OfflineBanner(p.Offline, false)
+		@EmptyRefreshBanner()
 		<header class="pr-header">
 			<div class="pr-title">
 				<h1>{ p.PR.Title } <span class="muted">#{ itoa(p.PR.Ref.Number) }</span></h1>
@@ -17,10 +20,11 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 				{ p.PR.Author } wants to merge <code>{ p.PR.HeadBranch }</code> into <code>{ p.PR.BaseBranch }</code>
 				· <a href={ templ.SafeURL(p.PR.URL) }>GitHub</a>
 			</p>
+			@Checks(p.Checks)
 			@Reactions(p.PR.Ref, p.Review.PRID, p.Review.Reactions)
 		</header>
 		<details class="conversation-panel">
-			<summary>Conversation ({ itoa(len(p.Review.Conversation)) })</summary>
+			<summary>Conversation (<span id="conversation-count">{ itoa(len(p.Review.Conversation)) }</span>)</summary>
 			@Conversation(p.PR.Ref, p.Review.Conversation)
 		</details>
 		<div class="toolbar">

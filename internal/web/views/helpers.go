@@ -3,6 +3,7 @@ package views
 import (
 	"encoding/json"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -146,4 +147,59 @@ func rowThreads(row review.SplitRow) []domain.ReviewThread {
 		ts = append(ts, row.Right.Threads...)
 	}
 	return ts
+}
+
+func mergeStateLabel(m domain.MergeState) string {
+	switch m {
+	case domain.MergeClean:
+		return "Ready to merge"
+	case domain.MergeBlocked:
+		return "Blocked"
+	case domain.MergeBehind:
+		return "Behind base"
+	case domain.MergeConflicting:
+		return "Conflicts"
+	case domain.MergeUnstable:
+		return "Unstable"
+	}
+	return "Merge state unknown"
+}
+
+func checkIcon(s domain.CheckState) string {
+	switch s {
+	case domain.CheckSuccess:
+		return "✓"
+	case domain.CheckFailure:
+		return "✗"
+	case domain.CheckPending:
+		return "●"
+	}
+	return "–"
+}
+
+func checkName(c domain.Check) string {
+	if c.Workflow != "" {
+		return c.Workflow + " / " + c.Name
+	}
+	return c.Name
+}
+
+// sortedChecks lists failures first, then pending, then the rest, with
+// Required Checks ahead within each group.
+func sortedChecks(cs []domain.Check) []domain.Check {
+	rank := map[domain.CheckState]int{domain.CheckFailure: 0, domain.CheckPending: 1, domain.CheckSuccess: 2, domain.CheckNeutral: 3}
+	out := slices.Clone(cs)
+	slices.SortStableFunc(out, func(a, b domain.Check) int {
+		if d := rank[a.State] - rank[b.State]; d != 0 {
+			return d
+		}
+		switch {
+		case a.Required && !b.Required:
+			return -1
+		case b.Required && !a.Required:
+			return 1
+		}
+		return 0
+	})
+	return out
 }

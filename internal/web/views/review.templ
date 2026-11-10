@@ -7,7 +7,23 @@ import (
 // Thread renders a Review Thread with its comments, reply form and resolve
 // button. Every write inside it swaps the whole thread.
 templ Thread(pr domain.PRRef, t domain.ReviewThread) {
-	<div class="thread" id={ "thread-" + t.ID } data-resolved={ boolString(t.Resolved) }>
+	@threadView(pr, t, false)
+}
+
+// ThreadOOB is a Thread that replaces the one on the page out of band.
+templ ThreadOOB(pr domain.PRRef, t domain.ReviewThread) {
+	@threadView(pr, t, true)
+}
+
+templ threadView(pr domain.PRRef, t domain.ReviewThread, oob bool) {
+	<div
+		class="thread"
+		id={ "thread-" + t.ID }
+		if oob {
+			hx-swap-oob="true"
+		}
+		data-resolved={ boolString(t.Resolved) }
+	>
 		<details open?={ !t.Resolved }>
 			<summary class="thread-summary">
 				<span class="path">{ threadLocation(t) }</span>
@@ -23,7 +39,7 @@ templ Thread(pr domain.PRRef, t domain.ReviewThread) {
 				@commentView(pr, c)
 			}
 			<form class="reply" hx-post={ pr.Path() + "/threads/" + t.ID + "/replies" } hx-target="closest .thread" hx-swap="outerHTML">
-				<textarea name="body" rows="2" placeholder="Reply…" required></textarea>
+				<textarea id={ "reply-" + t.ID } name="body" rows="2" placeholder="Reply…" required></textarea>
 				<div class="actions">
 					<button type="submit">Reply</button>
 					if t.Resolved && t.ViewerCanUnresolve {
@@ -124,12 +140,21 @@ templ PendingCount(p *domain.PendingReview, oob bool) {
 
 // Conversation renders the Conversation Comments and the form for a new one.
 templ Conversation(pr domain.PRRef, comments []domain.Comment) {
-	<section id="conversation">
+	@conversationView(pr, comments, false)
+}
+
+templ conversationView(pr domain.PRRef, comments []domain.Comment, oob bool) {
+	<section
+		id="conversation"
+		if oob {
+			hx-swap-oob="true"
+		}
+	>
 		for _, c := range comments {
 			@commentView(pr, c)
 		}
 		<form class="reply" hx-post={ pr.Path() + "/comments" } hx-target="#conversation" hx-swap="outerHTML">
-			<textarea name="body" rows="3" placeholder="Add a comment" required></textarea>
+			<textarea id="conversation-new" name="body" rows="3" placeholder="Add a comment" required></textarea>
 			<div class="actions"><button type="submit">Comment</button></div>
 		</form>
 	</section>

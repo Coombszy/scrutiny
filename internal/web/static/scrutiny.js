@@ -20,6 +20,7 @@
     if (open) document.getElementById(open.dataset.openDialog)?.showModal();
     if (e.target.closest("[data-close-dialog]")) e.target.closest("dialog")?.close();
     if (e.target.closest("[data-remove-row]")) e.target.closest("tr")?.remove();
+    if (e.target.closest("[data-reload]")) location.reload();
     const add = e.target.closest(".add-comment");
     if (add) {
       const row = add.closest("tr");
@@ -29,6 +30,39 @@
     }
     const nav = e.target.closest("[data-comment-nav]");
     if (nav) navigate(nav.dataset.commentNav === "next" ? 1 : -1);
+  });
+
+  // Live updates arrive as out-of-band HTML over an event stream, held open
+  // only while the page is visible: the server polls GitHub only for PRs
+  // someone is looking at.
+  const live = document.querySelector("[data-live]");
+  let stream = null;
+  function connect() {
+    if (stream || document.hidden || !live) return;
+    stream = new EventSource(live.dataset.live);
+    stream.addEventListener("update", (e) => htmx.swap(document.body, e.data, { swapStyle: "none" }));
+  }
+  function disconnect() {
+    stream?.close();
+    stream = null;
+  }
+  document.addEventListener("visibilitychange", () => (document.hidden ? disconnect() : connect()));
+  window.addEventListener("pagehide", disconnect);
+  connect();
+
+  // Out-of-band swaps replace threads and the Conversation wholesale, so
+  // carry over any unsent text and the focus.
+  document.addEventListener("htmx:oobBeforeSwap", (e) => {
+    const { target, fragment } = e.detail;
+    for (const old of target.querySelectorAll("textarea[id]")) {
+      const fresh = fragment.querySelector?.("#" + CSS.escape(old.id));
+      if (fresh && old.value) fresh.textContent = old.value;
+    }
+    const focused = document.activeElement;
+    if (focused?.id && target.contains(focused)) e.detail.refocus = focused.id;
+  });
+  document.addEventListener("htmx:oobAfterSwap", (e) => {
+    if (e.detail.refocus) document.getElementById(e.detail.refocus)?.focus();
   });
 
   // Ctrl/Cmd+Enter submits the form a textarea is in.

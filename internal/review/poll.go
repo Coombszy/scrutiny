@@ -123,3 +123,6 @@ func sameJSON(a, b any) bool {
 	jb, _ := json.Marshal(b)
 	return string(ja) == string(jb)
 }
+
+// Status reports the code host's reachability and rate limit.
+func (s *Service) Status() codehost.Status { return s.CodeHost.Status() }

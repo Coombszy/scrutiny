@@ -11,6 +11,7 @@ import (
 	"github.com/Coombszy/scrutiny/internal/codehost"
 	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/highlight"
+	"github.com/Coombszy/scrutiny/internal/live"
 	"github.com/Coombszy/scrutiny/internal/repostore"
 	"github.com/Coombszy/scrutiny/internal/review"
 	"github.com/Coombszy/scrutiny/internal/settings"
@@ -30,6 +31,7 @@ const (
 )
 
 type app struct {
+	hub      *live.Hub
 	host     *codehost.Fake
 	repos    *repostore.Fake
 	settings *settings.Memory
@@ -38,7 +40,7 @@ type app struct {
 
 func newApp(t *testing.T) *app {
 	t.Helper()
-	a := &app{host: codehost.NewFake(), repos: repostore.NewFake(), settings: settings.NewMemory(settings.Defaults())}
+	a := &app{hub: live.NewHub(), host: codehost.NewFake(), repos: repostore.NewFake(), settings: settings.NewMemory(settings.Defaults())}
 	a.host.PRs[ref] = domain.PullRequest{Ref: ref, Title: "Teach the parser <generics>", Author: "octo", BaseBranch: "main", HeadBranch: "feat", HeadSHA: c2, State: domain.Open}
 	a.host.CommitsOf[ref] = []domain.Commit{{SHA: c1, Headline: "first step"}, {SHA: c2, Headline: "second step"}}
 	a.repos.Remotes[ref] = repostore.FakeRemote{BaseTip: tip, Commits: []domain.SHA{c1, c2}}
@@ -62,7 +64,7 @@ func newApp(t *testing.T) *app {
 		CodeHost: a.host, Repos: a.repos, Highlighter: highlight.PlainHighlighter{},
 		Cache: cache.NewMemory(), Settings: a.settings,
 	})
-	a.handler = web.NewServer(token, svc, a.settings).Handler()
+	a.handler = web.NewServer(token, svc, a.settings, a.hub).Handler()
 	return a
 }
 

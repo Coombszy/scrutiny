@@ -153,3 +153,26 @@ dialog h2 { margin: 0; font-size: 1.1rem; }
 dialog fieldset { border: 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
 
 .toast { position: fixed; bottom: 1rem; right: 1rem; max-width: min(30rem, calc(100vw - 32px)); background: var(--red); color: var(--bg0); padding: .6rem .9rem; border-radius: 6px; z-index: 10; }
+
+/* Freshness and Checks */
+.notice.live { display: flex; gap: .8rem; align-items: center; border-left-color: var(--blue); position: sticky; top: 2.6rem; z-index: 2; }
+.notice.offline { border-left-color: var(--red); }
+#offline-banner[data-offline] ~ * form,
+#offline-banner[data-offline] ~ * .add-comment,
+#offline-banner[data-offline] ~ * [data-open-dialog],
+#offline-banner[data-offline] ~ * .reaction-picker,
+#offline-banner[data-offline] ~ * .viewed-toggle { display: none; }
+
+.checks { margin: .4rem 0; }
+.checks > summary { cursor: pointer; display: inline-flex; gap: .5rem; align-items: center; padding: .15rem .6rem; border-radius: 999px; background: var(--bg1); }
+.merge-state { font-weight: 600; }
+.merge-clean { color: var(--green); }
+.merge-blocked, .merge-conflicting { color: var(--red); }
+.merge-behind, .merge-unstable { color: var(--yellow); }
+.check-count.failure, .check-failure .check-icon { color: var(--red); }
+.check-count.pending, .check-pending .check-icon { color: var(--yellow); }
+.check-count.success, .check-success .check-icon { color: var(--green); }
+.check-neutral .check-icon { color: var(--gray); }
+.check-list { list-style: none; margin: .4rem 0; padding: .4rem .8rem; background: var(--bg1); border-radius: 6px; max-width: 50rem; }
+.check { display: flex; gap: .5rem; align-items: baseline; padding: .1rem 0; }
+.check-icon { width: 1em; text-align: center; }

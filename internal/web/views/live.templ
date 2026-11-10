@@ -1,0 +1,116 @@
+package views
+
+import (
+	"github.com/Coombszy/scrutiny/internal/domain"
+	"github.com/Coombszy/scrutiny/internal/review"
+)
+
+// LiveUpdate renders an Update as out-of-band swaps for the PR page.
+templ LiveUpdate(pr domain.PRRef, u review.Update) {
+	if u.Head != "" || u.NewThreads > 0 {
+		@refreshBanner(u, true)
+	}
+	if u.OfflineChanged {
+		@OfflineBanner(u.Offline, true)
+	}
+	for _, t := range u.Threads {
+		@ThreadOOB(pr, t)
+	}
+	if u.ConversationChanged {
+		@conversationView(pr, u.Conversation, true)
+		<span id="conversation-count" hx-swap-oob="true">{ itoa(len(u.Conversation)) }</span>
+	}
+	if u.PendingChanged {
+		@PendingCount(u.Pending, true)
+	}
+	if u.Checks != nil {
+		@checksView(*u.Checks, true)
+	}
+}
+
+templ refreshBanner(u review.Update, oob bool) {
+	<div
+		id="refresh-banner"
+		if oob {
+			hx-swap-oob="true"
+		}
+		class="notice live"
+	>
+		if u.Head != "" {
+			New commits were pushed (head is now <code>{ u.Head.Short() }</code>).
+		} else {
+			New comments were added.
+		}
+		<button data-reload>Refresh</button>
+	</div>
+}
+
+// EmptyRefreshBanner is the placeholder the Refresh button arrives in.
+templ EmptyRefreshBanner() {
+	<div id="refresh-banner"></div>
+}
+
+// OfflineBanner says GitHub is unreachable; while it carries data-offline,
+// CSS hides every review action.
+templ OfflineBanner(offline bool, oob bool) {
+	<div
+		id="offline-banner"
+		if oob {
+			hx-swap-oob="true"
+		}
+		if offline {
+			class="notice offline"
+			data-offline
+		}
+	>
+		if offline {
+			GitHub is unreachable. Showing what was last fetched; review actions are disabled until it is back.
+		}
+	</div>
+}
+
+// Checks is the header pill that expands into the Checks panel.
+templ Checks(c domain.Checks) {
+	@checksView(c, false)
+}
+
+templ checksView(c domain.Checks, oob bool) {
+	<details
+		id="checks"
+		if oob {
+			hx-swap-oob="true"
+		}
+		class="checks"
+	>
+		<summary>
+			<span class={ "merge-state", "merge-" + string(c.MergeState) }>{ mergeStateLabel(c.MergeState) }</span>
+			if n := c.Count(domain.CheckFailure); n > 0 {
+				<span class="check-count failure">✗ { itoa(n) }</span>
+			}
+			if n := c.Count(domain.CheckPending); n > 0 {
+				<span class="check-count pending">● { itoa(n) }</span>
+			}
+			if n := c.Count(domain.CheckSuccess); n > 0 {
+				<span class="check-count success">✓ { itoa(n) }</span>
+			}
+			if len(c.Checks) == 0 {
+				<span class="muted">No Checks</span>
+			}
+		</summary>
+		<ul class="check-list">
+			for _, ch := range sortedChecks(c.Checks) {
+				<li class={ "check", "check-" + string(ch.State) }>
+					<span class="check-icon">{ checkIcon(ch.State) }</span>
+					if ch.URL != "" {
+						<a href={ templ.SafeURL(ch.URL) } target="_blank" rel="noopener">{ checkName(ch) }</a>
+					} else {
+						{ checkName(ch) }
+					}
+					if ch.Required {
+						<span class="badge">Required</span>
+					}
+				</li>
+			}
+		</ul>
+	</details>
+}
