@@ -31,7 +31,7 @@ func TestInstallingShowsProgressThenTheInstalledVersion(t *testing.T) {
 	a.inst.Block = make(chan struct{})
 
 	rec := a.do(t, http.MethodPost, "/settings/servers/gopls/install", formValues())
-	mustContain(t, rec.Body.String(), `id="server-gopls"`, "Installing", `hx-trigger="every 1s"`)
+	mustContain(t, rec.Body.String(), `id="server-gopls"`, "Installing", `hx-trigger="every 1s"`, "data-quiet")
 
 	close(a.inst.Block)
 	deadline := time.Now().Add(5 * time.Second)

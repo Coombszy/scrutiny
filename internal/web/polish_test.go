@@ -117,3 +117,10 @@ func TestKeyboardHelpIsOfferedOnThePRPageAndDashboard(t *testing.T) {
 	a.do(t, http.MethodPost, "/settings/keys", url.Values{"action": {"help"}, "binding": {"h"}})
 	mustContain(t, a.do(t, http.MethodGet, prPath, nil).Body.String(), "<kbd>h</kbd>")
 }
+
+func TestEveryPageHasAnActivitySpinner(t *testing.T) {
+	a := newApp(t)
+	for _, path := range []string{"/", prPath, "/settings/servers"} {
+		mustContain(t, a.do(t, http.MethodGet, path, nil).Body.String(), `id="activity"`)
+	}
+}

@@ -151,7 +151,7 @@ func ServerRow(st servers.Status) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" hx-trigger=\"every 1s\" hx-swap=\"outerHTML\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" hx-trigger=\"every 1s\" hx-swap=\"outerHTML\" data-quiet")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -163,7 +163,7 @@ func ServerRow(st servers.Status) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(st.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 49, Col: 20}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 50, Col: 20}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -176,7 +176,7 @@ func ServerRow(st servers.Status) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(strings.Join(st.Languages, ", "))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 50, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 51, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -194,7 +194,7 @@ func ServerRow(st servers.Status) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(st.Description)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 52, Col: 37}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 53, Col: 37}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -218,7 +218,7 @@ func ServerRow(st servers.Status) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(st.Version)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 58, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 59, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -236,7 +236,7 @@ func ServerRow(st servers.Status) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(st.Installed.Version)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 60, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 61, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -254,7 +254,7 @@ func ServerRow(st servers.Status) templ.Component {
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templruntime.NewAttributeExpression("/settings/servers/" + st.Name + "/install").Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 62, Col: 67}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 63, Col: 67}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 				if templ_7745c5c3_Err != nil {
@@ -267,7 +267,7 @@ func ServerRow(st servers.Status) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(st.Version)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 62, Col: 140}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 63, Col: 140}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -285,7 +285,7 @@ func ServerRow(st servers.Status) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templruntime.NewAttributeExpression("/settings/servers/" + st.Name + "/remove").Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 64, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 65, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 			if templ_7745c5c3_Err != nil {
@@ -303,7 +303,7 @@ func ServerRow(st servers.Status) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(st.Unsupported)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 66, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 67, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -321,7 +321,7 @@ func ServerRow(st servers.Status) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(strings.Join(st.Missing, " and "))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 68, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 69, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -339,7 +339,7 @@ func ServerRow(st servers.Status) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templruntime.NewAttributeExpression("/settings/servers/" + st.Name + "/install").Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 70, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 71, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 			if templ_7745c5c3_Err != nil {
@@ -352,7 +352,7 @@ func ServerRow(st servers.Status) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(st.Version)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 70, Col: 137}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 71, Col: 137}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
@@ -371,7 +371,7 @@ func ServerRow(st servers.Status) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(st.Job.Err)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 73, Col: 43}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/servers.templ`, Line: 74, Col: 43}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {

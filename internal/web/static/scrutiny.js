@@ -2,6 +2,61 @@
 // named actions in Scrutiny.actions; hotkeys and the Command Palette run them.
 window.Scrutiny = { actions: {} };
 
+// The top bar's activity spinner shows while anything the user started is
+// in flight: htmx requests, script fetches (Scrutiny.busy), and page loads
+// that actions end in. It waits a moment so instant actions do not flicker;
+// background polling marked data-quiet never shows it.
+(() => {
+  "use strict";
+  const activity = document.getElementById("activity");
+  let active = 0;
+  let leaving = false;
+  let timer;
+  function update() {
+    clearTimeout(timer);
+    if (!activity) return;
+    if (active > 0 || leaving) timer = setTimeout(() => (activity.hidden = false), 150);
+    else activity.hidden = true;
+  }
+  function start() {
+    active++;
+    update();
+  }
+  function stop() {
+    active = Math.max(0, active - 1);
+    update();
+  }
+  Scrutiny.busy = (promise) => {
+    start();
+    return Promise.resolve(promise).finally(stop);
+  };
+  document.addEventListener("htmx:beforeRequest", (e) => {
+    if (e.detail.elt?.closest?.("[data-quiet]")) return;
+    e.detail.xhr.scrutinyBusy = true;
+    start();
+  });
+  const done = (e) => {
+    const xhr = e.detail.xhr;
+    if (xhr?.scrutinyBusy) {
+      xhr.scrutinyBusy = false;
+      stop();
+    }
+  };
+  document.addEventListener("htmx:afterRequest", done);
+  document.addEventListener("htmx:sendError", done);
+  addEventListener("beforeunload", () => {
+    leaving = true;
+    update();
+  });
+  // Back/forward cache restores the page as it was left.
+  addEventListener("pageshow", (e) => {
+    if (e.persisted) {
+      leaving = false;
+      update();
+    }
+  });
+})();
+
 (() => {
   "use strict";
 
@@ -157,7 +212,7 @@ window.Scrutiny = { actions: {} };
   }
 
   async function fetchOK(url) {
-    const res = await fetch(url, { headers: { "HX-Request": "true" } });
+    const res = await Scrutiny.busy(fetch(url, { headers: { "HX-Request": "true" } }));
     if (!res.ok) throw new Error((await res.text()).trim() || res.statusText);
     return res;
   }
@@ -678,11 +733,11 @@ window.Scrutiny = { actions: {} };
       capture = null;
       dialog.close();
       const binding = keys.join(" ");
-      fetch("/settings/keys", {
+      Scrutiny.busy(fetch("/settings/keys", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content },
         body: new URLSearchParams({ action, binding }),
-      }).then(async (res) => {
+      })).then(async (res) => {
         if (!res.ok) return toast((await res.text()).trim());
         bindings = { ...bindings, [action]: binding };
         const hint = action === "help" && document.querySelector("#help-hint kbd");

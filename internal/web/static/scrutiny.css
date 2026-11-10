@@ -246,3 +246,7 @@ kbd { font-family: var(--mono); font-size: .8em; background: var(--bg2); color: 
 .keys { width: 100%; border-collapse: collapse; }
 .keys td { padding: .3rem .2rem; border-bottom: 1px solid var(--bg1); }
 .keys td:first-child { white-space: nowrap; width: 40%; }
+
+/* Activity spinner, far right of the top bar */
+.activity { display: inline-flex; align-items: center; margin-left: .8rem; }
+.activity[hidden] { display: none; }

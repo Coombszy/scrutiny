@@ -158,7 +158,7 @@ func Layout(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<a class=\"topbar-link\" href=\"/settings/servers\">Language Servers</a></header><main>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<a class=\"topbar-link\" href=\"/settings/servers\">Language Servers</a> <span id=\"activity\" class=\"activity\" hidden title=\"Working…\" aria-live=\"polite\"><span class=\"spinner\"></span></span></header><main>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

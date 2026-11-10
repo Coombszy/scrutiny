@@ -43,6 +43,7 @@ templ ServerRow(st servers.Status) {
 			hx-get={ "/settings/servers/" + st.Name }
 			hx-trigger="every 1s"
 			hx-swap="outerHTML"
+			data-quiet
 		}
 	>
 		<div class="server-info">

@@ -27,6 +27,7 @@ templ Layout(title string) {
 				}
 				@IndexingSpinner(pageFrom(ctx).Indexing, false)
 				<a class="topbar-link" href="/settings/servers">Language Servers</a>
+				<span id="activity" class="activity" hidden title="Working…" aria-live="polite"><span class="spinner"></span></span>
 			</header>
 			<main>
 				{ children... }
