@@ -107,3 +107,33 @@ func TestEventsCatchUpAPageFromBeforeAPush(t *testing.T) {
 		}
 	}
 }
+
+func TestMergeStateIsShownOnlyWhereItMeansSomething(t *testing.T) {
+	for _, c := range []struct {
+		name      string
+		checks    domain.Checks
+		state     domain.PRState
+		want      string
+		forbidden string
+	}{
+		{"clean with no checks", domain.Checks{MergeState: domain.MergeClean}, domain.Open, "No Checks", "Ready to merge"},
+		{"clean with checks", domain.Checks{MergeState: domain.MergeClean, Checks: []domain.Check{{Name: "ci", State: domain.CheckSuccess}}}, domain.Open, "Ready to merge", ""},
+		{"blocked with no checks", domain.Checks{MergeState: domain.MergeBlocked}, domain.Open, "Blocked", ""},
+		{"merged", domain.Checks{MergeState: domain.MergeConflicting, Checks: []domain.Check{{Name: "ci", State: domain.CheckSuccess}}}, domain.Merged, "✓ 1", "Conflicts"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			a := newApp(t)
+			pr := a.host.PRs[ref]
+			pr.State = c.state
+			a.host.PRs[ref] = pr
+			a.host.ChecksOf[ref] = c.checks
+			body := a.do(t, http.MethodGet, prPath, nil).Body.String()
+			checks := body[strings.Index(body, `id="checks"`):]
+			checks = checks[:strings.Index(checks, "</summary>")]
+			mustContain(t, checks, c.want)
+			if c.forbidden != "" && strings.Contains(checks, c.forbidden) {
+				t.Errorf("Checks pill shows %q: %s", c.forbidden, checks)
+			}
+		})
+	}
+}

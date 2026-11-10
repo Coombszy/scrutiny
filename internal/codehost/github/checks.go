@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"strings"
 
 	"github.com/Coombszy/scrutiny/internal/codehost"
 	"github.com/Coombszy/scrutiny/internal/domain"
@@ -15,6 +16,7 @@ var checksQuery string
 type gqlChecks struct {
 	Repository struct {
 		PullRequest *struct {
+			State             string `json:"state"`
 			MergeStateStatus  string `json:"mergeStateStatus"`
 			HeadRefOid        string `json:"headRefOid"`
 			StatusCheckRollup *struct {
@@ -58,7 +60,10 @@ func (c *Client) Checks(ctx context.Context, ref domain.PRRef) (domain.Checks, e
 	if pr == nil {
 		return domain.Checks{}, fmt.Errorf("%s: %w", ref, codehost.ErrNotFound)
 	}
-	checks := domain.Checks{Head: domain.SHA(pr.HeadRefOid), MergeState: mergeState(pr.MergeStateStatus)}
+	checks := domain.Checks{
+		Head: domain.SHA(pr.HeadRefOid), MergeState: mergeState(pr.MergeStateStatus),
+		PRState: domain.PRState(strings.ToLower(pr.State)),
+	}
 	if pr.StatusCheckRollup != nil {
 		for _, n := range pr.StatusCheckRollup.Contexts.Nodes {
 			checks.Checks = append(checks.Checks, n.toDomain())

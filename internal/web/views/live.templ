@@ -82,7 +82,9 @@ templ checksView(c domain.Checks, oob bool) {
 		class="checks"
 	>
 		<summary>
-			<span class={ "merge-state", "merge-" + string(c.MergeState) }>{ mergeStateLabel(c.MergeState) }</span>
+			if c.ShowMergeState() {
+				<span class={ "merge-state", "merge-" + string(c.MergeState) }>{ mergeStateLabel(c.MergeState) }</span>
+			}
 			if n := c.Count(domain.CheckFailure); n > 0 {
 				<span class="check-count failure">✗ { itoa(n) }</span>
 			}

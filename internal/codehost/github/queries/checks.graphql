@@ -1,6 +1,7 @@
 query Checks($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
+      state
       mergeStateStatus
       headRefOid
       statusCheckRollup {

@@ -36,6 +36,17 @@ type Checks struct {
 	Head       SHA
 	MergeState MergeState
 	Checks     []Check
+	PRState    PRState // the code host still reports a MergeState once a PR is closed
+}
+
+// ShowMergeState reports whether MergeState is worth showing: not once the
+// PR is closed or merged, and not "clean" when there are no Checks, since
+// that only means the repository enforces nothing.
+func (c Checks) ShowMergeState() bool {
+	if c.PRState == Closed || c.PRState == Merged {
+		return false
+	}
+	return c.MergeState != MergeClean || len(c.Checks) > 0
 }
 
 // Count returns how many Checks are in state s.

@@ -67,10 +67,13 @@ func (f *Fake) Checks(_ context.Context, ref domain.PRRef) (domain.Checks, error
 	if !f.Health.Online {
 		return domain.Checks{}, ErrOffline
 	}
-	if _, ok := f.PRs[ref]; !ok {
+	pr, ok := f.PRs[ref]
+	if !ok {
 		return domain.Checks{}, ErrNotFound
 	}
-	return f.ChecksOf[ref], nil
+	c := f.ChecksOf[ref]
+	c.PRState = pr.State
+	return c, nil
 }
 
 func (f *Fake) PullRequest(_ context.Context, ref domain.PRRef) (domain.PullRequest, error) {
