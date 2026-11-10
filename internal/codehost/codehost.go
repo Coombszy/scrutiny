@@ -5,12 +5,35 @@ package codehost
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/Coombszy/scrutiny/internal/domain"
 )
 
-// ErrNotFound is returned when the PR does not exist or is not visible.
-var ErrNotFound = errors.New("not found")
+var (
+	// ErrNotFound is returned when the PR does not exist or is not visible.
+	ErrNotFound = errors.New("not found")
+	// ErrOffline is returned when the code host is unreachable and there is
+	// no cached copy to serve instead.
+	ErrOffline = errors.New("code host unreachable")
+)
+
+// Status is the code host connection's health as of the last request.
+type Status struct {
+	Online bool
+	// RateLimit is the most constrained limit seen; Limit is zero before
+	// any response has reported one.
+	RateLimit RateLimit
+}
+
+// RateLimit is an API rate limit's state.
+type RateLimit struct {
+	Remaining, Limit int
+	Reset            time.Time
+}
+
+// Low reports whether less than 10% of the limit remains.
+func (r RateLimit) Low() bool { return r.Limit > 0 && r.Remaining*10 < r.Limit }
 
 // Dashboard is the set of PR lists shown on the Dashboard.
 type Dashboard struct {
@@ -37,6 +60,12 @@ type CodeHost interface {
 	// Dashboard lists the open PRs awaiting the viewer's review and those
 	// they authored.
 	Dashboard(ctx context.Context) (Dashboard, error)
+
+	// Checks reads the Checks on the PR's head commit and its MergeState.
+	Checks(ctx context.Context, ref domain.PRRef) (domain.Checks, error)
+	// Status reports reachability and rate limits. Reads are served from
+	// cache while the code host is unreachable.
+	Status() Status
 
 	// ReviewState reads the PR's Review Threads, Conversation Comments,
 	// Reactions, the viewer's Pending Review and Viewed files.

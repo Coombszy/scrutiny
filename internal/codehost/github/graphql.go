@@ -36,9 +36,11 @@ func (c *Client) graphql(ctx context.Context, query string, vars map[string]any,
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		c.status.failed()
+		return fmt.Errorf("graphql: %w: %v", codehost.ErrOffline, err)
 	}
 	defer resp.Body.Close()
+	c.status.observe(resp.Header)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err

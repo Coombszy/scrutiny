@@ -1,0 +1,30 @@
+query Checks($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      mergeStateStatus
+      headRefOid
+      statusCheckRollup {
+        state
+        contexts(first: 100) {
+          nodes {
+            __typename
+            ... on CheckRun {
+              name
+              status
+              conclusion
+              detailsUrl
+              isRequired(pullRequestNumber: $number)
+              checkSuite { workflowRun { workflow { name } } }
+            }
+            ... on StatusContext {
+              context
+              state
+              targetUrl
+              isRequired(pullRequestNumber: $number)
+            }
+          }
+        }
+      }
+    }
+  }
+}

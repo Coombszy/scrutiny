@@ -26,6 +26,7 @@ type Client struct {
 	baseURL string
 	cache   cache.Cache
 	now     func() time.Time
+	status  statusTracker
 }
 
 var _ codehost.CodeHost = (*Client)(nil)
@@ -44,6 +45,10 @@ func NewFromGH(c cache.Cache) (*Client, error) {
 	}
 	return New(hc, "https://api.github.com", c), nil
 }
+
+// Status reports whether the last request reached GitHub, and the most
+// constrained rate limit seen.
+func (c *Client) Status() codehost.Status { return c.status.status() }
 
 func (c *Client) PullRequest(ctx context.Context, ref domain.PRRef) (domain.PullRequest, error) {
 	var p restPull
@@ -134,9 +139,14 @@ func (c *Client) get(ctx context.Context, path string, v any) (link string, err 
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return "", err
+		c.status.failed()
+		if hasCached {
+			return cachedLink(cached), json.Unmarshal(cachedBody(cached.Value), v)
+		}
+		return "", fmt.Errorf("GET %s: %w: %v", path, codehost.ErrOffline, err)
 	}
 	defer resp.Body.Close()
+	c.status.observe(resp.Header)
 
 	var body []byte
 	switch {

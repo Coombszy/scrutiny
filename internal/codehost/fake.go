@@ -25,6 +25,8 @@ type Fake struct {
 	Dash        Dashboard
 	States      map[domain.PRRef]*domain.ReviewState
 	Submissions []Submission
+	ChecksOf    map[domain.PRRef]domain.Checks
+	Health      Status
 	nextID      int
 }
 
@@ -35,7 +37,37 @@ func NewFake() *Fake {
 		PRs:       map[domain.PRRef]domain.PullRequest{},
 		CommitsOf: map[domain.PRRef][]domain.Commit{},
 		States:    map[domain.PRRef]*domain.ReviewState{},
+		ChecksOf:  map[domain.PRRef]domain.Checks{},
+		Health:    Status{Online: true},
 	}
+}
+
+// SetOnline sets whether the Fake behaves as reachable. Unreachable, it acts
+// like the GitHub adapter: REST reads (PRs, commits, Dashboard) still succeed
+// as if served from cache, while GraphQL reads and all writes fail with
+// ErrOffline.
+func (f *Fake) SetOnline(online bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Health.Online = online
+}
+
+func (f *Fake) Status() Status {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.Health
+}
+
+func (f *Fake) Checks(_ context.Context, ref domain.PRRef) (domain.Checks, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.Health.Online {
+		return domain.Checks{}, ErrOffline
+	}
+	if _, ok := f.PRs[ref]; !ok {
+		return domain.Checks{}, ErrNotFound
+	}
+	return f.ChecksOf[ref], nil
 }
 
 func (f *Fake) PullRequest(_ context.Context, ref domain.PRRef) (domain.PullRequest, error) {
@@ -82,6 +114,9 @@ func (f *Fake) state(ref domain.PRRef) *domain.ReviewState {
 func (f *Fake) ReviewState(_ context.Context, ref domain.PRRef) (domain.ReviewState, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if !f.Health.Online {
+		return domain.ReviewState{}, ErrOffline
+	}
 	if _, ok := f.PRs[ref]; !ok {
 		return domain.ReviewState{}, ErrNotFound
 	}
@@ -144,6 +179,9 @@ func (f *Fake) byReviewID(reviewID string) (*domain.ReviewState, error) {
 func (f *Fake) StartReview(_ context.Context, prID string, commit domain.SHA) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if !f.Health.Online {
+		return "", ErrOffline
+	}
 	_, s, err := f.byPRID(prID)
 	if err != nil {
 		return "", err
@@ -158,6 +196,9 @@ func (f *Fake) StartReview(_ context.Context, prID string, commit domain.SHA) (s
 func (f *Fake) AddThread(_ context.Context, reviewID string, t NewThread) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if !f.Health.Online {
+		return ErrOffline
+	}
 	s, err := f.byReviewID(reviewID)
 	if err != nil {
 		return err
@@ -174,6 +215,9 @@ func (f *Fake) AddThread(_ context.Context, reviewID string, t NewThread) error 
 func (f *Fake) Reply(_ context.Context, reviewID, threadID, body string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if !f.Health.Online {
+		return ErrOffline
+	}
 	s, err := f.byReviewID(reviewID)
 	if err != nil {
 		return err
@@ -193,6 +237,9 @@ func (f *Fake) Reply(_ context.Context, reviewID, threadID, body string) error {
 func (f *Fake) SetThreadResolved(_ context.Context, threadID string, resolved bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if !f.Health.Online {
+		return ErrOffline
+	}
 	for _, s := range f.States {
 		for i := range s.Threads {
 			if s.Threads[i].ID == threadID {
@@ -208,6 +255,9 @@ func (f *Fake) SetThreadResolved(_ context.Context, threadID string, resolved bo
 func (f *Fake) AddConversationComment(_ context.Context, prID, body string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if !f.Health.Online {
+		return ErrOffline
+	}
 	_, s, err := f.byPRID(prID)
 	if err != nil {
 		return err
@@ -219,6 +269,9 @@ func (f *Fake) AddConversationComment(_ context.Context, prID, body string) erro
 func (f *Fake) SetReaction(_ context.Context, subjectID string, r domain.Reaction, on bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if !f.Health.Online {
+		return ErrOffline
+	}
 	for _, s := range f.States {
 		if s.PRID == subjectID {
 			s.Reactions = react(s.Reactions, r, on)
@@ -265,6 +318,9 @@ func react(groups []domain.ReactionGroup, r domain.Reaction, on bool) []domain.R
 func (f *Fake) SubmitReview(_ context.Context, prID, reviewID string, commit domain.SHA, event domain.ReviewEvent, body string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if !f.Health.Online {
+		return ErrOffline
+	}
 	ref, s, err := f.byPRID(prID)
 	if err != nil {
 		return err
@@ -288,6 +344,9 @@ func (f *Fake) SubmitReview(_ context.Context, prID, reviewID string, commit dom
 func (f *Fake) SetViewed(_ context.Context, prID, path string, viewed bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if !f.Health.Online {
+		return ErrOffline
+	}
 	_, s, err := f.byPRID(prID)
 	if err != nil {
 		return err

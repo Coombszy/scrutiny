@@ -30,19 +30,16 @@ type snapshot struct {
 	State     domain.ReviewState
 	Head      domain.SHA // the PR's head when State was read
 	MergeBase domain.SHA
+	Checks    domain.Checks
+	Offline   bool // the code host was unreachable at the last poll
 }
 
 func snapshotKey(ref domain.PRRef) string { return "review:" + ref.String() }
 
 // snapshot returns the cached snapshot for ref, reading it fresh if absent.
 func (s *Service) snapshot(ctx context.Context, ref domain.PRRef) (snapshot, error) {
-	if e, ok, err := s.Cache.Get(ctx, snapshotKey(ref)); err != nil {
-		return snapshot{}, err
-	} else if ok {
-		var snap snapshot
-		if err := json.Unmarshal(e.Value, &snap); err == nil {
-			return snap, nil
-		}
+	if snap, ok, err := s.cachedSnapshot(ctx, ref); err != nil || ok {
+		return snap, err
 	}
 	pr, err := s.CodeHost.PullRequest(ctx, ref)
 	if err != nil {
@@ -55,18 +52,38 @@ func (s *Service) snapshot(ctx context.Context, ref domain.PRRef) (snapshot, err
 	return s.readState(ctx, ref, pr.HeadSHA, mb)
 }
 
-// readState reads the review state from the code host and caches it.
+// readState reads the review state from the code host and caches it,
+// keeping the cached Checks.
 func (s *Service) readState(ctx context.Context, ref domain.PRRef, head, mergeBase domain.SHA) (snapshot, error) {
 	st, err := s.CodeHost.ReviewState(ctx, ref)
 	if err != nil {
 		return snapshot{}, err
 	}
 	snap := snapshot{State: st, Head: head, MergeBase: mergeBase}
+	if prev, ok, err := s.cachedSnapshot(ctx, ref); err == nil && ok {
+		snap.Checks = prev.Checks
+	}
+	return snap, s.saveSnapshot(ctx, ref, snap)
+}
+
+func (s *Service) cachedSnapshot(ctx context.Context, ref domain.PRRef) (snapshot, bool, error) {
+	e, ok, err := s.Cache.Get(ctx, snapshotKey(ref))
+	if err != nil || !ok {
+		return snapshot{}, false, err
+	}
+	var snap snapshot
+	if err := json.Unmarshal(e.Value, &snap); err != nil {
+		return snapshot{}, false, nil
+	}
+	return snap, true, nil
+}
+
+func (s *Service) saveSnapshot(ctx context.Context, ref domain.PRRef, snap snapshot) error {
 	b, err := json.Marshal(snap)
 	if err != nil {
-		return snapshot{}, err
+		return err
 	}
-	return snap, s.Cache.Put(ctx, snapshotKey(ref), cache.Entry{Value: b, FetchedAt: s.Now()})
+	return s.Cache.Put(ctx, snapshotKey(ref), cache.Entry{Value: b, FetchedAt: s.Now()})
 }
 
 // write runs a code host write against the current snapshot, then re-reads

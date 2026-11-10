@@ -68,6 +68,10 @@ type PRPage struct {
 	Review     domain.ReviewState
 	// OtherThreads are Review Threads on files not in this Comparison.
 	OtherThreads []domain.ReviewThread
+	Checks       domain.Checks
+	// Offline is set when the code host is unreachable and the page is
+	// served from the cache; review actions are then unavailable.
+	Offline bool
 }
 
 // FileEntry is a changed file as listed on the PR page.
@@ -113,11 +117,14 @@ func (s *Service) PRPage(ctx context.Context, ref domain.PRRef, req ComparisonRe
 	if err != nil {
 		return PRPage{}, err
 	}
-	snap, err := s.readState(ctx, ref, pr.HeadSHA, mergeBase)
+	snap, err := s.readFresh(ctx, ref, pr.HeadSHA, mergeBase)
 	if err != nil {
 		return PRPage{}, err
 	}
-	page := PRPage{PR: pr, Commits: commits, Comparison: cmp, MergeBase: mergeBase, Files: files, Review: snap.State}
+	page := PRPage{
+		PR: pr, Commits: commits, Comparison: cmp, MergeBase: mergeBase, Files: files,
+		Review: snap.State, Checks: snap.Checks, Offline: snap.Offline,
+	}
 	inComparison := map[string]bool{}
 	for i := range page.Files {
 		f := &page.Files[i]
