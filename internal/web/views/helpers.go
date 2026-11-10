@@ -2,10 +2,12 @@ package views
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/review"
@@ -252,4 +254,17 @@ func groupByPath(refs []review.Reference) [][]review.Reference {
 // stackURL is another PR in the same repository's Stack.
 func stackURL(pr domain.PRRef, number int) string {
 	return domain.PRRef{Repo: pr.Repo, Number: number}.Path()
+}
+
+// ago describes how long before now t was, for status lines.
+func ago(t time.Time) string {
+	switch d := time.Since(t); {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%d min ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%d h ago", int(d.Hours()))
+	}
+	return t.Local().Format("2 Jan 15:04")
 }

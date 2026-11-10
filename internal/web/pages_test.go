@@ -181,7 +181,7 @@ func TestToggleViewModeWritesSettings(t *testing.T) {
 	}
 }
 
-func TestDashboardRendersAtOnceAndLoadsGitHubListsAfter(t *testing.T) {
+func TestDashboardFetchesFromGitHubOnlyWhenStaleOrAsked(t *testing.T) {
 	a := newApp(t)
 	a.host.Dash = codehost.Dashboard{
 		ReviewRequested: []domain.PRSummary{{Ref: domain.PRRef{Repo: repo, Number: 9}, Title: "Needs eyes", Author: "pat"}},
@@ -196,11 +196,17 @@ func TestDashboardRendersAtOnceAndLoadsGitHubListsAfter(t *testing.T) {
 		t.Error("first page load waited for GitHub")
 	}
 	lists := a.do(t, http.MethodGet, "/dashboard/lists", nil).Body.String()
-	mustContain(t, lists, "Review requested", "Needs eyes", `href="/github.com/o/r/pull/9"`, "Authored", "My work")
+	mustContain(t, lists, "Review requested", "Needs eyes", `href="/github.com/o/r/pull/9"`, "Authored", "My work", "Updated", "Refresh")
+	if strings.Contains(lists, `hx-trigger="load"`) {
+		t.Error("fresh lists would reload themselves")
+	}
 
-	// Later visits show the last lists straight away, then refresh them.
+	// Within ten minutes: the cached lists, no automatic fetch, a Refresh button.
 	body = a.do(t, http.MethodGet, "/", nil).Body.String()
-	mustContain(t, body, "Needs eyes", `hx-get="/dashboard/lists"`)
+	mustContain(t, body, "Needs eyes", `hx-get="/dashboard/lists"`, "Refresh")
+	if strings.Contains(body, `hx-trigger="load"`) {
+		t.Error("fetched from GitHub again within ten minutes")
+	}
 }
 
 func TestOpenRedirectsGitHubURLs(t *testing.T) {

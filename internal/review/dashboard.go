@@ -3,6 +3,7 @@ package review
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/Coombszy/scrutiny/internal/cache"
 	"github.com/Coombszy/scrutiny/internal/codehost"
@@ -11,10 +12,16 @@ import (
 // recentLimit is how many recently opened PRs the Dashboard lists.
 const recentLimit = 20
 
+// dashboardMaxAge is how long the Dashboard's GitHub lists are shown before
+// a visit fetches them again; the page also has a Refresh button.
+const dashboardMaxAge = 10 * time.Minute
+
 // DashboardPage is the PR lists shown on the Dashboard.
 type DashboardPage struct {
 	codehost.Dashboard
-	Recent []cache.Visit
+	Recent    []cache.Visit
+	FetchedAt time.Time // when the GitHub lists were fetched
+	Stale     bool      // older than dashboardMaxAge
 }
 
 const dashboardKey = "dashboard"
@@ -31,11 +38,12 @@ func (s *Service) Dashboard(ctx context.Context) (DashboardPage, error) {
 	if err != nil {
 		return DashboardPage{}, err
 	}
-	if err := s.Cache.Put(ctx, dashboardKey, cache.Entry{Value: b, FetchedAt: s.Now()}); err != nil {
+	now := s.Now()
+	if err := s.Cache.Put(ctx, dashboardKey, cache.Entry{Value: b, FetchedAt: now}); err != nil {
 		return DashboardPage{}, err
 	}
 	recent, err := s.Cache.RecentVisits(ctx, recentLimit)
-	return DashboardPage{Dashboard: d, Recent: recent}, err
+	return DashboardPage{Dashboard: d, Recent: recent, FetchedAt: now}, err
 }
 
 // CachedDashboard returns the Dashboard as last fetched, without calling
@@ -49,5 +57,7 @@ func (s *Service) CachedDashboard(ctx context.Context) (page DashboardPage, ok b
 	if err != nil || !ok {
 		return page, false, err
 	}
+	page.FetchedAt = e.FetchedAt
+	page.Stale = s.Now().Sub(e.FetchedAt) > dashboardMaxAge
 	return page, json.Unmarshal(e.Value, &page.Dashboard) == nil, nil
 }

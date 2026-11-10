@@ -5,22 +5,28 @@ import (
 	"github.com/Coombszy/scrutiny/internal/review"
 )
 
-// Dashboard renders at once from what is cached; the GitHub lists then
-// refresh themselves, since GitHub's search takes seconds.
+// Dashboard renders at once from what is cached. The GitHub lists are
+// fetched again only when missing or over ten minutes old, or on Refresh,
+// since GitHub's search takes seconds.
 templ Dashboard(d review.DashboardPage, cached bool) {
 	@Layout("Dashboard") {
 		<form class="open-pr" action="/open" method="get">
 			<input type="url" name="url" placeholder="Paste a GitHub pull request URL" required/>
 			<button type="submit">Open</button>
 		</form>
-		<div id="dashboard-lists" hx-get="/dashboard/lists" hx-trigger="load" hx-swap="outerHTML">
-			if cached {
-				@prList("Review requested", d.ReviewRequested)
-				@prList("Authored", d.Authored)
-			} else {
-				<p class="muted"><span class="spinner"></span> Loading your pull requests from GitHub…</p>
-			}
-		</div>
+		if !cached || d.Stale {
+			<div id="dashboard-lists" hx-get="/dashboard/lists" hx-trigger="load" hx-swap="outerHTML">
+				if cached {
+					@dashboardStatus(d, true)
+					@prList("Review requested", d.ReviewRequested)
+					@prList("Authored", d.Authored)
+				} else {
+					<p class="muted"><span class="spinner"></span> Loading your pull requests from GitHub…</p>
+				}
+			</div>
+		} else {
+			@DashboardLists(d)
+		}
 		<section class="pr-list">
 			<h2>Recently opened</h2>
 			if len(d.Recent) == 0 {
@@ -41,6 +47,7 @@ templ Dashboard(d review.DashboardPage, cached bool) {
 // DashboardLists are the freshly fetched GitHub lists.
 templ DashboardLists(d review.DashboardPage) {
 	<div id="dashboard-lists">
+		@dashboardStatus(d, false)
 		@prList("Review requested", d.ReviewRequested)
 		@prList("Authored", d.Authored)
 	</div>
@@ -64,4 +71,16 @@ templ prList(title string, prs []domain.PRSummary) {
 			}
 		</ul>
 	</section>
+}
+
+// dashboardStatus says when the lists were fetched, with a Refresh button.
+templ dashboardStatus(d review.DashboardPage, refreshing bool) {
+	<div class="dashboard-status muted">
+		if refreshing {
+			<span class="spinner"></span> Refreshing from GitHub… (last updated { ago(d.FetchedAt) })
+		} else {
+			Updated { ago(d.FetchedAt) }
+			<button hx-get="/dashboard/lists" hx-target="#dashboard-lists" hx-swap="outerHTML" hx-indicator="this">Refresh</button>
+		}
+	</div>
 }

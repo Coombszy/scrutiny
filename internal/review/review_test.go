@@ -279,3 +279,22 @@ func TestTheLastDashboardIsKeptForTheNextVisit(t *testing.T) {
 		t.Errorf("CachedDashboard = %+v, %v, %v", got, ok, err)
 	}
 }
+
+func TestTheDashboardIsStaleAfterTenMinutes(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	if _, err := f.svc.Dashboard(ctx); err != nil {
+		t.Fatal(err)
+	}
+	fetched := f.now
+
+	f.now = fetched.Add(9 * time.Minute)
+	got, _, _ := f.svc.CachedDashboard(ctx)
+	if got.Stale || !got.FetchedAt.Equal(fetched) {
+		t.Errorf("after 9 minutes: Stale %v, FetchedAt %v", got.Stale, got.FetchedAt)
+	}
+	f.now = fetched.Add(11 * time.Minute)
+	if got, _, _ := f.svc.CachedDashboard(ctx); !got.Stale {
+		t.Error("after 11 minutes: not Stale")
+	}
+}
