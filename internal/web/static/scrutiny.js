@@ -240,8 +240,9 @@ window.Scrutiny = { actions: {} };
   }
 })();
 
-// Code navigation: ctrl/cmd-click or right-click a head-side code cell
-// (data-line) to go to a definition or find usages; ctrl+k for Symbol Search.
+// Code navigation on a head-side code cell (data-line): ctrl/cmd+click goes
+// to the definition, ctrl/cmd+shift+click finds usages, and right-click
+// offers both; ctrl+k for Symbol Search.
 (() => {
   "use strict";
   const prPath = location.pathname.match(/^\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/)?.[0];
@@ -375,8 +376,14 @@ window.Scrutiny = { actions: {} };
       if (!pos) return;
       e.preventDefault();
       lastPoint = { x: e.clientX, y: e.clientY };
-      definition(pos);
+      (e.shiftKey ? usages : definition)(pos);
     }
+  });
+
+  // shift+mousedown would extend the text selection before ctrl/cmd+shift+click
+  // finds usages.
+  document.addEventListener("mousedown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.button === 0 && position(e)) e.preventDefault();
   });
 
   document.addEventListener("contextmenu", (e) => {
