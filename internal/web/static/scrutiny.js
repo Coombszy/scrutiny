@@ -338,22 +338,35 @@ window.Scrutiny = { actions: {} };
 
   // A small context menu of [label, action] items at a point.
   let lastPoint = { x: 0, y: 0 };
+  // The modifier for ctrl/cmd+click, as the platform writes it.
+  const mac = /Mac|iPhone|iPad/.test(navigator.platform);
+  const navMod = mac ? "⌘" : "Ctrl+";
+
+  // menu shows items [label, action, shortcut?] at a point, with any
+  // shortcut right-aligned.
   function menu(at, items) {
     closeMenu();
     const el = document.createElement("div");
     el.className = "context-menu";
-    for (const [label, action] of items) {
+    for (const [label, action, shortcut] of items) {
       const b = document.createElement("button");
-      b.textContent = label;
+      b.append(label);
+      if (shortcut) {
+        const hint = document.createElement("span");
+        hint.className = "hint";
+        hint.textContent = shortcut;
+        b.append(hint);
+      }
       b.addEventListener("click", () => {
         closeMenu();
         action();
       });
       el.append(b);
     }
-    el.style.left = `${Math.min(at.x, innerWidth - 220)}px`;
-    el.style.top = `${Math.min(at.y, innerHeight - 40 * items.length)}px`;
     document.body.append(el);
+    // Keep the menu on screen, measured now its shortcuts set its width.
+    el.style.left = `${Math.max(0, Math.min(at.x, innerWidth - el.offsetWidth - 8))}px`;
+    el.style.top = `${Math.max(0, Math.min(at.y, innerHeight - el.offsetHeight - 8))}px`;
   }
   function closeMenu() {
     document.querySelector(".context-menu")?.remove();
@@ -392,8 +405,8 @@ window.Scrutiny = { actions: {} };
     e.preventDefault();
     lastPoint = { x: e.clientX, y: e.clientY };
     menu(lastPoint, [
-      ["Go to definition", () => definition(pos)],
-      ["Find usages", () => usages(pos)],
+      ["Go to definition", () => definition(pos), `${navMod}Click`],
+      ["Find usages", () => usages(pos), `${navMod}${mac ? "⇧" : "Shift+"}Click`],
     ]);
   });
 
