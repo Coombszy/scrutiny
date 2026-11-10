@@ -46,17 +46,16 @@ templ Diff(c DiffContext, d review.DiffFile) {
 				} else {
 					<colgroup><col class="ln"/><col/><col class="ln"/><col/></colgroup>
 				}
-				for i, h := range d.Hunks {
-					if h.Gap != nil {
-						@expander(c, *h.Gap, hunkID(d.Path, i))
-					}
+				for _, h := range d.Hunks {
 					if h.Header != "" {
-						<tr class="hunk" id={ hunkID(d.Path, i) }><td colspan={ itoa(c.cols()) }>{ h.Header }</td></tr>
+						@hunkHeader(c, h.Header, h.Gap)
+					} else if h.Gap != nil {
+						@expander(c, *h.Gap)
 					}
 					@DiffRows(c, h.Lines)
 				}
 				if d.TailGap != nil {
-					@expander(c, *d.TailGap, "")
+					@expander(c, *d.TailGap)
 				}
 			</table>
 		}
@@ -113,42 +112,71 @@ templ DiffRows(c DiffContext, lines []review.DiffLine) {
 	}
 }
 
-// ExpandedRows are the lines a click on an expander reveals, with an
-// expander for whatever is still hidden on the side it remains. Once a gap
-// is fully open, the header of the hunk below it (hunk, when it has one)
-// is removed, since the lines now run on without a break.
-templ ExpandedRows(c DiffContext, lines []review.DiffLine, rest *review.Gap, restBefore bool, hunk string) {
+// ExpandedRows are the lines a click on a gap's controls reveals. When
+// the gap belongs to a hunk header, the header comes back at the break that
+// is left, with controls for the rest; once nothing is hidden it is gone,
+// as the lines now run on unbroken. A gap with no header (the end of the
+// file) gets a plain expander row for the rest instead.
+templ ExpandedRows(c DiffContext, lines []review.DiffLine, rest *review.Gap, restBefore bool, header string) {
 	if rest != nil && restBefore {
-		@expander(c, *rest, hunk)
+		@restRow(c, header, *rest)
 	}
 	@DiffRows(c, lines)
 	if rest != nil && !restBefore {
-		@expander(c, *rest, hunk)
-	}
-	if rest == nil && hunk != "" {
-		<tr id={ hunk } hx-swap-oob="delete"></tr>
+		@restRow(c, header, *rest)
 	}
 }
 
-// expander is a row standing in for unchanged lines left out of the diff.
-// Small gaps open whole; bigger ones a few lines at a time from either end
-// (only upwards at the top of the file, downwards at the bottom).
-templ expander(c DiffContext, g review.Gap, hunk string) {
-	<tr class="expander">
+templ restRow(c DiffContext, header string, rest review.Gap) {
+	if header != "" {
+		@hunkHeader(c, header, &rest)
+	} else {
+		@expander(c, rest)
+	}
+}
+
+// hunkHeader is a hunk's "@@ … @@" row, with the controls for the hidden
+// lines above it right-aligned on the same line.
+templ hunkHeader(c DiffContext, header string, gap *review.Gap) {
+	<tr class="hunk">
 		<td colspan={ itoa(c.cols()) }>
-			if g.Size() <= c.ExpandLines {
-				<button hx-get={ contextURL(c, g, review.All, hunk) } hx-target="closest tr" hx-swap="outerHTML">↕ Show { itoa(g.Size()) } lines</button>
-			} else {
-				if !g.First {
-					<button hx-get={ contextURL(c, g, review.Down, hunk) } hx-target="closest tr" hx-swap="outerHTML" title="Show the lines below the change above">↓ { itoa(c.ExpandLines) } lines</button>
+			<div class="hunk-line">
+				<span class="hunk-text">{ header }</span>
+				if gap != nil {
+					@expandActions(c, *gap, header)
 				}
-				<span class="muted">{ itoa(g.Size()) } hidden lines</span>
-				if !g.Last {
-					<button hx-get={ contextURL(c, g, review.Up, hunk) } hx-target="closest tr" hx-swap="outerHTML" title="Show the lines above the change below">↑ { itoa(c.ExpandLines) } lines</button>
-				}
-			}
+			</div>
 		</td>
 	</tr>
+}
+
+// expander is a row of its own for a gap no hunk header sits below: the
+// end of the file.
+templ expander(c DiffContext, g review.Gap) {
+	<tr class="expander">
+		<td colspan={ itoa(c.cols()) }>
+			@expandActions(c, g, "")
+		</td>
+	</tr>
+}
+
+// expandActions reveal a gap: small gaps open whole; bigger ones a few
+// lines at a time from either end (only upwards at the top of the file,
+// downwards at the bottom). Each replaces the row it is on.
+templ expandActions(c DiffContext, g review.Gap, header string) {
+	<span class="expand-actions">
+		if g.Size() <= c.ExpandLines {
+			<button hx-get={ contextURL(c, g, review.All, header) } hx-target="closest tr" hx-swap="outerHTML">↕ Show { itoa(g.Size()) } lines</button>
+		} else {
+			if !g.First {
+				<button hx-get={ contextURL(c, g, review.Down, header) } hx-target="closest tr" hx-swap="outerHTML" title="Show the lines below the change above">↓ { itoa(c.ExpandLines) } lines</button>
+			}
+			<span class="muted">{ itoa(g.Size()) } hidden lines</span>
+			if !g.Last {
+				<button hx-get={ contextURL(c, g, review.Up, header) } hx-target="closest tr" hx-swap="outerHTML" title="Show the lines above the change below">↑ { itoa(c.ExpandLines) } lines</button>
+			}
+		}
+	</span>
 }
 
 // addComment is a button that loads the new-thread form below its row; the

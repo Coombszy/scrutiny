@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -81,33 +80,41 @@ func TestFullFileShowsEveryLine(t *testing.T) {
 	}
 }
 
-func TestOpeningAGapFullyRemovesTheHunkHeaderBelowIt(t *testing.T) {
+func TestGapControlsSitOnTheHunkHeader(t *testing.T) {
 	a := newApp(t)
 	a.withLongParser()
 	a.do(t, http.MethodGet, prPath, nil)
 	body := a.do(t, http.MethodGet, fileURL(), nil).Body.String()
 
-	// The second hunk's header, and the gap above it that names it.
-	header := regexp.MustCompile(`<tr class="hunk" id="(hunk-[0-9a-f]+-1)">`).FindStringSubmatch(body)
-	if header == nil {
-		t.Fatalf("no id on the second hunk header:\n%s", body)
+	// The middle gap's controls are on the second hunk's header row.
+	row := body[strings.Index(body, "@@ -99,3 +100,3 @@"):]
+	row = row[:strings.Index(row, "</tr>")]
+	mustContain(t, row, `class="expand-actions"`, "↓ 64 lines", "88 hidden lines", "↑ 64 lines")
+	if n := strings.Count(body, `class="expander"`); n != 1 {
+		t.Errorf("%d standalone expander rows, want 1 (the end of the file)", n)
 	}
-	mustContain(t, body, "hunk="+header[1])
 
 	q := url.Values{"base": {string(mb)}, "head": {string(c2)}, "path": {"parser.go"}, "old": {"parser.go"}, "status": {"modified"},
-		"start": {"12"}, "end": {"99"}, "offset": {"-1"}, "hunk": {header[1]}}
-	q.Set("dir", "down")
-	partial := a.do(t, http.MethodGet, prPath+"/context?"+q.Encode(), nil).Body.String()
-	if strings.Contains(partial, `hx-swap-oob="delete"`) {
-		t.Error("removed the header while lines are still hidden")
-	}
-	mustContain(t, partial, "hunk="+header[1]) // the remaining gap still names it
-	q.Set("dir", "all")
-	whole := a.do(t, http.MethodGet, prPath+"/context?"+q.Encode(), nil).Body.String()
-	mustContain(t, whole, `<tr id="`+header[1]+`" hx-swap-oob="delete"></tr>`)
+		"start": {"12"}, "end": {"99"}, "offset": {"-1"}, "header": {"@@ -99,3 +100,3 @@"}}
 
-	q.Set("hunk", "nope; drop table")
-	if rec := a.do(t, http.MethodGet, prPath+"/context?"+q.Encode(), nil); rec.Code != http.StatusBadRequest {
-		t.Errorf("bad hunk id: status %d, want 400", rec.Code)
+	// Down: the shown lines, then the header (with the rest's controls) at the new break.
+	q.Set("dir", "down")
+	down := a.do(t, http.MethodGet, prPath+"/context?"+q.Encode(), nil).Body.String()
+	if !(strings.Index(down, `data-line="75"`) < strings.Index(down, "@@ -99,3 +100,3 @@")) {
+		t.Error("expanding down should put the header after the shown lines")
+	}
+	mustContain(t, down, "Show 24 lines")
+
+	// Up: the header (with the rest's controls), then the shown lines.
+	q.Set("dir", "up")
+	up := a.do(t, http.MethodGet, prPath+"/context?"+q.Encode(), nil).Body.String()
+	if !(strings.Index(up, "@@ -99,3 +100,3 @@") < strings.Index(up, `data-line="36"`)) {
+		t.Error("expanding up should put the header before the shown lines")
+	}
+
+	// All: no break is left, so no header.
+	q.Set("dir", "all")
+	if all := a.do(t, http.MethodGet, prPath+"/context?"+q.Encode(), nil).Body.String(); strings.Contains(all, "@@") {
+		t.Error("a fully opened gap kept its hunk header")
 	}
 }
