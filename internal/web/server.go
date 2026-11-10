@@ -30,6 +30,8 @@ type Deps struct {
 	Hub       *live.Hub // live updates for open pages
 	Servers   *servers.Service
 	ThemesDir string // drop-in Themes; may be empty
+	// Dev relaxes the Content-Security-Policy for a live-reload proxy.
+	Dev bool
 }
 
 // Server serves the UI.
@@ -40,6 +42,7 @@ type Server struct {
 	hub       *live.Hub
 	servers   *servers.Service
 	themesDir string
+	dev       bool
 	mux       *http.ServeMux
 }
 
@@ -47,7 +50,7 @@ type Server struct {
 func NewServer(d Deps) *Server {
 	s := &Server{
 		csrfToken: d.CSRFToken, review: d.Review, settings: d.Settings, hub: d.Hub, servers: d.Servers,
-		themesDir: d.ThemesDir, mux: http.NewServeMux(),
+		themesDir: d.ThemesDir, dev: d.Dev, mux: http.NewServeMux(),
 	}
 	static, _ := fs.Sub(staticFS, "static")
 	s.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
@@ -69,6 +72,9 @@ func NewServer(d Deps) *Server {
 
 // Handler returns the root handler with the security middleware applied.
 func (s *Server) Handler() http.Handler {
+	if s.dev {
+		return secure(s.mux, s.csrfToken, devContentSecurityPolicy)
+	}
 	return Secure(s.mux, s.csrfToken)
 }
 

@@ -74,3 +74,16 @@ func TestSecureRequiresCSRFTokenOnMutatingRequests(t *testing.T) {
 		})
 	}
 }
+
+func TestOnlyDevModeAllowsInlineScripts(t *testing.T) {
+	for dev, want := range map[bool]bool{false: false, true: true} {
+		h := web.NewServer(web.Deps{CSRFToken: token, Dev: dev}).Handler()
+		req := httptest.NewRequest(http.MethodGet, "/static/scrutiny.css", nil)
+		req.Host = "127.0.0.1:7878"
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if got := strings.Contains(rec.Header().Get("Content-Security-Policy"), "'unsafe-inline'; style-src"); got != want {
+			t.Errorf("dev=%v: inline scripts allowed = %v, want %v (CSP %q)", dev, got, want, rec.Header().Get("Content-Security-Policy"))
+		}
+	}
+}

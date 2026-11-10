@@ -14,6 +14,11 @@ import (
 const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
 	"img-src 'self' https: data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
 
+// devContentSecurityPolicy also allows inline scripts, which a live-reload
+// proxy (air, for `just run-live`) injects. Never use it outside development.
+const devContentSecurityPolicy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+	"img-src 'self' https: data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+
 // NewCSRFToken returns a random per-process CSRF token.
 func NewCSRFToken() string {
 	b := make([]byte, 32)
@@ -26,6 +31,10 @@ func NewCSRFToken() string {
 // defence), and every mutating request must carry the CSRF token in the
 // X-CSRF-Token header or a csrf_token form field.
 func Secure(next http.Handler, csrfToken string) http.Handler {
+	return secure(next, csrfToken, contentSecurityPolicy)
+}
+
+func secure(next http.Handler, csrfToken, csp string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !isLoopback(r.Host) {
 			http.Error(w, "forbidden host", http.StatusForbidden)
@@ -48,7 +57,7 @@ func Secure(next http.Handler, csrfToken string) http.Handler {
 				return
 			}
 		}
-		w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
+		w.Header().Set("Content-Security-Policy", csp)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		next.ServeHTTP(w, r)
 	})

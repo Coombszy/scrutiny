@@ -2,7 +2,10 @@ module github.com/Coombszy/scrutiny
 
 go 1.27.0
 
-tool github.com/a-h/templ/cmd/templ
+tool (
+	github.com/a-h/templ/cmd/templ
+	github.com/air-verse/air
+)
 
 require (
 	github.com/a-h/templ v0.3.1100
@@ -12,18 +15,28 @@ require (
 )
 
 require (
+	dario.cat/mergo v1.0.2 // indirect
 	github.com/a-h/parse v0.0.0-20250122154542-74294addb73e // indirect
+	github.com/air-verse/air v1.67.4 // indirect
 	github.com/andybalholm/brotli v1.2.7 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
+	github.com/bep/godartsass/v2 v2.5.0 // indirect
+	github.com/bep/golibsass v1.2.0 // indirect
+	github.com/bits-and-blooms/bitset v1.24.5 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cli/browser v1.3.0 // indirect
 	github.com/cli/safeexec v1.0.1 // indirect
 	github.com/cli/shurcooL-graphql v0.0.4 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/fatih/color v1.19.0 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
+	github.com/gobwas/glob v0.2.3 // indirect
+	github.com/gohugoio/hashstructure v0.6.0 // indirect
+	github.com/gohugoio/hugo v0.164.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/henvic/httpretty v0.2.0 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
@@ -32,8 +45,12 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/natefinch/atomic v1.0.1 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
+	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/spf13/afero v1.15.0 // indirect
+	github.com/spf13/cast v1.10.0 // indirect
+	github.com/tdewolff/parse/v2 v2.8.12 // indirect
 	github.com/thlib/go-timezone-local v0.0.9 // indirect
 	github.com/tree-sitter-grammars/tree-sitter-markdown v0.5.3 // indirect
 	github.com/tree-sitter-grammars/tree-sitter-yaml v0.7.2 // indirect
@@ -48,6 +65,7 @@ require (
 	golang.org/x/term v0.47.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/tools v0.52.0 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/libc v1.80.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect

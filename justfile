@@ -21,3 +21,7 @@ vet: generate
 # Build and run `scrutiny serve`
 run *args: build
     ./bin/scrutiny serve {{args}}
+
+# Run with live reload (air): rebuilds and restarts on changes, reloads the browser
+run-live:
+    go tool air

@@ -40,17 +40,18 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 || args[0] != "serve" {
-		return errors.New("usage: scrutiny serve [-port N]")
+		return errors.New("usage: scrutiny serve [-port N] [-dev]")
 	}
 	fl := flag.NewFlagSet("serve", flag.ContinueOnError)
 	port := fl.Int("port", 0, "port to listen on, overriding the config file (127.0.0.1 only)")
+	dev := fl.Bool("dev", false, "allow inline scripts, for a live-reload proxy (just run-live)")
 	if err := fl.Parse(args[1:]); err != nil {
 		return err
 	}
-	return serve(*port)
+	return serve(*port, *dev)
 }
 
-func serve(portOverride int) error {
+func serve(portOverride int, dev bool) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -106,7 +107,7 @@ func serve(portOverride int) error {
 	srv := &http.Server{
 		Handler: web.NewServer(web.Deps{
 			CSRFToken: web.NewCSRFToken(), Review: svc, Settings: settings, Hub: hub,
-			Servers: languageServers, ThemesDir: filepath.Join(dirs.Config, "themes"),
+			Servers: languageServers, ThemesDir: filepath.Join(dirs.Config, "themes"), Dev: dev,
 		}).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		// Requests share ctx so that open event streams end on shutdown.
