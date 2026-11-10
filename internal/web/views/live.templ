@@ -25,8 +25,8 @@ templ LiveUpdate(pr domain.PRRef, u review.Update) {
 	if u.Checks != nil {
 		@statusBox(*u.Checks, true)
 	}
-	if u.Indexing != nil {
-		@IndexingSpinner(*u.Indexing, true)
+	if u.Languages != nil {
+		@LSPStatus(u.Languages, true)
 	}
 }
 

@@ -110,33 +110,82 @@ func TestSymbolsMatchAcrossTheWorkspace(t *testing.T) {
 	}
 }
 
-func TestIndexingIsReportedUntilTheServerIsReady(t *testing.T) {
+func TestWarmingStartsAServerThatBecomesReady(t *testing.T) {
 	m, ws := newManager(t, time.Minute), module(t)
 	var (
 		mu     sync.Mutex
-		states []bool
+		phases []navigator.Phase
 	)
-	m.OnIndexing(func(w navigator.Workspace, indexing bool) {
+	m.OnState(func(w navigator.Workspace, st navigator.ServerState) {
 		mu.Lock()
 		defer mu.Unlock()
-		if w == ws {
-			states = append(states, indexing)
+		if w == ws && (len(phases) == 0 || phases[len(phases)-1] != st.Phase) {
+			phases = append(phases, st.Phase)
 		}
 	})
-	if m.Indexing(ws) {
-		t.Error("Indexing before any request")
+	if st := m.State(ws); st.Phase != navigator.Stopped {
+		t.Errorf("before warming: %+v", st)
 	}
 
-	if _, err := m.Definition(ctx(t), ws, "main.go", navigator.Position{Line: 6, Col: 14}); err != nil {
+	start := time.Now()
+	if err := m.Warm(ctx(t), ws); err != nil {
 		t.Fatal(err)
+	}
+	if time.Since(start) > 500*time.Millisecond {
+		t.Errorf("Warm took %v; it should not wait for the server", time.Since(start))
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for m.State(ws).Phase != navigator.Ready && time.Now().Before(deadline) {
+		time.Sleep(50 * time.Millisecond)
+	}
+	if st := m.State(ws); st.Phase != navigator.Ready || st.Server != "gopls" {
+		t.Fatalf("after warming: %+v", st)
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if len(states) < 2 || !states[0] || states[len(states)-1] {
-		t.Errorf("indexing transitions = %v, want true … false", states)
+	if len(phases) < 2 || phases[0] != navigator.Starting || phases[len(phases)-1] != navigator.Ready {
+		t.Errorf("phases = %v, want starting … ready", phases)
 	}
-	if m.Indexing(ws) {
-		t.Error("still Indexing after answering")
+}
+
+func TestOnlyLanguagesWithAServerAreAvailable(t *testing.T) {
+	m := newManager(t, time.Minute)
+	if !m.Available("go") || m.Available("cobol") {
+		t.Errorf("Available(go) = %v, Available(cobol) = %v", m.Available("go"), m.Available("cobol"))
+	}
+	if err := m.Warm(context.Background(), navigator.Workspace{Root: t.TempDir(), Language: "cobol"}); !errors.Is(err, navigator.ErrNoServer) {
+		t.Errorf("Warm(cobol) = %v, want ErrNoServer", err)
+	}
+}
+
+func TestAServerThatCannotStartIsFailed(t *testing.T) {
+	m := lsp.NewManager(lsp.Static(map[string][]string{"go": {filepath.Join(t.TempDir(), "no-such-server")}}), time.Minute)
+	t.Cleanup(m.Close)
+	ws := module(t)
+	var (
+		mu   sync.Mutex
+		last navigator.ServerState
+	)
+	m.OnState(func(w navigator.Workspace, st navigator.ServerState) {
+		mu.Lock()
+		defer mu.Unlock()
+		last = st
+	})
+	m.Warm(ctx(t), ws)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		mu.Lock()
+		failed := last.Phase == navigator.Failed
+		mu.Unlock()
+		if failed || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if last.Phase != navigator.Failed || last.Err == "" {
+		t.Errorf("last state = %+v, want failed with a reason", last)
 	}
 }
 

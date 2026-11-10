@@ -136,3 +136,13 @@ func TestReviewAndCommentNavigationSitOnTheFilesChangedLine(t *testing.T) {
 		t.Error("more than one Review button")
 	}
 }
+
+func TestTheHelpHintSitsWithTheIconsOnTheRight(t *testing.T) {
+	a := newApp(t)
+	page := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	end := page[strings.Index(page, `class="topbar-end"`):]
+	mustContain(t, end[:strings.Index(end, `id="lsp-status"`)], `id="help-hint"`, "<kbd>?</kbd> for keyboard shortcuts")
+	if strings.Contains(page, "Press <kbd>") {
+		t.Error("the hint still says Press")
+	}
+}

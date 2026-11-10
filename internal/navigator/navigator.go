@@ -41,14 +41,39 @@ type Symbol struct {
 	Location
 }
 
+// Phase is where a Workspace's Language Server is in its life.
+type Phase string
+
+const (
+	Stopped  Phase = "stopped"  // not running; it starts when needed
+	Starting Phase = "starting" // launching and initialising
+	Indexing Phase = "indexing" // running, but not yet able to answer
+	Ready    Phase = "ready"
+	Failed   Phase = "failed" // could not start; see Err
+)
+
+// ServerState is a Workspace's Language Server's Phase.
+type ServerState struct {
+	Phase  Phase
+	Server string // the server's executable name, e.g. "gopls"
+	Err    string // why it Failed
+}
+
+// Busy reports whether the server is on its way to Ready.
+func (s ServerState) Busy() bool { return s.Phase == Starting || s.Phase == Indexing }
+
 // Navigator answers code navigation queries.
 type Navigator interface {
 	Definition(ctx context.Context, ws Workspace, path string, pos Position) ([]Location, error)
 	References(ctx context.Context, ws Workspace, path string, pos Position) ([]Location, error)
 	Symbols(ctx context.Context, ws Workspace, query string) ([]Symbol, error)
-	// Indexing reports whether the Workspace's server is running but not
-	// yet able to answer.
-	Indexing(ws Workspace) bool
+	// Available reports whether a Language Server exists for language.
+	Available(language string) bool
+	// Warm starts the Workspace's server in the background so it has
+	// indexed before the first query; ErrNoServer when there is none.
+	Warm(ctx context.Context, ws Workspace) error
+	// State reports the Workspace's server's Phase.
+	State(ws Workspace) ServerState
 	// Reset stops the Workspace's server, e.g. after its files changed on
 	// disk; the next query starts a fresh one.
 	Reset(ws Workspace)

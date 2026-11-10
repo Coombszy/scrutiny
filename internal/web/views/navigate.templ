@@ -5,20 +5,28 @@ import (
 	"github.com/Coombszy/scrutiny/internal/review"
 )
 
-// IndexingSpinner shows, top right, while a Language Server is Indexing.
-templ IndexingSpinner(indexing bool, oob bool) {
+// LSPStatus is the top bar's Language Server icon: a ring spins round it
+// while a server for the PR starts or indexes, a green tick shows once all
+// are ready, and hovering says what each is doing.
+templ LSPStatus(langs []review.LanguageStatus, oob bool) {
 	<span
-		id="indexing"
-		class="indexing"
+		id="lsp-status"
+		class={ "lsp-status", "lsp-" + lspOverall(langs) }
 		if oob {
 			hx-swap-oob="true"
 		}
-		if !indexing {
-			hidden
-		}
-		title="A Language Server is indexing this pull request; navigation answers once it is ready"
+		title={ lspTooltip(langs) }
+		role="status"
+		aria-label={ lspTooltip(langs) }
 	>
-		<span class="spinner"></span> Indexing
+		<svg class="lsp-ring" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="12.5"></circle></svg>
+		<svg class="lsp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"></path>
+			<path d="M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"></path>
+			<circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"></circle>
+		</svg>
+		<svg class="lsp-badge lsp-tick" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="6"></circle><path d="M3.3 6.2l1.8 1.8 3.6-3.8"></path></svg>
+		<svg class="lsp-badge lsp-cross" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="6"></circle><path d="M4 4l4 4M8 4l-4 4"></path></svg>
 	</span>
 }
 

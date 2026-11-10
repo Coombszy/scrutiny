@@ -20,10 +20,11 @@ type Fake struct {
 	Definitions map[Query][]Location
 	Refs        map[Query][]Location
 	AllSymbols  []Symbol
-	Busy        map[Workspace]bool
+	States      map[Workspace]ServerState
 	// Calls records the Workspace of every query; Resets every Reset.
 	Calls  []Workspace
 	Resets []Workspace
+	Warmed []Workspace
 }
 
 var _ Navigator = (*Fake)(nil)
@@ -33,7 +34,7 @@ func NewFake() *Fake {
 		Languages:   map[string]bool{"go": true},
 		Definitions: map[Query][]Location{},
 		Refs:        map[Query][]Location{},
-		Busy:        map[Workspace]bool{},
+		States:      map[Workspace]ServerState{},
 	}
 }
 
@@ -72,10 +73,33 @@ func (f *Fake) Symbols(_ context.Context, ws Workspace, _ string) ([]Symbol, err
 	return f.AllSymbols, nil
 }
 
-func (f *Fake) Indexing(ws Workspace) bool {
+func (f *Fake) Available(language string) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.Busy[ws]
+	return f.Languages[language]
+}
+
+// Warm records the Workspace and reports it Starting, as a real server would.
+func (f *Fake) Warm(_ context.Context, ws Workspace) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.Languages[ws.Language] {
+		return fmt.Errorf("%w for %s", ErrNoServer, ws.Language)
+	}
+	f.Warmed = append(f.Warmed, ws)
+	if _, ok := f.States[ws]; !ok {
+		f.States[ws] = ServerState{Phase: Starting, Server: ws.Language + "-server"}
+	}
+	return nil
+}
+
+func (f *Fake) State(ws Workspace) ServerState {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if st, ok := f.States[ws]; ok {
+		return st
+	}
+	return ServerState{Phase: Stopped}
 }
 
 func (f *Fake) Reset(ws Workspace) {

@@ -31,6 +31,13 @@ type Deps struct {
 	Settings    settings.Store
 	Navigator   navigator.Navigator // optional: code navigation is off without it
 	Now         func() time.Time
+	// Background runs work the page should not wait for, such as warming
+	// Language Servers; it defaults to a new goroutine.
+	Background func(func())
+	// OnLanguageStatus, if set, is told when a PR's LanguageStatus changes
+	// because of work done here (its servers' own changes come from the
+	// Navigator).
+	OnLanguageStatus func(domain.PRRef)
 }
 
 // Service loads PRs and their diffs.
@@ -42,6 +49,9 @@ type Service struct {
 func NewService(d Deps) *Service {
 	if d.Now == nil {
 		d.Now = time.Now
+	}
+	if d.Background == nil {
+		d.Background = func(fn func()) { go fn() }
 	}
 	return &Service{Deps: d}
 }
@@ -135,6 +145,9 @@ func (s *Service) PRPage(ctx context.Context, ref domain.PRRef, req ComparisonRe
 	snap, err := s.readFresh(ctx, ref, pr.HeadSHA, mergeBase)
 	if err != nil {
 		return PRPage{}, err
+	}
+	if pr.State != domain.Closed && pr.State != domain.Merged && !snap.Offline {
+		s.warmFor(ref, snap)
 	}
 	page := PRPage{
 		PR: pr, Commits: commits, Comparison: cmp, MergeBase: mergeBase, Files: files,

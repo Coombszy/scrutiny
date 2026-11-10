@@ -5,11 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"path"
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/highlight"
@@ -49,18 +51,21 @@ type Reference struct {
 	Text string
 }
 
-// workspaces tracks the Language Server Workspaces opened for each PR and
-// the head their worktree was at.
+// workspaces tracks the Language Server Workspaces opened for each PR, the
+// head their worktree was at, and PRs whose worktree is being prepared.
 type workspaces struct {
-	mu    sync.Mutex
-	heads map[domain.PRRef]domain.SHA
-	open  map[domain.PRRef]map[navigator.Workspace]bool
+	move      sync.Mutex // held while the worktree is created or moved
+	mu        sync.Mutex // guards the maps; never held across slow work
+	heads     map[domain.PRRef]domain.SHA
+	open      map[domain.PRRef]map[navigator.Workspace]bool
+	preparing map[domain.PRRef]bool
 }
 
 func (w *workspaces) init() {
 	if w.heads == nil {
 		w.heads = map[domain.PRRef]domain.SHA{}
 		w.open = map[domain.PRRef]map[navigator.Workspace]bool{}
+		w.preparing = map[domain.PRRef]bool{}
 	}
 }
 
@@ -92,14 +97,17 @@ func validPath(p string) bool {
 
 func (s *Service) workspaceFor(ctx context.Context, ref domain.PRRef, snap snapshot, lang string) (navigator.Workspace, snapshot, error) {
 	// Held across the worktree move so concurrent requests cannot move it
-	// back and forth.
-	s.ws.mu.Lock()
-	defer s.ws.mu.Unlock()
+	// back and forth; the bookkeeping lock is only taken afterwards, so
+	// status reads never wait on git.
+	s.ws.move.Lock()
+	defer s.ws.move.Unlock()
 	dir, err := s.Repos.Worktree(ctx, ref, snap.Head)
 	if err != nil {
 		return navigator.Workspace{}, snapshot{}, err
 	}
 	ws := navigator.Workspace{Root: dir, Language: lang}
+	s.ws.mu.Lock()
+	defer s.ws.mu.Unlock()
 	s.ws.init()
 	if head, ok := s.ws.heads[ref]; ok && head != snap.Head {
 		for open := range s.ws.open[ref] {
@@ -127,20 +135,120 @@ func (s *Service) WorkspacePR(ws navigator.Workspace) (domain.PRRef, bool) {
 	return domain.PRRef{}, false
 }
 
-// Indexing reports whether any of the PR's Language Servers is indexing.
-func (s *Service) Indexing(ref domain.PRRef) bool {
+// LanguageStatus is a language the PR's changed files are in, and the state
+// of the Language Server for it.
+type LanguageStatus struct {
+	Language string
+	navigator.ServerState
+	Unavailable bool // no Language Server is installed or on $PATH for it
+}
+
+// LanguageStatus reports, for each language among the PR's changed files
+// (merge base to head, as last read), whether its Language Server is
+// starting, indexing, ready, stopped, failed or unavailable.
+func (s *Service) LanguageStatus(ctx context.Context, ref domain.PRRef) []LanguageStatus {
+	if s.Navigator == nil {
+		return nil
+	}
+	snap, ok, err := s.cachedSnapshot(ctx, ref)
+	if err != nil || !ok {
+		return nil
+	}
+	langs, err := s.prLanguages(ctx, ref, snap)
+	if err != nil {
+		return nil
+	}
 	s.ws.mu.Lock()
-	defer s.ws.mu.Unlock()
+	s.ws.init()
+	preparing := s.ws.preparing[ref]
+	open := map[string]navigator.Workspace{}
 	for ws := range s.ws.open[ref] {
-		if s.Navigator.Indexing(ws) {
-			return true
+		open[ws.Language] = ws
+	}
+	s.ws.mu.Unlock()
+
+	out := make([]LanguageStatus, 0, len(langs))
+	for _, lang := range langs {
+		st := LanguageStatus{Language: lang}
+		switch ws, ok := open[lang]; {
+		case !s.Navigator.Available(lang):
+			st.Unavailable = true
+		case ok:
+			st.ServerState = s.Navigator.State(ws)
+		case preparing:
+			st.ServerState = navigator.ServerState{Phase: navigator.Starting}
+		default:
+			// Not started for this PR: ask for the server it would use.
+			st.ServerState = s.Navigator.State(navigator.Workspace{Language: lang})
+			st.Phase = navigator.Stopped
+		}
+		out = append(out, st)
+	}
+	return out
+}
+
+// prLanguages are the languages of the PR's changed files, sorted.
+func (s *Service) prLanguages(ctx context.Context, ref domain.PRRef, snap snapshot) ([]string, error) {
+	changed, err := s.prChanges(ctx, ref, snap)
+	if err != nil {
+		return nil, err
+	}
+	set := map[string]bool{}
+	for p, c := range changed {
+		if l := Language(p); l != "" && c.Status != domain.Deleted {
+			set[l] = true
 		}
 	}
-	return false
+	return slices.Sorted(maps.Keys(set)), nil
+}
+
+// warmFor starts, in the background, the Language Servers for the PR's
+// languages that have one, so they have indexed by the time they are
+// needed. PRs with no such language are left without a worktree.
+func (s *Service) warmFor(ref domain.PRRef, snap snapshot) {
+	if s.Navigator == nil {
+		return
+	}
+	langs, err := s.prLanguages(context.Background(), ref, snap)
+	if err != nil {
+		return
+	}
+	langs = slices.DeleteFunc(langs, func(l string) bool { return !s.Navigator.Available(l) })
+	if len(langs) == 0 {
+		return
+	}
+	s.setPreparing(ref, true)
+	s.Background(func() {
+		defer s.setPreparing(ref, false)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		for _, lang := range langs {
+			ws, _, err := s.workspaceFor(ctx, ref, snap, lang)
+			if err != nil {
+				slog.Warn("preparing worktree", "pr", ref, "err", err)
+				return
+			}
+			if err := s.Navigator.Warm(ctx, ws); err != nil {
+				slog.Warn("warming language server", "pr", ref, "language", lang, "err", err)
+			}
+		}
+	})
+}
+
+func (s *Service) setPreparing(ref domain.PRRef, on bool) {
+	s.ws.mu.Lock()
+	s.ws.init()
+	s.ws.preparing[ref] = on
+	s.ws.mu.Unlock()
+	if s.OnLanguageStatus != nil {
+		s.OnLanguageStatus(ref)
+	}
 }
 
 // closeWorkspaces stops the PR's servers and removes its worktree.
 func (s *Service) closeWorkspaces(ctx context.Context, ref domain.PRRef) error {
+	s.ws.move.Lock()
+	defer s.ws.move.Unlock()
 	if s.Navigator == nil {
 		return s.Repos.RemoveWorktree(ctx, ref)
 	}

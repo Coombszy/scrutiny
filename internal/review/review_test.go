@@ -62,6 +62,7 @@ func newFixture(t *testing.T) *fixture {
 		Settings:    f.settings,
 		Navigator:   f.nav,
 		Now:         func() time.Time { return f.now },
+		Background:  func(fn func()) { fn() }, // run warm-ups inline so tests can see them
 	})
 	return f
 }

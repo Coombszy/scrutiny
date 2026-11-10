@@ -199,8 +199,25 @@ details.status-row { display: block; }
 
 /* Code navigation */
 .topbar-hint { font-size: var(--fs-sm); }
-.indexing { margin-left: auto; display: inline-flex; gap: .4rem; align-items: center; color: var(--fg-dim); font-size: var(--fs-sm); }
-.indexing[hidden] { display: none; }
+/* The top bar's right-hand group: Language Server icon, settings cog, activity. */
+.topbar-end { margin-left: auto; display: inline-flex; gap: 1rem; align-items: center; }
+
+/* Language Server status: a ring spins while starting or indexing; a badge
+   shows ready (tick) or failed (cross). */
+.lsp-status { position: relative; display: inline-flex; width: 20px; height: 20px; color: var(--fg-dim); cursor: help; }
+.lsp-icon { width: 20px; height: 20px; }
+.lsp-ring { position: absolute; inset: -4px; width: 28px; height: 28px; fill: none; stroke: var(--yellow); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 20 60; opacity: 0; }
+.lsp-busy .lsp-ring { opacity: 1; animation: spin .9s linear infinite; }
+.lsp-busy .lsp-icon { color: var(--fg); }
+.lsp-ready .lsp-icon { color: var(--fg); }
+.lsp-badge { position: absolute; right: -5px; bottom: -4px; width: 11px; height: 11px; display: none; }
+.lsp-badge path { fill: none; stroke: var(--bg0); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.lsp-tick circle { fill: var(--green); }
+.lsp-cross circle { fill: var(--red); }
+.lsp-ready .lsp-tick, .lsp-failed .lsp-cross { display: block; }
+
+/* While a navigation query waits on the Language Server. */
+body.lsp-waiting, body.lsp-waiting * { cursor: progress !important; }
 .spinner { width: .9rem; height: .9rem; border: 2px solid var(--bg2); border-top-color: var(--yellow); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -257,8 +274,6 @@ tr:target td { background: rgba(250, 189, 47, .18); }
   .settings-form label { flex-wrap: wrap; gap: .3rem; }
   .settings-form label > span:first-child { flex-basis: 100%; }
 }
-.indexing:not([hidden]) + .topbar-link { margin-left: 1rem; }
-.indexing[hidden] + .topbar-link { margin-left: auto; }
 .server-list { display: flex; flex-direction: column; max-width: 60rem; }
 .server { display: flex; gap: 1rem; justify-content: space-between; align-items: center; padding: .6rem 0; border-bottom: 1px solid var(--bg1); }
 .server-info { flex: 1 1 auto; min-width: 0; }

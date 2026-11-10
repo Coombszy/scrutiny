@@ -23,11 +23,12 @@ type Manager struct {
 	command func(language string) []string // nil when no server is available
 	idle    time.Duration
 
-	mu         sync.Mutex
-	servers    map[navigator.Workspace]*server
-	onIndexing func(navigator.Workspace, bool)
-	done       chan struct{}
-	closeOnce  sync.Once
+	mu        sync.Mutex
+	servers   map[navigator.Workspace]*server
+	failures  map[navigator.Workspace]navigator.ServerState // the last failed start, until the next try
+	onState   func(navigator.Workspace, navigator.ServerState)
+	done      chan struct{}
+	closeOnce sync.Once
 }
 
 var _ navigator.Navigator = (*Manager)(nil)
@@ -36,7 +37,8 @@ var _ navigator.Navigator = (*Manager)(nil)
 // Workspace, looked up each time a server starts so newly installed servers
 // are picked up, and stops servers unused for idle.
 func NewManager(command func(language string) []string, idle time.Duration) *Manager {
-	m := &Manager{command: command, idle: idle, servers: map[navigator.Workspace]*server{}, done: make(chan struct{})}
+	m := &Manager{command: command, idle: idle, servers: map[navigator.Workspace]*server{},
+		failures: map[navigator.Workspace]navigator.ServerState{}, done: make(chan struct{})}
 	go m.reap()
 	return m
 }
@@ -46,11 +48,57 @@ func Static(commands map[string][]string) func(string) []string {
 	return func(language string) []string { return commands[language] }
 }
 
-// OnIndexing registers fn to be told when a Workspace's Indexing changes.
-func (m *Manager) OnIndexing(fn func(navigator.Workspace, bool)) {
+// OnState registers fn to be told whenever a Workspace's server changes
+// Phase.
+func (m *Manager) OnState(fn func(navigator.Workspace, navigator.ServerState)) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.onIndexing = fn
+	m.onState = fn
+}
+
+func (m *Manager) Available(language string) bool { return len(m.command(language)) > 0 }
+
+// State reports the Workspace's server: running, failed to start, or
+// stopped (it starts on the next query).
+func (m *Manager) State(ws navigator.Workspace) navigator.ServerState {
+	m.mu.Lock()
+	s, ok := m.servers[ws]
+	failed, hasFailed := m.failures[ws]
+	m.mu.Unlock()
+	switch {
+	case ok:
+		return s.state()
+	case hasFailed:
+		return failed
+	}
+	st := navigator.ServerState{Phase: navigator.Stopped}
+	if argv := m.command(ws.Language); len(argv) > 0 {
+		st.Server = filepath.Base(argv[0])
+	}
+	return st
+}
+
+// Warm starts the Workspace's server without waiting for it, then asks it a
+// trivial symbol query: answering marks it Ready even if it never reports
+// its indexing progress.
+func (m *Manager) Warm(_ context.Context, ws navigator.Workspace) error {
+	if !m.Available(ws.Language) {
+		return fmt.Errorf("%w for %s", navigator.ErrNoServer, ws.Language)
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		s, err := m.server(ctx, ws)
+		if err != nil {
+			return
+		}
+		defer s.release()
+		var found json.RawMessage
+		if s.conn.call(ctx, "workspace/symbol", map[string]string{"query": "scrutiny-warm-up"}, &found) == nil {
+			s.answered()
+		}
+	}()
+	return nil
 }
 
 // Running reports whether ws has a live server.
@@ -59,13 +107,6 @@ func (m *Manager) Running(ws navigator.Workspace) bool {
 	defer m.mu.Unlock()
 	_, ok := m.servers[ws]
 	return ok
-}
-
-func (m *Manager) Indexing(ws navigator.Workspace) bool {
-	m.mu.Lock()
-	s, ok := m.servers[ws]
-	m.mu.Unlock()
-	return ok && s.isIndexing()
 }
 
 func (m *Manager) Reset(ws navigator.Workspace) {
@@ -155,9 +196,10 @@ func (m *Manager) server(ctx context.Context, ws navigator.Workspace) (*server, 
 			return nil, fmt.Errorf("%w for %s", navigator.ErrNoServer, ws.Language)
 		}
 		s = newServer(ws, argv)
-		s.setIndex = func(indexing bool) { m.notify(s, indexing) }
+		s.notify = func(st navigator.ServerState) { m.notify(s, st) }
 		s.onExit = func() { m.forget(s) }
 		m.servers[ws] = s
+		delete(m.failures, ws)
 		go s.start()
 	}
 	s.acquire()
@@ -174,6 +216,7 @@ func (m *Manager) server(ctx context.Context, ws navigator.Workspace) (*server, 
 		m.mu.Lock()
 		if m.servers[ws] == s {
 			delete(m.servers, ws)
+			m.failures[ws] = s.state()
 		}
 		m.mu.Unlock()
 		return nil, s.err
@@ -181,15 +224,15 @@ func (m *Manager) server(ctx context.Context, ws navigator.Workspace) (*server, 
 	return s, nil
 }
 
-// notify reports s's Indexing, unless s has been replaced: a stopping
-// server must not hide the spinner for its successor.
-func (m *Manager) notify(s *server, indexing bool) {
+// notify reports s's state, unless s has been replaced: a stopping server
+// must not overwrite its successor's state.
+func (m *Manager) notify(s *server, st navigator.ServerState) {
 	m.mu.Lock()
-	fn := m.onIndexing
+	fn := m.onState
 	current, ok := m.servers[s.ws]
 	m.mu.Unlock()
 	if fn != nil && (!ok || current == s) {
-		fn(s.ws, indexing)
+		fn(s.ws, st)
 	}
 }
 
@@ -201,7 +244,9 @@ func (m *Manager) forget(s *server) {
 		delete(m.servers, s.ws)
 	}
 	m.mu.Unlock()
-	s.setIndexing(false)
+	if s.state().Phase != navigator.Failed {
+		s.setPhase(navigator.Stopped)
+	}
 }
 
 // reap stops servers that have been idle for longer than m.idle.
@@ -231,10 +276,10 @@ func (m *Manager) reap() {
 
 // server is one running Language Server process.
 type server struct {
-	ws       navigator.Workspace
-	argv     []string
-	setIndex func(bool)
-	onExit   func()
+	ws     navigator.Workspace
+	argv   []string
+	notify func(navigator.ServerState)
+	onExit func()
 
 	exited   chan struct{} // closed once the process has been waited for
 	waitOnce sync.Once
@@ -249,7 +294,8 @@ type server struct {
 	lastUsed time.Time
 	opened   map[string]bool
 	progress map[string]bool // active $/progress tokens
-	indexing bool
+	phase    navigator.Phase
+	errText  string
 }
 
 func newServer(ws navigator.Workspace, argv []string) *server {
@@ -267,11 +313,16 @@ func (s *server) wait() {
 
 func (s *server) start() {
 	defer close(s.ready)
-	s.setIndexing(true)
+	s.setPhase(navigator.Starting)
 	if err := s.launch(); err != nil {
 		s.err = fmt.Errorf("start %s: %w", s.argv[0], err)
-		s.setIndexing(false)
+		s.mu.Lock()
+		s.errText = s.err.Error()
+		s.mu.Unlock()
+		s.setPhase(navigator.Failed)
+		return
 	}
+	s.setPhase(navigator.Indexing)
 }
 
 func (s *server) launch() error {
@@ -348,8 +399,15 @@ func (s *server) handleNotification(method string, params json.RawMessage) {
 		delete(s.progress, string(p.Token))
 	}
 	active := len(s.progress) > 0
+	starting := s.phase == navigator.Starting
 	s.mu.Unlock()
-	s.setIndexing(active)
+	switch {
+	case starting: // still initialising: Indexing follows launch
+	case active:
+		s.setPhase(navigator.Indexing)
+	default:
+		s.setPhase(navigator.Ready)
+	}
 }
 
 func (s *server) handleRequest(method string, params json.RawMessage) (any, error) {
@@ -368,28 +426,28 @@ func (s *server) handleRequest(method string, params json.RawMessage) (any, erro
 	return nil, fmt.Errorf("unsupported method %s", method)
 }
 
-func (s *server) setIndexing(indexing bool) {
+func (s *server) setPhase(p navigator.Phase) {
 	s.mu.Lock()
-	changed := s.indexing != indexing
-	s.indexing = indexing
+	changed := s.phase != p
+	s.phase = p
 	s.mu.Unlock()
-	if changed {
-		s.setIndex(indexing)
+	if changed && s.notify != nil {
+		s.notify(s.state())
 	}
 }
 
-// answered marks the server ready: it has answered a navigation request.
+func (s *server) state() navigator.ServerState {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return navigator.ServerState{Phase: s.phase, Server: filepath.Base(s.argv[0]), Err: s.errText}
+}
+
+// answered marks the server Ready: it has answered a query.
 func (s *server) answered() {
 	s.mu.Lock()
 	clear(s.progress)
 	s.mu.Unlock()
-	s.setIndexing(false)
-}
-
-func (s *server) isIndexing() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.indexing
+	s.setPhase(navigator.Ready)
 }
 
 func (s *server) acquire() {

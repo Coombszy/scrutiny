@@ -1,11 +1,15 @@
 package web_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/Coombszy/scrutiny/internal/navigator"
+	"github.com/Coombszy/scrutiny/internal/review"
+	"github.com/Coombszy/scrutiny/internal/web/views"
 )
 
 func TestDefinitionReturnsTargetsWithTheirURLs(t *testing.T) {
@@ -84,7 +88,7 @@ func TestDiffCellsCarryNavigationAnchors(t *testing.T) {
 	body := a.do(t, http.MethodGet, fileURL(), nil).Body.String()
 	mustContain(t, body, `data-path="parser.go"`, `data-line="2"`, `data-head="`+string(c2)+`"`)
 	page := a.do(t, http.MethodGet, prPath, nil).Body.String()
-	mustContain(t, page, `id="indexing"`, `id="palette"`, `data-path="parser.go"`)
+	mustContain(t, page, `id="lsp-status"`, `id="palette"`, `data-path="parser.go"`)
 }
 
 func TestNavigatingFromAStaleViewIsAConflict(t *testing.T) {
@@ -97,4 +101,34 @@ func TestNavigatingFromAStaleViewIsAConflict(t *testing.T) {
 	if rec := a.do(t, http.MethodGet, prPath+"/definition?path=../x.go&line=2&col=6&head="+string(c2), nil); rec.Code != http.StatusBadRequest {
 		t.Errorf("bad path: status %d, want 400", rec.Code)
 	}
+}
+
+func TestTheLSPIconShowsWhatTheLanguageServersAreDoing(t *testing.T) {
+	a := newApp(t)
+	page := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	icon := page[strings.Index(page, `id="lsp-status"`):]
+	icon = icon[:strings.Index(icon, "</span>")]
+	// Opening the PR warmed gopls for its Go files; the fake reports it starting.
+	mustContain(t, icon, "lsp-busy", "Go · go-server: starting…")
+
+	ws := a.nav.Warmed[0]
+	a.nav.States[ws] = navigator.ServerState{Phase: navigator.Ready, Server: "gopls"}
+	page = a.do(t, http.MethodGet, prPath, nil).Body.String()
+	mustContain(t, page, "lsp-ready", "Go · gopls: ready")
+
+	dash := a.do(t, http.MethodGet, "/", nil).Body.String()
+	if strings.Contains(dash, `id="lsp-status"`) {
+		t.Error("the Dashboard shows the LSP icon")
+	}
+}
+
+func TestLSPStatusChangesArePushedToThePage(t *testing.T) {
+	var html strings.Builder
+	langs := []review.LanguageStatus{
+		{Language: "go", ServerState: navigator.ServerState{Phase: navigator.Indexing, Server: "gopls"}},
+		{Language: "rust", Unavailable: true},
+	}
+	views.LiveUpdate(ref, review.Update{Languages: langs}).Render(context.Background(), &html)
+	mustContain(t, html.String(), `id="lsp-status"`, `hx-swap-oob="true"`, "lsp-busy",
+		"Go · gopls: indexing…", "Rust: no Language Server installed")
 }

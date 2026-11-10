@@ -333,9 +333,22 @@ window.Scrutiny = { actions: {} };
     location.href = target.url;
   }
 
+  // waitingOn shows the wait cursor while a query waits on the Language
+  // Server, which can take a while as it indexes.
+  let waits = 0;
+  async function waitingOn(promise) {
+    waits++;
+    document.body.classList.add("lsp-waiting");
+    try {
+      return await promise;
+    } finally {
+      if (--waits === 0) document.body.classList.remove("lsp-waiting");
+    }
+  }
+
   async function definition(pos) {
     try {
-      const targets = await (await fetchOK(`${prPath}/definition?${query(pos)}`)).json();
+      const targets = await waitingOn(fetchOK(`${prPath}/definition?${query(pos)}`).then((r) => r.json()));
       if (targets.length === 0) return toast("No definition found.");
       if (targets.length === 1) return go(targets[0]);
       menu(lastPoint, targets.map((t) => [`${t.path}:${t.line}`, () => go(t)]));
@@ -346,7 +359,7 @@ window.Scrutiny = { actions: {} };
 
   async function usages(pos) {
     try {
-      const html = await (await fetchOK(`${prPath}/references?${query(pos)}`)).text();
+      const html = await waitingOn(fetchOK(`${prPath}/references?${query(pos)}`).then((r) => r.text()));
       document.getElementById("side-panel")?.remove();
       document.body.insertAdjacentHTML("beforeend", html);
     } catch (err) {

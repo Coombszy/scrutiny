@@ -18,6 +18,7 @@ import (
 
 	"github.com/Coombszy/scrutiny/internal/cache/sqlite"
 	"github.com/Coombszy/scrutiny/internal/codehost/github"
+	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/highlight/treesitter"
 	"github.com/Coombszy/scrutiny/internal/installer/mason"
 	"github.com/Coombszy/scrutiny/internal/live"
@@ -92,9 +93,19 @@ func serve(portOverride int, dev bool) error {
 	})
 
 	hub := live.NewHub()
-	nav.OnIndexing(func(ws navigator.Workspace, indexing bool) {
+	// Push Language Server state to open pages: the PR's warm-up and each
+	// server's phases.
+	publishLanguages := func(ref domain.PRRef) {
+		langs := svc.LanguageStatus(ctx, ref)
+		if langs == nil {
+			langs = []review.LanguageStatus{}
+		}
+		hub.Publish(ref, review.Update{Languages: langs})
+	}
+	svc.OnLanguageStatus = publishLanguages
+	nav.OnState(func(ws navigator.Workspace, _ navigator.ServerState) {
 		if ref, ok := svc.WorkspacePR(ws); ok {
-			hub.Publish(ref, review.Update{Indexing: &indexing})
+			publishLanguages(ref)
 		}
 	})
 	poller := &live.Poller{Source: svc, Hub: hub, Interval: 30 * time.Second, Now: time.Now}

@@ -3,6 +3,7 @@ package views
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Coombszy/scrutiny/internal/navigator"
 	"net/url"
 	"slices"
 	"strconv"
@@ -365,4 +366,82 @@ func contextURL(c DiffContext, g review.Gap, dir review.Direction, header string
 		q.Set("header", header)
 	}
 	return c.PR.Path() + "/context?" + q.Encode()
+}
+
+// lspOverall sums the PR's Language Servers up for the icon: failed if
+// any failed, busy while any is starting or indexing, ready when every
+// available one is ready, otherwise idle (stopped, none or not installed).
+func lspOverall(langs []review.LanguageStatus) string {
+	ready, busy, failed := 0, false, false
+	available := 0
+	for _, l := range langs {
+		if l.Unavailable {
+			continue
+		}
+		available++
+		switch {
+		case l.Phase == navigator.Failed:
+			failed = true
+		case l.Busy():
+			busy = true
+		case l.Phase == navigator.Ready:
+			ready++
+		}
+	}
+	switch {
+	case failed:
+		return "failed"
+	case busy:
+		return "busy"
+	case available > 0 && ready == available:
+		return "ready"
+	}
+	return "idle"
+}
+
+// lspTooltip says what each language's server is doing, one per line.
+func lspTooltip(langs []review.LanguageStatus) string {
+	if len(langs) == 0 {
+		return "No Language Server is needed for this pull request's files"
+	}
+	lines := make([]string, len(langs))
+	for i, l := range langs {
+		name := languageName(l.Language)
+		if l.Unavailable {
+			lines[i] = name + ": no Language Server installed (see Settings)"
+			continue
+		}
+		server := l.Server
+		if server == "" {
+			server = "Language Server"
+		}
+		var doing string
+		switch l.Phase {
+		case navigator.Starting:
+			doing = "starting…"
+		case navigator.Indexing:
+			doing = "indexing…"
+		case navigator.Ready:
+			doing = "ready"
+		case navigator.Failed:
+			doing = "failed: " + l.Err
+		default:
+			doing = "not running (starts when needed)"
+		}
+		lines[i] = name + " · " + server + ": " + doing
+	}
+	return strings.Join(lines, "\n")
+}
+
+// languageName is a language id as people write it.
+func languageName(id string) string {
+	names := map[string]string{
+		"go": "Go", "typescript": "TypeScript", "javascript": "JavaScript", "python": "Python", "rust": "Rust",
+		"java": "Java", "ruby": "Ruby", "c": "C", "cpp": "C++", "csharp": "C#", "lua": "Lua", "bash": "Bash",
+		"yaml": "YAML", "json": "JSON", "terraform": "Terraform", "zig": "Zig",
+	}
+	if n, ok := names[id]; ok {
+		return n
+	}
+	return id
 }

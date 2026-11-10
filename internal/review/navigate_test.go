@@ -207,3 +207,69 @@ func TestSymbolSearchRanksAnExactMatchAboveAnUnchangedSymbolInAModifiedFile(t *t
 		t.Errorf("results = %+v, want the exact match first", got)
 	}
 }
+
+func TestOpeningAPRWarmsTheLanguageServersItsFilesNeed(t *testing.T) {
+	f := newFixture(t)
+	f.repos.ChangeSets[repostore.Pair{From: mb, To: c3}] = []domain.FileChange{
+		{Path: "a.go", OldPath: "a.go", Status: domain.Modified},
+		{Path: "cmd/b.go", OldPath: "cmd/b.go", Status: domain.Added},
+		{Path: "lib.rs", OldPath: "lib.rs", Status: domain.Modified}, // no server for Rust
+		{Path: "notes.txt", OldPath: "notes.txt", Status: domain.Modified},
+	}
+	f.loadPage(t)
+
+	if len(f.nav.Warmed) != 1 || f.nav.Warmed[0] != goWorkspace {
+		t.Errorf("Warmed = %+v, want just the Go workspace", f.nav.Warmed)
+	}
+	if f.repos.Worktrees[ref] != c3 {
+		t.Errorf("worktree at %q, want the head", f.repos.Worktrees[ref])
+	}
+
+	got := f.svc.LanguageStatus(context.Background(), ref)
+	want := []review.LanguageStatus{
+		{Language: "go", ServerState: navigator.ServerState{Phase: navigator.Starting, Server: "go-server"}},
+		{Language: "rust", Unavailable: true},
+	}
+	if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("LanguageStatus = %+v\nwant %+v", got, want)
+	}
+	f.nav.States[goWorkspace] = navigator.ServerState{Phase: navigator.Ready, Server: "gopls"}
+	if got := f.svc.LanguageStatus(context.Background(), ref); got[0].Phase != navigator.Ready {
+		t.Errorf("after indexing: %+v", got[0])
+	}
+}
+
+func TestNothingIsWarmedWithoutASupportedLanguage(t *testing.T) {
+	f := newFixture(t)
+	f.repos.ChangeSets[repostore.Pair{From: mb, To: c3}] = []domain.FileChange{{Path: "README.md", OldPath: "README.md", Status: domain.Modified}}
+	f.loadPage(t)
+	if len(f.nav.Warmed) != 0 || len(f.repos.Worktrees) != 0 {
+		t.Errorf("Warmed %v, worktrees %v; want neither", f.nav.Warmed, f.repos.Worktrees)
+	}
+	if got := f.svc.LanguageStatus(context.Background(), ref); len(got) != 0 {
+		t.Errorf("LanguageStatus = %+v, want none", got)
+	}
+}
+
+func TestClosedPRsAreNotWarmed(t *testing.T) {
+	f := newFixture(t)
+	f.withDiff(mb, c3)
+	pr := f.host.PRs[ref]
+	pr.State = domain.Merged
+	f.host.PRs[ref] = pr
+	f.loadPage(t)
+	if len(f.nav.Warmed) != 0 {
+		t.Errorf("Warmed = %v for a merged PR", f.nav.Warmed)
+	}
+}
+
+func TestWarmingAnnouncesTheStatusChanges(t *testing.T) {
+	f := newFixture(t)
+	var announced []domain.PRRef
+	f.svc.OnLanguageStatus = func(r domain.PRRef) { announced = append(announced, r) }
+	f.withDiff(mb, c3)
+	f.loadPage(t)
+	if len(announced) < 2 || announced[0] != ref {
+		t.Errorf("announced %v, want the PR at least as preparation starts and ends", announced)
+	}
+}

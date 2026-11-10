@@ -118,5 +118,5 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	s.renderPage(w, r, http.StatusOK, views.Page{Indexing: s.review.Indexing(ref)}, views.FileViewPage(ref, fv))
+	s.renderPage(w, r, http.StatusOK, views.Page{ShowLanguages: true, Languages: s.review.LanguageStatus(r.Context(), ref)}, views.FileViewPage(ref, fv))
 }

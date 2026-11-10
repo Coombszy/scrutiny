@@ -74,8 +74,8 @@ func LiveUpdate(pr domain.PRRef, u review.Update) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		if u.Indexing != nil {
-			templ_7745c5c3_Err = IndexingSpinner(*u.Indexing, true).Render(ctx, templ_7745c5c3_Buffer)
+		if u.Languages != nil {
+			templ_7745c5c3_Err = LSPStatus(u.Languages, true).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

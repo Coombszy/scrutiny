@@ -74,6 +74,7 @@ func newApp(t *testing.T) *app {
 	svc := review.NewService(review.Deps{
 		CodeHost: a.host, Repos: a.repos, Highlighter: highlight.PlainHighlighter{},
 		Cache: cache.NewMemory(), Settings: a.settings, Navigator: a.nav,
+		Background: func(fn func()) { fn() },
 	})
 	lookPath := func(string) (string, error) { return "", exec.ErrNotFound }
 	a.themesDir = t.TempDir()

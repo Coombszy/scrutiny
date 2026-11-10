@@ -4,16 +4,20 @@ package views
 import (
 	"context"
 	"encoding/json"
+	"github.com/Coombszy/scrutiny/internal/review"
 )
 
 // Page is per-request data every page needs.
 type Page struct {
 	CSRFToken string
-	Indexing  bool // a Language Server for this page's PR is Indexing
-	Theme     string
-	Themes    []ThemeOption
-	Keys      map[string]string // action -> key sequence
-	ViewMode  string
+	// ShowLanguages puts the Language Server icon in the top bar, for
+	// pages of a PR; Languages is what it shows.
+	ShowLanguages bool
+	Languages     []review.LanguageStatus
+	Theme         string
+	Themes        []ThemeOption
+	Keys          map[string]string // action -> key sequence
+	ViewMode      string
 	// KeyHelp offers the keyboard shortcuts in the top bar; only pages with
 	// hotkeys to show (the PR page and Dashboard) set it. CodeHelp adds the
 	// mouse and editing shortcuts of pages showing code.
