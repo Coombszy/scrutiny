@@ -12,6 +12,7 @@ import (
 	"github.com/Coombszy/scrutiny/internal/codehost"
 	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/highlight"
+	"github.com/Coombszy/scrutiny/internal/navigator"
 	"github.com/Coombszy/scrutiny/internal/repostore"
 	"github.com/Coombszy/scrutiny/internal/settings"
 )
@@ -27,12 +28,14 @@ type Deps struct {
 	Highlighter highlight.Highlighter
 	Cache       cache.Cache
 	Settings    settings.Store
+	Navigator   navigator.Navigator // optional: code navigation is off without it
 	Now         func() time.Time
 }
 
 // Service loads PRs and their diffs.
 type Service struct {
 	Deps
+	ws workspaces
 }
 
 func NewService(d Deps) *Service {
@@ -100,6 +103,11 @@ func (s *Service) PRPage(ctx context.Context, ref domain.PRRef, req ComparisonRe
 	}
 	if err := s.Cache.RecordVisit(ctx, cache.Visit{PR: ref, Title: pr.Title, VisitedAt: s.Now()}); err != nil {
 		return PRPage{}, err
+	}
+	if pr.State == domain.Closed || pr.State == domain.Merged {
+		if err := s.closeWorkspaces(ctx, ref); err != nil {
+			return PRPage{}, err
+		}
 	}
 	mergeBase, err := s.mergeBase(ctx, pr)
 	if err != nil {

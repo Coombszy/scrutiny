@@ -28,12 +28,16 @@ type Update struct {
 
 	Offline        bool
 	OfflineChanged bool
+
+	// Indexing is set when a Language Server for the PR starts or stops
+	// Indexing.
+	Indexing *bool
 }
 
 // Empty reports whether nothing changed.
 func (u Update) Empty() bool {
 	return u.Head == "" && len(u.Threads) == 0 && u.NewThreads == 0 && !u.ConversationChanged &&
-		!u.PendingChanged && u.Checks == nil && !u.OfflineChanged
+		!u.PendingChanged && u.Checks == nil && !u.OfflineChanged && u.Indexing == nil
 }
 
 // readFresh reads the review state and Checks, falling back to the cached

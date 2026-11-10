@@ -6,6 +6,7 @@ import "context"
 // Page is per-request data every page needs.
 type Page struct {
 	CSRFToken string
+	Indexing  bool // a Language Server for this page's PR is Indexing
 }
 
 type pageKey struct{}

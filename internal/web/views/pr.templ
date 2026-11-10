@@ -61,6 +61,7 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 			</section>
 		}
 		@submitDialog(p.PR.Ref, p.Comparison.Head, p.Review.Pending)
+		@Palette(p.PR.Ref)
 	}
 }
 
@@ -92,7 +93,7 @@ templ comparisonPicker(p review.PRPage) {
 }
 
 templ fileSection(p review.PRPage, i int, f review.FileEntry) {
-	<section class={ "file", templ.KV("viewed", f.Viewed == "VIEWED") } id={ fileID(i) } data-threads={ itoa(f.Threads) } data-unresolved={ itoa(f.Unresolved) }>
+	<section class={ "file", templ.KV("viewed", f.Viewed == "VIEWED") } id={ fileID(i) } data-path={ f.Path } data-threads={ itoa(f.Threads) } data-unresolved={ itoa(f.Unresolved) }>
 		<header class="file-header">
 			<span class={ "badge", "status-" + string(f.Status) }>{ string(f.Status) }</span>
 			if f.Path != f.OldPath {

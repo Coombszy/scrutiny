@@ -10,6 +10,7 @@ import (
 	"github.com/Coombszy/scrutiny/internal/codehost"
 	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/highlight"
+	"github.com/Coombszy/scrutiny/internal/navigator"
 	"github.com/Coombszy/scrutiny/internal/repostore"
 	"github.com/Coombszy/scrutiny/internal/review"
 	"github.com/Coombszy/scrutiny/internal/settings"
@@ -34,6 +35,7 @@ type fixture struct {
 	repos    *repostore.Fake
 	cache    *cache.Memory
 	settings *settings.Memory
+	nav      *navigator.Fake
 	svc      *review.Service
 	now      time.Time
 }
@@ -45,6 +47,7 @@ func newFixture(t *testing.T) *fixture {
 		repos:    repostore.NewFake(),
 		cache:    cache.NewMemory(),
 		settings: settings.NewMemory(settings.Defaults()),
+		nav:      navigator.NewFake(),
 		now:      time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC),
 	}
 	f.host.PRs[ref] = domain.PullRequest{Ref: ref, Title: "Add things", BaseBranch: "main", HeadSHA: c3}
@@ -57,6 +60,7 @@ func newFixture(t *testing.T) *fixture {
 		Highlighter: highlight.PlainHighlighter{},
 		Cache:       f.cache,
 		Settings:    f.settings,
+		Navigator:   f.nav,
 		Now:         func() time.Time { return f.now },
 	})
 	return f

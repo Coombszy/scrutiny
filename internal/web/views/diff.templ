@@ -28,7 +28,7 @@ templ Diff(c DiffContext, d review.DiffFile) {
 		if len(d.Hunks) == 0 {
 			<p class="note">No content changes.</p>
 		} else if c.Mode == settings.Unified {
-			<table class="diff unified" data-new-thread={ newThreadURL(c.PR, c.Base, c.Head, d.Path, 3) }>
+			<table class="diff unified" data-path={ d.Path } data-new-thread={ newThreadURL(c.PR, c.Base, c.Head, d.Path, 3) }>
 				<colgroup><col class="ln"/><col class="ln"/><col/></colgroup>
 				for _, h := range d.Hunks {
 					<tr class="hunk"><td colspan="3">{ h.Header }</td></tr>
@@ -39,14 +39,19 @@ templ Diff(c DiffContext, d review.DiffFile) {
 								@addComment(c, d.Path, unifiedSide(l), unifiedLine(l), 3)
 								{ lineNo(l.NewNo) }
 							</td>
-							<td class="code">@tokens(l.Tokens)</td>
+							<td
+								class="code"
+								if l.Kind != domain.Delete {
+									data-line={ itoa(l.NewNo) }
+								}
+							>@tokens(l.Tokens)</td>
 						</tr>
 						@ThreadRows(c.PR, l.Threads, 3)
 					}
 				}
 			</table>
 		} else {
-			<table class="diff split" data-new-thread={ newThreadURL(c.PR, c.Base, c.Head, d.Path, 4) }>
+			<table class="diff split" data-path={ d.Path } data-new-thread={ newThreadURL(c.PR, c.Base, c.Head, d.Path, 4) }>
 				<colgroup><col class="ln"/><col/><col class="ln"/><col/></colgroup>
 				for _, h := range d.Hunks {
 					<tr class="hunk"><td colspan="4">{ h.Header }</td></tr>
@@ -69,7 +74,7 @@ templ Diff(c DiffContext, d review.DiffFile) {
 									@addComment(c, d.Path, domain.Right, row.Right.NewNo, 4)
 									{ lineNo(row.Right.NewNo) }
 								</td>
-								<td class={ "code", kindClass(row.Right.Kind) }>@tokens(row.Right.Tokens)</td>
+								<td class={ "code", kindClass(row.Right.Kind) } data-line={ itoa(row.Right.NewNo) }>@tokens(row.Right.Tokens)</td>
 							} else {
 								<td class="ln empty"></td>
 								<td class="code empty"></td>

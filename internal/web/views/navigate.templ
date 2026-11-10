@@ -1,0 +1,118 @@
+package views
+
+import (
+	"github.com/Coombszy/scrutiny/internal/domain"
+	"github.com/Coombszy/scrutiny/internal/review"
+)
+
+// IndexingSpinner shows, top right, while a Language Server is Indexing.
+templ IndexingSpinner(indexing bool, oob bool) {
+	<span
+		id="indexing"
+		class="indexing"
+		if oob {
+			hx-swap-oob="true"
+		}
+		if !indexing {
+			hidden
+		}
+		title="A Language Server is indexing this pull request; navigation answers once it is ready"
+	>
+		<span class="spinner"></span> Indexing
+	</span>
+}
+
+// Palette is the Symbol Search dialog (ctrl+k).
+templ Palette(pr domain.PRRef) {
+	<dialog id="palette" class="palette" data-symbols={ pr.Path() + "/symbols" }>
+		<input type="search" placeholder="Search files and symbols" autocomplete="off" spellcheck="false"/>
+		<div class="palette-results"></div>
+	</dialog>
+}
+
+templ SymbolResults(pr domain.PRRef, results []review.SearchResult) {
+	if len(results) == 0 {
+		<p class="muted">No matches.</p>
+	}
+	<ul class="results">
+		for _, r := range results {
+			<li>
+				<a
+					class={ "result", templ.KV("in-pr", r.InPR), "marker-" + string(r.Marker) }
+					href={ templ.SafeURL(blobURL(pr, r.Path, r.Line)) }
+					data-nav-path={ r.Path }
+					if r.Line > 0 {
+						data-nav-line={ itoa(r.Line) }
+					}
+					data-nav-in-pr={ boolString(r.InPR) }
+				>
+					<span class="marker" title={ markerTitle(r.Marker) }></span>
+					<span class="name">{ r.Name }</span>
+					<span class="kind">{ r.Kind }</span>
+					if r.Line > 0 {
+						<span class="where muted">{ r.Path }:{ itoa(r.Line) }</span>
+					}
+				</a>
+			</li>
+		}
+	</ul>
+}
+
+// ReferencesPanel lists usages, grouped by file, in the side panel.
+templ ReferencesPanel(pr domain.PRRef, refs []review.Reference) {
+	<aside id="side-panel" class="side-panel">
+		<header>
+			<strong>{ usages(len(refs)) }</strong>
+			<button data-close-panel title="Close">×</button>
+		</header>
+		for _, group := range groupByPath(refs) {
+			<section>
+				<h3 class={ templ.KV("in-pr", group[0].InPR) }>{ group[0].Path }</h3>
+				for _, ref := range group {
+					if ref.OutsideProject {
+						<div class="usage muted">{ itoa(ref.Line) } (outside the repository)</div>
+					} else {
+						<a
+							class="usage"
+							href={ templ.SafeURL(blobURL(pr, ref.Path, ref.Line)) }
+							data-nav-path={ ref.Path }
+							data-nav-line={ itoa(ref.Line) }
+							data-nav-in-pr={ boolString(ref.InPR) }
+						>
+							<span class="ln">{ itoa(ref.Line) }</span>
+							<code>{ ref.Text }</code>
+						</a>
+					}
+				}
+			</section>
+		}
+	</aside>
+}
+
+// FileViewPage shows a whole file at the PR's head.
+templ FileViewPage(pr domain.PRRef, f review.FileView) {
+	@Layout(f.Path) {
+		<header class="pr-header">
+			<p><a href={ templ.SafeURL(pr.Path()) }>← { pr.String() }</a></p>
+			<h1 class="path">{ f.Path }</h1>
+			<p class="muted">
+				At <code>{ f.Head.Short() }</code>.
+				if f.InPR {
+					This file is changed in the pull request.
+				}
+			</p>
+		</header>
+		<section class="file" data-path={ f.Path }>
+			<table class="diff file-view" data-path={ f.Path }>
+				<colgroup><col class="ln"/><col/></colgroup>
+				for i, line := range f.Lines {
+					<tr id={ "L" + itoa(i+1) }>
+						<td class="ln">{ itoa(i + 1) }</td>
+						<td class="code" data-line={ itoa(i + 1) }>@tokens(line)</td>
+					</tr>
+				}
+			</table>
+		</section>
+		@Palette(pr)
+	}
+}

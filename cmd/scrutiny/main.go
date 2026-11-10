@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
@@ -19,6 +20,8 @@ import (
 	"github.com/Coombszy/scrutiny/internal/codehost/github"
 	"github.com/Coombszy/scrutiny/internal/highlight/treesitter"
 	"github.com/Coombszy/scrutiny/internal/live"
+	"github.com/Coombszy/scrutiny/internal/navigator"
+	"github.com/Coombszy/scrutiny/internal/navigator/lsp"
 	"github.com/Coombszy/scrutiny/internal/repostore/gitcli"
 	"github.com/Coombszy/scrutiny/internal/review"
 	"github.com/Coombszy/scrutiny/internal/settings/tomlfile"
@@ -71,6 +74,8 @@ func serve(portOverride int) error {
 	if err != nil {
 		return err
 	}
+	nav := lsp.NewManager(languageServers(dirs), 10*time.Minute)
+	defer nav.Close()
 	repos := gitcli.New(filepath.Join(dirs.State, "repos"), filepath.Join(dirs.State, "worktrees"), gitcli.HTTPSCloneURL, gitcli.GHCredentialConfig("github.com")...)
 	svc := review.NewService(review.Deps{
 		CodeHost:    host,
@@ -78,9 +83,15 @@ func serve(portOverride int) error {
 		Highlighter: treesitter.New(),
 		Cache:       db,
 		Settings:    settings,
+		Navigator:   nav,
 	})
 
 	hub := live.NewHub()
+	nav.OnIndexing(func(ws navigator.Workspace, indexing bool) {
+		if ref, ok := svc.WorkspacePR(ws); ok {
+			hub.Publish(ref, review.Update{Indexing: &indexing})
+		}
+	})
 	poller := &live.Poller{Source: svc, Hub: hub, Interval: 30 * time.Second, Now: time.Now}
 	go poller.Run(ctx)
 
@@ -106,4 +117,19 @@ func serve(portOverride int) error {
 		defer cancel()
 		return srv.Shutdown(shutdownCtx)
 	}
+}
+
+// languageServers finds a Language Server for each supported language:
+// first among those Scrutiny installed, then on $PATH.
+func languageServers(dirs xdg.Dirs) map[string][]string {
+	servers := map[string][]string{}
+	for lang, bin := range map[string]string{"go": "gopls"} {
+		installed := filepath.Join(dirs.Data, "servers", "bin", bin)
+		if _, err := os.Stat(installed); err == nil {
+			servers[lang] = []string{installed}
+		} else if path, err := exec.LookPath(bin); err == nil {
+			servers[lang] = []string{path}
+		}
+	}
+	return servers
 }

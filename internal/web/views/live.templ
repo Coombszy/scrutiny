@@ -26,6 +26,9 @@ templ LiveUpdate(pr domain.PRRef, u review.Update) {
 	if u.Checks != nil {
 		@checksView(*u.Checks, true)
 	}
+	if u.Indexing != nil {
+		@IndexingSpinner(*u.Indexing, true)
+	}
 }
 
 templ refreshBanner(u review.Update, oob bool) {

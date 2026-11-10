@@ -16,6 +16,8 @@ templ Layout(title string) {
 		<body hx-headers={ csrfHeaders(ctx) }>
 			<header class="topbar">
 				<a class="brand" href="/">Scrutiny</a>
+				<span class="topbar-hint muted">ctrl+k search</span>
+				@IndexingSpinner(pageFrom(ctx).Indexing, false)
 			</header>
 			<main>
 				{ children... }

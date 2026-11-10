@@ -203,3 +203,48 @@ func sortedChecks(cs []domain.Check) []domain.Check {
 	})
 	return out
 }
+
+// blobURL is the file view of path at the PR's head, at line if positive.
+func blobURL(pr domain.PRRef, path string, line int) string {
+	u := pr.Path() + "/blob?" + url.Values{"path": {path}}.Encode()
+	if line > 0 {
+		u += "#L" + strconv.Itoa(line)
+	}
+	return u
+}
+
+// BlobURL is blobURL for handlers.
+func BlobURL(pr domain.PRRef, path string, line int) string { return blobURL(pr, path, line) }
+
+func markerTitle(m review.Marker) string {
+	switch m {
+	case review.MarkerAdded:
+		return "Added by this pull request"
+	case review.MarkerRemoved:
+		return "Removed by this pull request"
+	}
+	return ""
+}
+
+func usages(n int) string {
+	if n == 1 {
+		return "1 usage"
+	}
+	return strconv.Itoa(n) + " usages"
+}
+
+// groupByPath groups references by file, keeping their order.
+func groupByPath(refs []review.Reference) [][]review.Reference {
+	var groups [][]review.Reference
+	index := map[string]int{}
+	for _, r := range refs {
+		i, ok := index[r.Path]
+		if !ok {
+			i = len(groups)
+			index[r.Path] = i
+			groups = append(groups, nil)
+		}
+		groups[i] = append(groups[i], r)
+	}
+	return groups
+}
