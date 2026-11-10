@@ -105,8 +105,8 @@ func TestPRPageListsFilesForLazyLoading(t *testing.T) {
 		"Teach the parser &lt;generics&gt;",
 		`hx-trigger="intersect once"`,
 		"/github.com/o/r/pull/7/file?",
-		"Load diff",     // go.sum is generated
-		"Binary file",   // logo.png
+		"Load diff",   // go.sum is generated
+		"Binary file", // logo.png
 		"lex/old.go → lex/new.go",
 		"first step", "second step", // the Comparison picker
 	)
