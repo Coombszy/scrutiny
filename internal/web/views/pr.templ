@@ -12,7 +12,6 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 		@RefreshBanner()
 		<header class="pr-header">
 			<div class="pr-header-side">
-				<button class="primary" data-open-dialog="submit-review">Review @PendingCount(p.Review.Pending, false)</button>
 				@StatusBox(p.Checks)
 			</div>
 			<div class="pr-title">
@@ -58,7 +57,10 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 				disabled in this Comparison. Replies still work.
 			</p>
 		}
-		<p class="muted">{ itoa(len(p.Files)) } files changed</p>
+		<div class="files-bar">
+			<span class="muted">{ itoa(len(p.Files)) } files changed</span>
+			<button class="primary" data-open-dialog="submit-review">Review @PendingCount(p.Review.Pending, false)</button>
+		</div>
 		for i, f := range p.Files {
 			@fileSection(p, i, f)
 		}
