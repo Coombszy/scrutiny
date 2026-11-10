@@ -11,7 +11,7 @@ import (
 templ Dashboard(d review.DashboardPage, cached bool) {
 	@Layout("Dashboard") {
 		<div class="dashboard-top">
-			<form class="open-pr" action="/open" method="get">
+			<form class="open-pr" action="/open" method="get" autocomplete="off">
 				<input type="url" name="url" placeholder="Paste a GitHub pull request URL" required/>
 				<button type="submit">Open</button>
 			</form>

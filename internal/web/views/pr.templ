@@ -58,7 +58,7 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 				<span class="comment-nav">
 					<button data-comment-nav="prev" title="Previous comment">↑ Comment</button>
 					<button data-comment-nav="next" title="Next comment">↓ Comment</button>
-					<label><input type="checkbox" id="nav-include-resolved"/> include resolved</label>
+					<label><input type="checkbox" id="nav-include-resolved" autocomplete="off"/> include resolved</label>
 				</span>
 				<button class="primary" data-open-dialog="submit-review">Review @PendingCount(p.Review.Pending, false)</button>
 			</span>
@@ -82,7 +82,7 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 }
 
 templ comparisonPicker(p review.PRPage) {
-	<form class="comparison" method="get" action={ templ.SafeURL(p.PR.Ref.Path()) }>
+	<form class="comparison" method="get" autocomplete="off" action={ templ.SafeURL(p.PR.Ref.Path()) }>
 		if p.Comparison.IsDefault() {
 			<strong>All changes</strong>
 		} else {
@@ -132,7 +132,7 @@ templ fileSection(p review.PRPage, i int, f review.FileEntry) {
 			}
 			<span class="stat"><span class="plus">+{ itoa(f.Additions) }</span> <span class="minus">−{ itoa(f.Deletions) }</span></span>
 			<label class="viewed-toggle">
-				<input type="checkbox" name="viewed" value="true" checked?={ f.Viewed == "VIEWED" } hx-post={ p.PR.Ref.Path() + "/viewed" } hx-vals={ viewedVals(f.Path) } hx-swap="none"/>
+				<input type="checkbox" name="viewed" value="true" autocomplete="off" checked?={ f.Viewed == "VIEWED" } hx-post={ p.PR.Ref.Path() + "/viewed" } hx-vals={ viewedVals(f.Path) } hx-swap="none"/>
 				Viewed
 			</label>
 		</header>

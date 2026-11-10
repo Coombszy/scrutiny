@@ -46,7 +46,7 @@ func Dashboard(d review.DashboardPage, cached bool) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"dashboard-top\"><form class=\"open-pr\" action=\"/open\" method=\"get\"><input type=\"url\" name=\"url\" placeholder=\"Paste a GitHub pull request URL\" required> <button type=\"submit\">Open</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"dashboard-top\"><form class=\"open-pr\" action=\"/open\" method=\"get\" autocomplete=\"off\"><input type=\"url\" name=\"url\" placeholder=\"Paste a GitHub pull request URL\" required> <button type=\"submit\">Open</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

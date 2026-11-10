@@ -439,7 +439,7 @@ func PR(p review.PRPage, mode settings.ViewMode) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, " files changed</span> <span class=\"files-bar-actions\"><span class=\"comment-nav\"><button data-comment-nav=\"prev\" title=\"Previous comment\">↑ Comment</button> <button data-comment-nav=\"next\" title=\"Next comment\">↓ Comment</button> <label><input type=\"checkbox\" id=\"nav-include-resolved\"> include resolved</label></span> <button class=\"primary\" data-open-dialog=\"submit-review\">Review ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, " files changed</span> <span class=\"files-bar-actions\"><span class=\"comment-nav\"><button data-comment-nav=\"prev\" title=\"Previous comment\">↑ Comment</button> <button data-comment-nav=\"next\" title=\"Next comment\">↓ Comment</button> <label><input type=\"checkbox\" id=\"nav-include-resolved\" autocomplete=\"off\"> include resolved</label></span> <button class=\"primary\" data-open-dialog=\"submit-review\">Review ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -542,14 +542,14 @@ func comparisonPicker(p review.PRPage) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<form class=\"comparison\" method=\"get\" action=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<form class=\"comparison\" method=\"get\" autocomplete=\"off\" action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var29 string
 		templ_7745c5c3_Var29, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(p.PR.Ref.Path())).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/pr.templ`, Line: 85, Col: 78}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/pr.templ`, Line: 85, Col: 97}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 		if templ_7745c5c3_Err != nil {
@@ -1011,7 +1011,7 @@ func fileSection(p review.PRPage, i int, f review.FileEntry) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 91, "</span></span> <label class=\"viewed-toggle\"><input type=\"checkbox\" name=\"viewed\" value=\"true\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 91, "</span></span> <label class=\"viewed-toggle\"><input type=\"checkbox\" name=\"viewed\" value=\"true\" autocomplete=\"off\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1028,7 +1028,7 @@ func fileSection(p review.PRPage, i int, f review.FileEntry) templ.Component {
 		var templ_7745c5c3_Var55 string
 		templ_7745c5c3_Var55, templ_7745c5c3_Err = templruntime.NewAttributeExpression(p.PR.Ref.Path() + "/viewed").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/pr.templ`, Line: 135, Col: 125}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/pr.templ`, Line: 135, Col: 144}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var55)
 		if templ_7745c5c3_Err != nil {
@@ -1041,7 +1041,7 @@ func fileSection(p review.PRPage, i int, f review.FileEntry) templ.Component {
 		var templ_7745c5c3_Var56 string
 		templ_7745c5c3_Var56, templ_7745c5c3_Err = templruntime.NewAttributeExpression(viewedVals(f.Path)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/pr.templ`, Line: 135, Col: 156}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/pr.templ`, Line: 135, Col: 175}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var56)
 		if templ_7745c5c3_Err != nil {

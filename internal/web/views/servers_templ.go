@@ -44,7 +44,7 @@ func ServersPage(list []servers.Status) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<header class=\"pr-header\"><h1>Language Servers</h1><p class=\"muted\">Code navigation runs a Language Server per language. These come from the <a href=\"https://github.com/mason-org/mason-registry\">Mason registry</a> and install into Scrutiny's data directory; Scrutiny never installs runtimes such as node or go.</p></header><div class=\"toolbar\"><input type=\"search\" name=\"q\" placeholder=\"Filter by name or language\" hx-get=\"/settings/servers/list\" hx-trigger=\"input changed delay:200ms, search\" hx-target=\"#server-list\"> <button hx-post=\"/settings/servers/refresh\" hx-target=\"#server-list\">Update registry</button></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<header class=\"pr-header\"><h1>Language Servers</h1><p class=\"muted\">Code navigation runs a Language Server per language. These come from the <a href=\"https://github.com/mason-org/mason-registry\">Mason registry</a> and install into Scrutiny's data directory; Scrutiny never installs runtimes such as node or go.</p></header><div class=\"toolbar\"><input type=\"search\" name=\"q\" autocomplete=\"off\" placeholder=\"Filter by name or language\" hx-get=\"/settings/servers/list\" hx-trigger=\"input changed delay:200ms, search\" hx-target=\"#server-list\"> <button hx-post=\"/settings/servers/refresh\" hx-target=\"#server-list\">Update registry</button></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

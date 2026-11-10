@@ -39,8 +39,8 @@ templ threadView(pr domain.PRRef, t domain.ReviewThread, oob bool) {
 			for _, c := range t.Comments {
 				@commentView(pr, c)
 			}
-			<form class="reply" hx-post={ pr.Path() + "/threads/" + t.ID + "/replies" } hx-target="closest .thread" hx-swap="outerHTML">
-				<textarea id={ "reply-" + t.ID } name="body" rows="2" placeholder="Reply…" required></textarea>
+			<form class="reply" autocomplete="off" hx-post={ pr.Path() + "/threads/" + t.ID + "/replies" } hx-target="closest .thread" hx-swap="outerHTML">
+				<textarea autocomplete="off" id={ "reply-" + t.ID } name="body" rows="2" placeholder="Reply…" required></textarea>
 				<div class="actions">
 					<button type="submit">Reply</button>
 					if t.Resolved && t.ViewerCanUnresolve {
@@ -110,14 +110,14 @@ templ ThreadRows(pr domain.PRRef, threads []domain.ReviewThread, cols int) {
 templ NewThreadForm(pr domain.PRRef, a ThreadAnchor, cols int) {
 	<tr class="thread-row new-thread">
 		<td colspan={ itoa(cols) }>
-			<form hx-post={ pr.Path() + "/threads" } hx-target="closest tr" hx-swap="outerHTML">
+			<form autocomplete="off" hx-post={ pr.Path() + "/threads" } hx-target="closest tr" hx-swap="outerHTML">
 				<input type="hidden" name="base" value={ a.Base }/>
 				<input type="hidden" name="head" value={ a.Head }/>
 				<input type="hidden" name="path" value={ a.Path }/>
 				<input type="hidden" name="line" value={ itoa(a.Line) }/>
 				<input type="hidden" name="side" value={ a.Side }/>
 				<input type="hidden" name="cols" value={ itoa(cols) }/>
-				<textarea name="body" rows="3" placeholder="Leave a comment" required autofocus></textarea>
+				<textarea autocomplete="off" name="body" rows="3" placeholder="Leave a comment" required autofocus></textarea>
 				<div class="actions">
 					<button type="submit">Add to review</button>
 					<button type="button" class="cancel" data-remove-row>Cancel</button>
@@ -189,8 +189,8 @@ templ conversationView(pr domain.PRRef, comments []domain.Comment, oob bool) {
 		for _, c := range comments {
 			@commentView(pr, c)
 		}
-		<form class="reply" hx-post={ pr.Path() + "/comments" } hx-target="#conversation" hx-swap="outerHTML">
-			<textarea id="conversation-new" name="body" rows="3" placeholder="Add a comment" required></textarea>
+		<form class="reply" autocomplete="off" hx-post={ pr.Path() + "/comments" } hx-target="#conversation" hx-swap="outerHTML">
+			<textarea autocomplete="off" id="conversation-new" name="body" rows="3" placeholder="Add a comment" required></textarea>
 			<div class="actions"><button type="submit">Comment</button></div>
 		</form>
 	</section>
@@ -198,11 +198,11 @@ templ conversationView(pr domain.PRRef, comments []domain.Comment, oob bool) {
 
 templ submitDialog(pr domain.PRRef, head domain.SHA, pending []review.PendingComment) {
 	<dialog id="submit-review">
-		<form hx-post={ pr.Path() + "/review" }>
+		<form autocomplete="off" hx-post={ pr.Path() + "/review" }>
 			<h2>Finish your review</h2>
 			@PendingList(pending, false)
 			<input type="hidden" name="head" value={ string(head) }/>
-			<textarea name="body" rows="5" placeholder="Leave a comment"></textarea>
+			<textarea autocomplete="off" name="body" rows="5" placeholder="Leave a comment"></textarea>
 			<fieldset>
 				<label><input type="radio" name="event" value="COMMENT" checked/> Comment</label>
 				<label><input type="radio" name="event" value="APPROVE"/> Approve</label>

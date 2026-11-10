@@ -182,27 +182,27 @@ func threadView(pr domain.PRRef, t domain.ReviewThread, oob bool) templ.Componen
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<form class=\"reply\" hx-post=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<form class=\"reply\" autocomplete=\"off\" hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(pr.Path() + "/threads/" + t.ID + "/replies").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/review.templ`, Line: 42, Col: 76}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/review.templ`, Line: 42, Col: 95}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\" hx-target=\"closest .thread\" hx-swap=\"outerHTML\"><textarea id=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\" hx-target=\"closest .thread\" hx-swap=\"outerHTML\"><textarea autocomplete=\"off\" id=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templruntime.NewAttributeExpression("reply-" + t.ID).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/review.templ`, Line: 43, Col: 34}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/review.templ`, Line: 43, Col: 53}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 		if templ_7745c5c3_Err != nil {
@@ -675,14 +675,14 @@ func NewThreadForm(pr domain.PRRef, a ThreadAnchor, cols int) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\"><form hx-post=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\"><form autocomplete=\"off\" hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var35 string
 		templ_7745c5c3_Var35, templ_7745c5c3_Err = templruntime.NewAttributeExpression(pr.Path() + "/threads").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/review.templ`, Line: 113, Col: 41}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/review.templ`, Line: 113, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
 		if templ_7745c5c3_Err != nil {
@@ -766,7 +766,7 @@ func NewThreadForm(pr domain.PRRef, a ThreadAnchor, cols int) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "\"> <textarea name=\"body\" rows=\"3\" placeholder=\"Leave a comment\" required autofocus></textarea><div class=\"actions\"><button type=\"submit\">Add to review</button> <button type=\"button\" class=\"cancel\" data-remove-row>Cancel</button></div></form></td></tr>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "\"> <textarea autocomplete=\"off\" name=\"body\" rows=\"3\" placeholder=\"Leave a comment\" required autofocus></textarea><div class=\"actions\"><button type=\"submit\">Add to review</button> <button type=\"button\" class=\"cancel\" data-remove-row>Cancel</button></div></form></td></tr>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1043,20 +1043,20 @@ func conversationView(pr domain.PRRef, comments []domain.Comment, oob bool) temp
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "<form class=\"reply\" hx-post=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "<form class=\"reply\" autocomplete=\"off\" hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var53 string
 		templ_7745c5c3_Var53, templ_7745c5c3_Err = templruntime.NewAttributeExpression(pr.Path() + "/comments").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/review.templ`, Line: 192, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/review.templ`, Line: 192, Col: 74}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var53)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "\" hx-target=\"#conversation\" hx-swap=\"outerHTML\"><textarea id=\"conversation-new\" name=\"body\" rows=\"3\" placeholder=\"Add a comment\" required></textarea><div class=\"actions\"><button type=\"submit\">Comment</button></div></form></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "\" hx-target=\"#conversation\" hx-swap=\"outerHTML\"><textarea autocomplete=\"off\" id=\"conversation-new\" name=\"body\" rows=\"3\" placeholder=\"Add a comment\" required></textarea><div class=\"actions\"><button type=\"submit\">Comment</button></div></form></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1081,14 +1081,14 @@ func submitDialog(pr domain.PRRef, head domain.SHA, pending []review.PendingComm
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "<dialog id=\"submit-review\"><form hx-post=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "<dialog id=\"submit-review\"><form autocomplete=\"off\" hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var55 string
 		templ_7745c5c3_Var55, templ_7745c5c3_Err = templruntime.NewAttributeExpression(pr.Path() + "/review").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/review.templ`, Line: 201, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/review.templ`, Line: 201, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var55)
 		if templ_7745c5c3_Err != nil {
@@ -1115,7 +1115,7 @@ func submitDialog(pr domain.PRRef, head domain.SHA, pending []review.PendingComm
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "\"> <textarea name=\"body\" rows=\"5\" placeholder=\"Leave a comment\"></textarea><fieldset><label><input type=\"radio\" name=\"event\" value=\"COMMENT\" checked> Comment</label> <label><input type=\"radio\" name=\"event\" value=\"APPROVE\"> Approve</label> <label><input type=\"radio\" name=\"event\" value=\"REQUEST_CHANGES\"> Request changes</label></fieldset><div class=\"actions\"><button type=\"submit\">Submit review</button> <button type=\"button\" data-close-dialog>Cancel</button></div></form></dialog>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "\"> <textarea autocomplete=\"off\" name=\"body\" rows=\"5\" placeholder=\"Leave a comment\"></textarea><fieldset><label><input type=\"radio\" name=\"event\" value=\"COMMENT\" checked> Comment</label> <label><input type=\"radio\" name=\"event\" value=\"APPROVE\"> Approve</label> <label><input type=\"radio\" name=\"event\" value=\"REQUEST_CHANGES\"> Request changes</label></fieldset><div class=\"actions\"><button type=\"submit\">Submit review</button> <button type=\"button\" data-close-dialog>Cancel</button></div></form></dialog>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

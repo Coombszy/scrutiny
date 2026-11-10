@@ -1,6 +1,7 @@
 package web_test
 
 import (
+	"golang.org/x/net/html"
 	"net/http"
 	"net/url"
 	"strings"
@@ -174,4 +175,72 @@ func TestSubmitDialogListsPendingComments(t *testing.T) {
 	mustContain(t, dialog, "2 pending comments",
 		`data-jump-thread="T2"`, "lex/new.go:4", "New thread here",
 		`data-jump-thread="T1"`, "parser.go:2", "Reply", "A **draft** reply")
+}
+
+func TestCommentBoxesAreNotRestoredOrAutocompletedByTheBrowser(t *testing.T) {
+	a := newApp(t)
+	a.withThread()
+	a.do(t, http.MethodGet, prPath, nil)
+	q := url.Values{"base": {string(mb)}, "head": {string(c2)}, "path": {"parser.go"}, "line": {"3"}, "side": {"RIGHT"}}
+	for name, body := range map[string]string{
+		"PR page":         a.do(t, http.MethodGet, prPath, nil).Body.String(),
+		"file fragment":   a.do(t, http.MethodGet, fileURL(), nil).Body.String(),
+		"new thread form": a.do(t, http.MethodGet, prPath+"/threads/new?"+q.Encode(), nil).Body.String(),
+	} {
+		for _, ta := range strings.Split(body, "<textarea")[1:] {
+			tag := ta[:strings.Index(ta, ">")]
+			if !strings.Contains(tag, `autocomplete="off"`) {
+				t.Errorf("%s: textarea%s> can be restored or autocompleted", name, tag)
+			}
+		}
+	}
+}
+
+// TestNoFormControlCanBeRestoredOrAutocompleted parses every page and
+// fragment: each input, select and textarea must have autocomplete="off",
+// itself or on its form, so reloads and browser history never fill in
+// stale values that disagree with the page.
+func TestNoFormControlCanBeRestoredOrAutocompleted(t *testing.T) {
+	a := newApp(t)
+	a.withThread()
+	a.do(t, http.MethodGet, prPath, nil)
+	a.repos.Blobs[c2] = map[string]string{"lib/util.go": "package lib\n"}
+	q := url.Values{"base": {string(mb)}, "head": {string(c2)}, "path": {"parser.go"}, "line": {"3"}, "side": {"RIGHT"}}
+	for _, path := range []string{
+		"/", prPath, fileURL(), prPath + "/threads/new?" + q.Encode(), prPath + "/blob?path=lib/util.go",
+		"/settings/servers", "/settings/servers/list", "/dashboard/lists",
+	} {
+		doc, err := html.Parse(strings.NewReader(a.do(t, http.MethodGet, path, nil).Body.String()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var walk func(n *html.Node, formOff bool)
+		walk = func(n *html.Node, formOff bool) {
+			if n.Type == html.ElementNode {
+				off := attr(n, "autocomplete") == "off"
+				switch n.Data {
+				case "form":
+					formOff = off
+				case "input", "select", "textarea":
+					if !off && !formOff {
+						t.Errorf("%s: <%s name=%q id=%q type=%q> can be restored or autocompleted",
+							path, n.Data, attr(n, "name"), attr(n, "id"), attr(n, "type"))
+					}
+				}
+			}
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				walk(c, formOff)
+			}
+		}
+		walk(doc, false)
+	}
+}
+
+func attr(n *html.Node, key string) string {
+	for _, a := range n.Attr {
+		if a.Key == key {
+			return a.Val
+		}
+	}
+	return ""
 }

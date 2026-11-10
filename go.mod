@@ -11,6 +11,12 @@ require (
 	github.com/a-h/templ v0.3.1100
 	github.com/cli/go-gh/v2 v2.17.0
 	github.com/pelletier/go-toml/v2 v2.4.3
+	github.com/tree-sitter-grammars/tree-sitter-yaml v0.7.2
+	github.com/tree-sitter/go-tree-sitter v0.25.0
+	github.com/tree-sitter/tree-sitter-bash v0.25.1
+	github.com/tree-sitter/tree-sitter-go v0.25.0
+	github.com/tree-sitter/tree-sitter-json v0.24.8
+	golang.org/x/net v0.61.0
 	modernc.org/sqlite v1.62.0
 )
 
@@ -37,7 +43,6 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/henvic/httpretty v0.2.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
-	github.com/kr/pretty v0.3.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
@@ -52,14 +57,7 @@ require (
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/tdewolff/parse/v2 v2.8.12 // indirect
 	github.com/thlib/go-timezone-local v0.0.9 // indirect
-	github.com/tree-sitter-grammars/tree-sitter-markdown v0.5.3 // indirect
-	github.com/tree-sitter-grammars/tree-sitter-yaml v0.7.2 // indirect
-	github.com/tree-sitter/go-tree-sitter v0.25.0 // indirect
-	github.com/tree-sitter/tree-sitter-bash v0.25.1 // indirect
-	github.com/tree-sitter/tree-sitter-go v0.25.0 // indirect
-	github.com/tree-sitter/tree-sitter-json v0.24.8 // indirect
 	golang.org/x/mod v0.42.0 // indirect
-	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/term v0.47.0 // indirect
