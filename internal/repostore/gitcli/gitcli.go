@@ -93,6 +93,9 @@ func (s *Store) FetchPR(ctx context.Context, pr domain.PRRef, baseBranch string)
 }
 
 func (s *Store) HasCommit(ctx context.Context, repo domain.Repo, sha domain.SHA) (bool, error) {
+	if err := checkRevs(sha); err != nil {
+		return false, err
+	}
 	if _, err := os.Stat(filepath.Join(s.dir(repo), "HEAD")); errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	}
@@ -118,6 +121,9 @@ func (s *Store) Attribute(ctx context.Context, repo domain.Repo, sha domain.SHA,
 }
 
 func (s *Store) MergeBase(ctx context.Context, repo domain.Repo, a, b domain.SHA) (domain.SHA, error) {
+	if err := checkRevs(a, b); err != nil {
+		return "", err
+	}
 	out, err := s.git(ctx, repo, "merge-base", string(a), string(b))
 	if err != nil {
 		return "", err
@@ -126,6 +132,9 @@ func (s *Store) MergeBase(ctx context.Context, repo domain.Repo, a, b domain.SHA
 }
 
 func (s *Store) Blob(ctx context.Context, repo domain.Repo, sha domain.SHA, path string) ([]byte, error) {
+	if err := checkRevs(sha); err != nil {
+		return nil, err
+	}
 	out, err := s.git(ctx, repo, "cat-file", "blob", string(sha)+":"+path)
 	if err != nil {
 		return nil, fmt.Errorf("%s:%s: %w", sha.Short(), path, repostore.ErrNotFound)
@@ -134,6 +143,9 @@ func (s *Store) Blob(ctx context.Context, repo domain.Repo, sha domain.SHA, path
 }
 
 func (s *Store) ListFiles(ctx context.Context, repo domain.Repo, sha domain.SHA) ([]string, error) {
+	if err := checkRevs(sha); err != nil {
+		return nil, err
+	}
 	out, err := s.git(ctx, repo, "ls-tree", "-r", "-z", "--name-only", string(sha))
 	if err != nil {
 		return nil, err
@@ -142,6 +154,9 @@ func (s *Store) ListFiles(ctx context.Context, repo domain.Repo, sha domain.SHA)
 }
 
 func (s *Store) Changes(ctx context.Context, repo domain.Repo, from, to domain.SHA) ([]domain.FileChange, error) {
+	if err := checkRevs(from, to); err != nil {
+		return nil, err
+	}
 	out, err := s.git(ctx, repo, "diff", "--no-ext-diff", "--find-renames", "--raw", "--numstat", "-z", string(from), string(to))
 	if err != nil {
 		return nil, err
@@ -201,6 +216,9 @@ func parseRawNumstat(tok []string) ([]domain.FileChange, error) {
 }
 
 func (s *Store) FileDiff(ctx context.Context, repo domain.Repo, from, to domain.SHA, change domain.FileChange) (domain.FileDiff, error) {
+	if err := checkRevs(from, to); err != nil {
+		return domain.FileDiff{}, err
+	}
 	args := []string{"diff", "--no-ext-diff", "--no-color", "--find-renames", string(from), string(to), "--", change.OldPath}
 	if change.Path != change.OldPath {
 		args = append(args, change.Path)
@@ -220,6 +238,16 @@ func (s *Store) FileDiff(ctx context.Context, repo domain.Repo, from, to domain.
 // never prompting for credentials.
 func (s *Store) git(ctx context.Context, repo domain.Repo, args ...string) ([]byte, error) {
 	return s.gitWithInput(ctx, repo, nil, args...)
+}
+
+// checkRevs rejects revisions that git would parse as options.
+func checkRevs(revs ...domain.SHA) error {
+	for _, r := range revs {
+		if r == "" || strings.HasPrefix(string(r), "-") {
+			return fmt.Errorf("invalid revision %q", r)
+		}
+	}
+	return nil
 }
 
 func (s *Store) gitWithInput(ctx context.Context, repo domain.Repo, stdin io.Reader, args ...string) ([]byte, error) {

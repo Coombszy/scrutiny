@@ -15,6 +15,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Coombszy/scrutiny/internal/cache/sqlite"
+	"github.com/Coombszy/scrutiny/internal/codehost/github"
+	"github.com/Coombszy/scrutiny/internal/highlight/treesitter"
+	"github.com/Coombszy/scrutiny/internal/repostore/gitcli"
+	"github.com/Coombszy/scrutiny/internal/review"
 	"github.com/Coombszy/scrutiny/internal/settings/tomlfile"
 	"github.com/Coombszy/scrutiny/internal/web"
 	"github.com/Coombszy/scrutiny/internal/xdg"
@@ -36,29 +41,52 @@ func run(args []string) error {
 	if err := fl.Parse(args[1:]); err != nil {
 		return err
 	}
+	return serve(*port)
+}
+
+func serve(portOverride int) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	dirs, err := xdg.Resolve()
 	if err != nil {
 		return err
 	}
-	cfg, err := tomlfile.New(filepath.Join(dirs.Config, "config.toml")).Load()
+	settings := tomlfile.New(filepath.Join(dirs.Config, "config.toml"))
+	cfg, err := settings.Load()
 	if err != nil {
 		return err
 	}
-	if *port != 0 {
-		cfg.Port = *port
+	port := cfg.Port
+	if portOverride != 0 {
+		port = portOverride
 	}
-	return serve(cfg.Port)
-}
-
-func serve(port int) error {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	db, err := sqlite.Open(filepath.Join(dirs.State, "cache.db"))
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	host, err := github.NewFromGH(db)
+	if err != nil {
+		return err
+	}
+	repos := gitcli.New(filepath.Join(dirs.State, "repos"), gitcli.HTTPSCloneURL, gitcli.GHCredentialConfig("github.com")...)
+	svc := review.NewService(review.Deps{
+		CodeHost:    host,
+		Repos:       repos,
+		Highlighter: treesitter.New(),
+		Cache:       db,
+		Settings:    settings,
+	})
 
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return err
 	}
-	srv := &http.Server{Handler: web.NewServer(web.NewCSRFToken()).Handler(), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{
+		Handler:           web.NewServer(web.NewCSRFToken(), svc, settings).Handler(),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
 	slog.Info("scrutiny listening", "url", "http://"+ln.Addr().String())
 
 	errc := make(chan error, 1)

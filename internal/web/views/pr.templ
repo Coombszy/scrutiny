@@ -1,0 +1,94 @@
+package views
+
+import (
+	"github.com/Coombszy/scrutiny/internal/review"
+	"github.com/Coombszy/scrutiny/internal/settings"
+)
+
+templ PR(p review.PRPage, mode settings.ViewMode) {
+	@Layout(p.PR.Title) {
+		<header class="pr-header">
+			<h1>{ p.PR.Title } <span class="muted">#{ itoa(p.PR.Ref.Number) }</span></h1>
+			<p class="muted">
+				<span class={ "badge", "state-" + string(p.PR.State) }>{ string(p.PR.State) }</span>
+				{ p.PR.Author } wants to merge <code>{ p.PR.HeadBranch }</code> into <code>{ p.PR.BaseBranch }</code>
+				· <a href={ templ.SafeURL(p.PR.URL) }>GitHub</a>
+			</p>
+		</header>
+		<div class="toolbar">
+			@comparisonPicker(p)
+			if mode == settings.Split {
+				<button hx-post="/settings/view-mode" hx-vals={ `{"mode":"unified"}` }>Unified</button>
+			} else {
+				<button hx-post="/settings/view-mode" hx-vals={ `{"mode":"split"}` }>Split</button>
+			}
+		</div>
+		<p class="muted">{ itoa(len(p.Files)) } files changed</p>
+		for i, f := range p.Files {
+			@fileSection(p, i, f)
+		}
+	}
+}
+
+templ comparisonPicker(p review.PRPage) {
+	<form class="comparison" method="get" action={ templ.SafeURL(p.PR.Ref.Path()) }>
+		if p.Comparison.IsDefault() {
+			<strong>All changes</strong>
+		} else {
+			<a href={ templ.SafeURL(p.PR.Ref.Path()) }>All changes</a>
+		}
+		<label>
+			from
+			<select name="first">
+				for _, c := range p.Commits {
+					<option value={ string(c.SHA) } selected?={ c.SHA == p.Comparison.First }>{ c.SHA.Short() } { c.Headline }</option>
+				}
+			</select>
+		</label>
+		<label>
+			to
+			<select name="last">
+				for i, c := range p.Commits {
+					<option value={ string(c.SHA) } selected?={ c.SHA == p.Comparison.Last || (p.Comparison.IsDefault() && i == len(p.Commits)-1) }>{ c.SHA.Short() } { c.Headline }</option>
+				}
+			</select>
+		</label>
+		<button type="submit">Compare</button>
+	</form>
+}
+
+templ fileSection(p review.PRPage, i int, f review.FileEntry) {
+	<section class="file" id={ fileID(i) }>
+		<header class="file-header">
+			<span class={ "badge", "status-" + string(f.Status) }>{ string(f.Status) }</span>
+			if f.Path != f.OldPath {
+				<span class="path">{ f.OldPath + " → " + f.Path }</span>
+			} else {
+				<span class="path">{ f.Path }</span>
+			}
+			<span class="stat"><span class="plus">+{ itoa(f.Additions) }</span> <span class="minus">−{ itoa(f.Deletions) }</span></span>
+		</header>
+		<div class="file-body">
+			switch {
+				case f.Binary:
+					<p class="note">Binary file changed.</p>
+				case f.Collapse == review.CollapsedGenerated:
+					<p class="note">
+						Generated file.
+						<button hx-get={ FileURL(p.PR.Ref, p.Comparison, f.FileChange) } hx-target="closest .file-body">Load diff</button>
+					</p>
+				case f.Collapse == review.CollapsedLarge:
+					<p class="note">
+						Large diff ({ itoa(f.ChangedLines()) } lines changed).
+						<button hx-get={ FileURL(p.PR.Ref, p.Comparison, f.FileChange) } hx-target="closest .file-body">Load diff</button>
+					</p>
+				case f.Status == "renamed" && f.ChangedLines() == 0:
+					<p class="note">File renamed without changes.</p>
+				default:
+					<div hx-get={ FileURL(p.PR.Ref, p.Comparison, f.FileChange) } hx-trigger="intersect once" hx-swap="outerHTML">
+						<p class="note">Loading…</p>
+					</div>
+			}
+		</div>
+	</section>
+}

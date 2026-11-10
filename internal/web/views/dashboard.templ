@@ -1,0 +1,51 @@
+package views
+
+import (
+	"github.com/Coombszy/scrutiny/internal/domain"
+	"github.com/Coombszy/scrutiny/internal/review"
+)
+
+templ Dashboard(d review.DashboardPage) {
+	@Layout("Dashboard") {
+		<form class="open-pr" action="/open" method="get">
+			<input type="url" name="url" placeholder="Paste a GitHub pull request URL" required/>
+			<button type="submit">Open</button>
+		</form>
+		@prList("Review requested", d.ReviewRequested)
+		@prList("Authored", d.Authored)
+		<section class="pr-list">
+			<h2>Recently opened</h2>
+			if len(d.Recent) == 0 {
+				<p class="muted">Nothing yet.</p>
+			}
+			<ul>
+				for _, v := range d.Recent {
+					<li>
+						<a href={ templ.SafeURL(v.PR.Path()) }>{ v.Title }</a>
+						<span class="muted">{ v.PR.String() }</span>
+					</li>
+				}
+			</ul>
+		</section>
+	}
+}
+
+templ prList(title string, prs []domain.PRSummary) {
+	<section class="pr-list">
+		<h2>{ title }</h2>
+		if len(prs) == 0 {
+			<p class="muted">None.</p>
+		}
+		<ul>
+			for _, p := range prs {
+				<li>
+					<a href={ templ.SafeURL(p.Ref.Path()) }>{ p.Title }</a>
+					if p.Draft {
+						<span class="badge">Draft</span>
+					}
+					<span class="muted">{ p.Ref.String() } by { p.Author }</span>
+				</li>
+			}
+		</ul>
+	</section>
+}

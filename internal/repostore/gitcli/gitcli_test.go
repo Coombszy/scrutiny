@@ -216,3 +216,17 @@ func TestGitAttributeAtSHA(t *testing.T) {
 		}
 	}
 }
+
+func TestRevisionsThatLookLikeOptionsAreRejected(t *testing.T) {
+	ctx := context.Background()
+	r := newRemote(t)
+	head := r.commit("head")
+	r.openPR(1, head)
+	store := storeFor(t, r)
+	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Changes(ctx, testRepo, "--output=/tmp/pwned", head); err == nil {
+		t.Error("Changes accepted an option as a revision")
+	}
+}

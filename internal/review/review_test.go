@@ -193,3 +193,21 @@ func TestLargeAndGeneratedFilesStartCollapsed(t *testing.T) {
 		}
 	}
 }
+
+func TestDashboardCombinesCodeHostListsWithRecentVisits(t *testing.T) {
+	f := newFixture(t)
+	other := domain.PRRef{Repo: repo, Number: 9}
+	f.host.Dash = codehost.Dashboard{
+		ReviewRequested: []domain.PRSummary{{Ref: other, Title: "Please review"}},
+		Authored:        []domain.PRSummary{{Ref: ref, Title: "Mine"}},
+	}
+	f.cache.RecordVisit(context.Background(), cache.Visit{PR: ref, Title: "Mine", VisitedAt: f.now})
+
+	got, err := f.svc.Dashboard(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.ReviewRequested) != 1 || len(got.Authored) != 1 || len(got.Recent) != 1 || got.Recent[0].PR != ref {
+		t.Errorf("Dashboard = %+v", got)
+	}
+}

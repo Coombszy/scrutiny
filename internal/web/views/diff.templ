@@ -1,0 +1,69 @@
+package views
+
+import (
+	"github.com/Coombszy/scrutiny/internal/highlight"
+	"github.com/Coombszy/scrutiny/internal/review"
+	"github.com/Coombszy/scrutiny/internal/settings"
+)
+
+templ Diff(d review.DiffFile, mode settings.ViewMode) {
+	if len(d.Hunks) == 0 {
+		<p class="note">No content changes.</p>
+	} else if mode == settings.Unified {
+		<table class="diff unified">
+			<colgroup><col class="ln"/><col class="ln"/><col/></colgroup>
+			for _, h := range d.Hunks {
+				<tr class="hunk"><td colspan="3">{ h.Header }</td></tr>
+				for _, l := range h.Lines {
+					<tr class={ kindClass(l.Kind) }>
+						<td class="ln">{ lineNo(l.OldNo) }</td>
+						<td class="ln">{ lineNo(l.NewNo) }</td>
+						<td class="code">@tokens(l.Tokens)</td>
+					</tr>
+				}
+			}
+		</table>
+	} else {
+		<table class="diff split">
+			<colgroup><col class="ln"/><col/><col class="ln"/><col/></colgroup>
+			for _, h := range d.Hunks {
+				<tr class="hunk"><td colspan="4">{ h.Header }</td></tr>
+				for _, row := range h.SplitRows() {
+					<tr>
+						if row.Left != nil {
+							<td class={ "ln", kindClass(row.Left.Kind) }>{ lineNo(row.Left.OldNo) }</td>
+							<td class={ "code", kindClass(row.Left.Kind) }>@tokens(row.Left.Tokens)</td>
+						} else {
+							<td class="ln empty"></td>
+							<td class="code empty"></td>
+						}
+						if row.Right != nil {
+							<td class={ "ln", kindClass(row.Right.Kind) }>{ lineNo(row.Right.NewNo) }</td>
+							<td class={ "code", kindClass(row.Right.Kind) }>@tokens(row.Right.Tokens)</td>
+						} else {
+							<td class="ln empty"></td>
+							<td class="code empty"></td>
+						}
+					</tr>
+				}
+			}
+		</table>
+	}
+}
+
+templ tokens(ts []highlight.Token) {
+	for _, t := range ts {
+		if t.Class == "" {
+			{ t.Text }
+		} else {
+			<span class={ tokenClass(t.Class) }>{ t.Text }</span>
+		}
+	}
+}
+
+templ Error(status int, message string) {
+	@Layout("Error") {
+		<h1>{ itoa(status) }</h1>
+		<p>{ message }</p>
+	}
+}

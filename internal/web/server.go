@@ -3,27 +3,37 @@ package web
 
 import (
 	"context"
+	"errors"
 	"io"
 	"io/fs"
+	"log/slog"
 	"net/http"
 
+	"github.com/Coombszy/scrutiny/internal/codehost"
+	"github.com/Coombszy/scrutiny/internal/repostore"
+	"github.com/Coombszy/scrutiny/internal/review"
+	"github.com/Coombszy/scrutiny/internal/settings"
 	"github.com/Coombszy/scrutiny/internal/web/views"
 )
 
 // Server serves the UI.
 type Server struct {
 	csrfToken string
+	review    *review.Service
+	settings  settings.Store
 	mux       *http.ServeMux
 }
 
 // NewServer returns a Server whose mutating requests must carry csrfToken.
-func NewServer(csrfToken string) *Server {
-	s := &Server{csrfToken: csrfToken, mux: http.NewServeMux()}
+func NewServer(csrfToken string, svc *review.Service, st settings.Store) *Server {
+	s := &Server{csrfToken: csrfToken, review: svc, settings: st, mux: http.NewServeMux()}
 	static, _ := fs.Sub(staticFS, "static")
 	s.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
-	s.mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		s.render(w, r, views.Home())
-	})
+	s.mux.HandleFunc("GET /{$}", s.dashboard)
+	s.mux.HandleFunc("GET /open", s.open)
+	s.mux.HandleFunc("GET /github.com/{owner}/{repo}/pull/{number}", s.pullRequest)
+	s.mux.HandleFunc("GET /github.com/{owner}/{repo}/pull/{number}/file", s.file)
+	s.mux.HandleFunc("POST /settings/view-mode", s.setViewMode)
 	return s
 }
 
@@ -36,10 +46,29 @@ type component interface {
 	Render(ctx context.Context, w io.Writer) error
 }
 
-func (s *Server) render(w http.ResponseWriter, r *http.Request, c component) {
+func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, c component) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
 	ctx := views.WithPage(r.Context(), views.Page{CSRFToken: s.csrfToken})
 	if err := c.Render(ctx, w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("render", "path", r.URL.Path, "err", err)
 	}
+}
+
+// fail renders err with a status derived from its kind.
+func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
+	status := http.StatusInternalServerError
+	switch {
+	case errors.Is(err, codehost.ErrNotFound), errors.Is(err, repostore.ErrNotFound):
+		status = http.StatusNotFound
+	case errors.Is(err, review.ErrInvalidComparison), errors.Is(err, errBadRequest):
+		status = http.StatusBadRequest
+	default:
+		slog.Error("request failed", "path", r.URL.Path, "err", err)
+	}
+	if r.Header.Get("HX-Request") == "true" {
+		http.Error(w, err.Error(), status)
+		return
+	}
+	s.render(w, r, status, views.Error(status, err.Error()))
 }
