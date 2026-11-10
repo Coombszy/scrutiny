@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -140,13 +142,18 @@ func TestCommitsFollowsPagination(t *testing.T) {
 }
 
 func TestDashboardSearchesReviewRequestsAndAuthored(t *testing.T) {
-	var queries []string
+	var (
+		mu      sync.Mutex // the two searches run in parallel
+		queries []string
+	)
 	body, err := os.ReadFile("testdata/search.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		queries = append(queries, r.URL.Query().Get("q"))
+		mu.Unlock()
 		w.Write(body)
 	}))
 	t.Cleanup(srv.Close)
@@ -155,7 +162,8 @@ func TestDashboardSearchesReviewRequestsAndAuthored(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(queries) != 2 || queries[0] != "is:pr is:open archived:false review-requested:@me" || queries[1] != "is:pr is:open archived:false author:@me" {
+	slices.Sort(queries)
+	if len(queries) != 2 || queries[0] != "is:pr is:open archived:false author:@me" || queries[1] != "is:pr is:open archived:false review-requested:@me" {
 		t.Errorf("queries = %q", queries)
 	}
 	want := domain.PRSummary{
