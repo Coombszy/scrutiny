@@ -39,7 +39,7 @@ func TestFileDiffHighlightsEachSideFromItsOwnBlob(t *testing.T) {
 		}}},
 	}}
 
-	got, err := f.svc.FileDiff(context.Background(), ref, mb, c3, change)
+	got, err := f.svc.FileDiff(context.Background(), ref, mb, c3, change, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestFileDiffFallsBackToPlainTextWithoutBlobs(t *testing.T) {
 		}}},
 	}}
 
-	got, err := f.svc.FileDiff(context.Background(), ref, mb, c3, change)
+	got, err := f.svc.FileDiff(context.Background(), ref, mb, c3, change, false)
 	if err != nil {
 		t.Fatal(err)
 	}

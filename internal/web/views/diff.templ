@@ -14,6 +14,18 @@ type DiffContext struct {
 	Mode       settings.ViewMode
 	// CanComment and CanCommentLeft gate the add-comment buttons.
 	CanComment, CanCommentLeft bool
+	// File is the change shown, which expanding a gap needs to name.
+	File domain.FileChange
+	// ExpandLines is how many lines each expand button reveals.
+	ExpandLines int
+}
+
+// cols is how many columns a row spans in this View Mode.
+func (c DiffContext) cols() int {
+	if c.Mode == settings.Unified {
+		return 3
+	}
+	return 4
 }
 
 templ Diff(c DiffContext, d review.DiffFile) {
@@ -27,65 +39,111 @@ templ Diff(c DiffContext, d review.DiffFile) {
 		}
 		if len(d.Hunks) == 0 {
 			<p class="note">No content changes.</p>
-		} else if c.Mode == settings.Unified {
-			<table class="diff unified" data-path={ d.Path } data-head={ string(c.Head) } data-new-thread={ newThreadURL(c.PR, c.Base, c.Head, d.Path, 3) }>
-				<colgroup><col class="ln"/><col class="ln"/><col/></colgroup>
-				for _, h := range d.Hunks {
-					<tr class="hunk"><td colspan="3">{ h.Header }</td></tr>
-					for _, l := range h.Lines {
-						<tr class={ kindClass(l.Kind) }>
-							<td class="ln">{ lineNo(l.OldNo) }</td>
-							<td class="ln">
-								@addComment(c, d.Path, unifiedSide(l), unifiedLine(l), 3)
-								{ lineNo(l.NewNo) }
-							</td>
-							<td
-								class="code"
-								if l.Kind != domain.Delete {
-									data-line={ itoa(l.NewNo) }
-								}
-							>@tokens(l.Tokens)</td>
-						</tr>
-						@ThreadRows(c.PR, l.Threads, 3)
-					}
-				}
-			</table>
 		} else {
-			<table class="diff split" data-path={ d.Path } data-head={ string(c.Head) } data-new-thread={ newThreadURL(c.PR, c.Base, c.Head, d.Path, 4) }>
-				<colgroup><col class="ln"/><col/><col class="ln"/><col/></colgroup>
+			<table class={ "diff", string(c.Mode) } data-path={ d.Path } data-head={ string(c.Head) } data-new-thread={ newThreadURL(c.PR, c.Base, c.Head, d.Path, c.cols()) }>
+				if c.Mode == settings.Unified {
+					<colgroup><col class="ln"/><col class="ln"/><col/></colgroup>
+				} else {
+					<colgroup><col class="ln"/><col/><col class="ln"/><col/></colgroup>
+				}
 				for _, h := range d.Hunks {
-					<tr class="hunk"><td colspan="4">{ h.Header }</td></tr>
-					for _, row := range h.SplitRows() {
-						<tr>
-							if row.Left != nil {
-								<td class={ "ln", kindClass(row.Left.Kind) }>
-									if row.Left.Kind == domain.Delete {
-										@addComment(c, d.Path, domain.Left, row.Left.OldNo, 4)
-									}
-									{ lineNo(row.Left.OldNo) }
-								</td>
-								<td class={ "code", kindClass(row.Left.Kind) }>@tokens(row.Left.Tokens)</td>
-							} else {
-								<td class="ln empty"></td>
-								<td class="code empty"></td>
-							}
-							if row.Right != nil {
-								<td class={ "ln", kindClass(row.Right.Kind) }>
-									@addComment(c, d.Path, domain.Right, row.Right.NewNo, 4)
-									{ lineNo(row.Right.NewNo) }
-								</td>
-								<td class={ "code", kindClass(row.Right.Kind) } data-line={ itoa(row.Right.NewNo) }>@tokens(row.Right.Tokens)</td>
-							} else {
-								<td class="ln empty"></td>
-								<td class="code empty"></td>
-							}
-						</tr>
-						@ThreadRows(c.PR, rowThreads(row), 4)
+					if h.Gap != nil {
+						@expander(c, *h.Gap)
 					}
+					if h.Header != "" {
+						<tr class="hunk"><td colspan={ itoa(c.cols()) }>{ h.Header }</td></tr>
+					}
+					@DiffRows(c, h.Lines)
+				}
+				if d.TailGap != nil {
+					@expander(c, *d.TailGap)
 				}
 			</table>
 		}
 	</div>
+}
+
+// DiffRows renders diff lines, with their threads, as table rows.
+templ DiffRows(c DiffContext, lines []review.DiffLine) {
+	if c.Mode == settings.Unified {
+		for _, l := range lines {
+			<tr class={ kindClass(l.Kind) }>
+				<td class="ln">{ lineNo(l.OldNo) }</td>
+				<td class="ln">
+					@addComment(c, c.File.Path, unifiedSide(l), unifiedLine(l), 3)
+					{ lineNo(l.NewNo) }
+				</td>
+				<td
+					class="code"
+					if l.Kind != domain.Delete {
+						data-line={ itoa(l.NewNo) }
+					}
+				>@tokens(l.Tokens)</td>
+			</tr>
+			@ThreadRows(c.PR, l.Threads, 3)
+		}
+	} else {
+		for _, row := range (review.DiffHunk{Lines: lines}).SplitRows() {
+			<tr>
+				if row.Left != nil {
+					<td class={ "ln", kindClass(row.Left.Kind) }>
+						if row.Left.Kind == domain.Delete {
+							@addComment(c, c.File.Path, domain.Left, row.Left.OldNo, 4)
+						}
+						{ lineNo(row.Left.OldNo) }
+					</td>
+					<td class={ "code", kindClass(row.Left.Kind) }>@tokens(row.Left.Tokens)</td>
+				} else {
+					<td class="ln empty"></td>
+					<td class="code empty"></td>
+				}
+				if row.Right != nil {
+					<td class={ "ln", kindClass(row.Right.Kind) }>
+						@addComment(c, c.File.Path, domain.Right, row.Right.NewNo, 4)
+						{ lineNo(row.Right.NewNo) }
+					</td>
+					<td class={ "code", kindClass(row.Right.Kind) } data-line={ itoa(row.Right.NewNo) }>@tokens(row.Right.Tokens)</td>
+				} else {
+					<td class="ln empty"></td>
+					<td class="code empty"></td>
+				}
+			</tr>
+			@ThreadRows(c.PR, rowThreads(row), 4)
+		}
+	}
+}
+
+// ExpandedRows are the lines a click on an expander reveals, with an
+// expander for whatever is still hidden on the side it remains.
+templ ExpandedRows(c DiffContext, lines []review.DiffLine, rest *review.Gap, restBefore bool) {
+	if rest != nil && restBefore {
+		@expander(c, *rest)
+	}
+	@DiffRows(c, lines)
+	if rest != nil && !restBefore {
+		@expander(c, *rest)
+	}
+}
+
+// expander is a row standing in for unchanged lines left out of the diff.
+// Small gaps open whole; bigger ones a few lines at a time from either end
+// (only upwards at the top of the file, downwards at the bottom).
+templ expander(c DiffContext, g review.Gap) {
+	<tr class="expander">
+		<td colspan={ itoa(c.cols()) }>
+			if g.Size() <= c.ExpandLines {
+				<button hx-get={ contextURL(c, g, review.All) } hx-target="closest tr" hx-swap="outerHTML">↕ Show { itoa(g.Size()) } lines</button>
+			} else {
+				if !g.First {
+					<button hx-get={ contextURL(c, g, review.Down) } hx-target="closest tr" hx-swap="outerHTML" title="Show the lines below the change above">↓ { itoa(c.ExpandLines) } lines</button>
+				}
+				<span class="muted">{ itoa(g.Size()) } hidden lines</span>
+				if !g.Last {
+					<button hx-get={ contextURL(c, g, review.Up) } hx-target="closest tr" hx-swap="outerHTML" title="Show the lines above the change below">↑ { itoa(c.ExpandLines) } lines</button>
+				}
+			}
+		</td>
+	</tr>
 }
 
 // addComment is a button that loads the new-thread form below its row; the

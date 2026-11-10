@@ -111,26 +111,68 @@ func (s *Server) file(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, fmt.Errorf("%w: base, head, path and old are required", errBadRequest))
 		return
 	}
-	d, err := s.review.FileDiff(r.Context(), ref, domain.SHA(base), domain.SHA(head), change)
+	d, err := s.review.FileDiff(r.Context(), ref, domain.SHA(base), domain.SHA(head), change, q.Get("full") == "1")
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	anchors, err := s.review.Anchors(r.Context(), ref)
+	dc, err := s.diffContext(r, ref, domain.SHA(base), domain.SHA(head), change)
 	if err != nil {
 		s.fail(w, r, err)
 		return
+	}
+	s.render(w, r, http.StatusOK, views.Diff(dc, d))
+}
+
+// diffContext is what rendering rows of a file's diff needs.
+func (s *Server) diffContext(r *http.Request, ref domain.PRRef, base, head domain.SHA, change domain.FileChange) (views.DiffContext, error) {
+	anchors, err := s.review.Anchors(r.Context(), ref)
+	if err != nil {
+		return views.DiffContext{}, err
 	}
 	cfg, err := s.settings.Load()
 	if err != nil {
+		return views.DiffContext{}, err
+	}
+	return views.DiffContext{
+		PR: ref, Base: base, Head: head, Mode: cfg.ViewMode, File: change, ExpandLines: cfg.Diff.ExpandLines,
+		CanComment:     anchors.Pending == nil || anchors.Pending.Commit == head,
+		CanCommentLeft: base == anchors.MergeBase,
+	}, nil
+}
+
+// expandGap reveals unchanged lines from a gap in a file's diff.
+func (s *Server) expandGap(w http.ResponseWriter, r *http.Request) {
+	ref, ok := prRef(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	q := r.URL.Query()
+	base, head := q.Get("base"), q.Get("head")
+	change := domain.FileChange{Path: q.Get("path"), OldPath: q.Get("old"), Status: domain.ChangeStatus(q.Get("status"))}
+	start, err1 := strconv.Atoi(q.Get("start"))
+	end, err2 := strconv.Atoi(q.Get("end"))
+	offset, err3 := strconv.Atoi(q.Get("offset"))
+	dir := review.Direction(q.Get("dir"))
+	if !shaPattern.MatchString(base) || !shaPattern.MatchString(head) || change.Path == "" ||
+		err1 != nil || err2 != nil || err3 != nil || (dir != review.Up && dir != review.Down && dir != review.All) {
+		s.fail(w, r, fmt.Errorf("%w: base, head, path, start, end, offset and dir are required", errBadRequest))
+		return
+	}
+	gap := review.Gap{Start: start, End: end, Offset: offset, First: q.Get("first") == "true", Last: q.Get("last") == "true"}
+	dc, err := s.diffContext(r, ref, domain.SHA(base), domain.SHA(head), change)
+	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	s.render(w, r, http.StatusOK, views.Diff(views.DiffContext{
-		PR: ref, Base: domain.SHA(base), Head: domain.SHA(head), Mode: cfg.ViewMode,
-		CanComment:     anchors.Pending == nil || anchors.Pending.Commit == domain.SHA(head),
-		CanCommentLeft: domain.SHA(base) == anchors.MergeBase,
-	}, d))
+	shown, rest, restBefore := gap.Reveal(dir, dc.ExpandLines)
+	lines, err := s.review.ContextLines(r.Context(), ref, domain.SHA(head), change.Path, shown)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.render(w, r, http.StatusOK, views.ExpandedRows(dc, lines, rest, restBefore))
 }
 
 // setViewMode saves the View Mode to the config file and reloads the page.

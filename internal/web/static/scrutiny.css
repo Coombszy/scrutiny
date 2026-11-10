@@ -103,6 +103,8 @@ button.primary:hover { filter: brightness(1.1); background: var(--green); }
 #conversation { max-width: 60rem; }
 
 .file.viewed .file-body { display: none; }
+/* A Viewed file opened by navigation, without un-marking it. */
+.file.viewed.peek .file-body { display: block; }
 .viewed-toggle { display: flex; gap: .3rem; align-items: center; font-size: var(--fs-sm); color: var(--fg-dim); }
 
 .diff td.ln { position: relative; }
@@ -299,3 +301,11 @@ kbd { font-family: var(--mono); font-size: var(--fs-sm); background: var(--bg2);
 .pending-list a:hover { background: var(--bg1); }
 .pending-list .where { font-family: var(--mono); font-size: var(--fs-sm); color: var(--blue); flex: none; }
 .pending-list .excerpt { color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Expanding unchanged lines */
+.diff tr.expander td { background: var(--bg1); padding: .15rem .5rem; font-family: var(--sans); font-size: var(--fs-sm); }
+.diff tr.expander td { display: table-cell; }
+.diff tr.expander button { font-size: var(--fs-sm); padding: 0 .5rem; margin-right: .5rem; }
+.diff tr.expander .muted { margin-right: .5rem; }
+.full-toggle { font-size: var(--fs-sm); padding: .1rem .5rem; }
+.full-toggle[aria-pressed="true"] { border-color: var(--blue); }

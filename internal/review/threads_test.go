@@ -55,7 +55,7 @@ func TestThreadsArePlacedOnTheirLinesInTheDefaultComparison(t *testing.T) {
 		t.Errorf("a.go thread count = %d, want 5", page.Files[0].Threads)
 	}
 
-	d, err := f.svc.FileDiff(ctx, ref, mb, c3, change)
+	d, err := f.svc.FileDiff(ctx, ref, mb, c3, change, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestThreadsAreUnplacedInAComparisonNotEndingAtHead(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d, err := f.svc.FileDiff(ctx, ref, c1, c2, change)
+	d, err := f.svc.FileDiff(ctx, ref, c1, c2, change, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestAddingAThreadStartsAPendingReviewAtTheComparisonHead(t *testing.T) {
 	}
 
 	// The new threads are visible to the next fragment without a page load.
-	d, err := f.svc.FileDiff(ctx, ref, mb, c3, change)
+	d, err := f.svc.FileDiff(ctx, ref, mb, c3, change, false)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -351,3 +351,14 @@ func excerpt(body string) string {
 	}
 	return s
 }
+
+// contextURL loads a gap's unchanged lines, revealing them in dir.
+func contextURL(c DiffContext, g review.Gap, dir review.Direction) string {
+	q := url.Values{
+		"base": {string(c.Base)}, "head": {string(c.Head)},
+		"path": {c.File.Path}, "old": {c.File.OldPath}, "status": {string(c.File.Status)},
+		"start": {strconv.Itoa(g.Start)}, "end": {strconv.Itoa(g.End)}, "offset": {strconv.Itoa(g.Offset)},
+		"first": {strconv.FormatBool(g.First)}, "last": {strconv.FormatBool(g.Last)}, "dir": {string(dir)},
+	}
+	return c.PR.Path() + "/context?" + q.Encode()
+}

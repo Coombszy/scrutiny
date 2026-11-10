@@ -116,7 +116,7 @@ templ comparisonPicker(p review.PRPage) {
 }
 
 templ fileSection(p review.PRPage, i int, f review.FileEntry) {
-	<section class={ "file", templ.KV("viewed", f.Viewed == "VIEWED") } id={ fileID(i) } data-path={ f.Path } data-threads={ itoa(f.Threads) } data-unresolved={ itoa(f.Unresolved) }>
+	<section class={ "file", templ.KV("viewed", f.Viewed == "VIEWED") } id={ fileID(i) } data-path={ f.Path } data-file-url={ FileURL(p.PR.Ref, p.Comparison, f.FileChange) } data-threads={ itoa(f.Threads) } data-unresolved={ itoa(f.Unresolved) }>
 		<header class="file-header">
 			<span class={ "badge", "status-" + string(f.Status) }>{ string(f.Status) }</span>
 			if f.Path != f.OldPath {
@@ -131,6 +131,9 @@ templ fileSection(p review.PRPage, i int, f review.FileEntry) {
 				<span class="badge">Changed since viewed</span>
 			}
 			<span class="stat"><span class="plus">+{ itoa(f.Additions) }</span> <span class="minus">−{ itoa(f.Deletions) }</span></span>
+			if !f.Binary && (f.Status == "modified" || f.Status == "renamed") {
+				<button class="full-toggle" data-full-toggle aria-pressed="false" title="Show the whole file, or only the changes">Full file</button>
+			}
 			<label class="viewed-toggle">
 				<input type="checkbox" name="viewed" value="true" autocomplete="off" checked?={ f.Viewed == "VIEWED" } hx-post={ p.PR.Ref.Path() + "/viewed" } hx-vals={ viewedVals(f.Path) } hx-swap="none"/>
 				Viewed

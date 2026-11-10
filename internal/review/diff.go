@@ -12,6 +12,10 @@ import (
 type DiffFile struct {
 	domain.FileChange
 	Hunks []DiffHunk
+	// TailGap is the unchanged lines after the last hunk, if any.
+	TailGap *Gap
+	// Full is set when every unchanged line is shown.
+	Full bool
 	// Unplaced are the file's Review Threads that cannot be shown on a line
 	// of this diff: outdated, outside its hunks, or from another Comparison.
 	Unplaced []domain.ReviewThread
@@ -19,8 +23,50 @@ type DiffFile struct {
 
 // DiffHunk is a hunk of highlighted lines.
 type DiffHunk struct {
-	Header string // e.g. "@@ -1,2 +1,3 @@ func f()"
+	Header string // e.g. "@@ -1,2 +1,3 @@ func f()"; empty for a whole file
 	Lines  []DiffLine
+	// Gap is the unchanged lines between the previous hunk (or the start of
+	// the file) and this one, if any.
+	Gap *Gap
+}
+
+// Gap is a run of unchanged lines a diff leaves out, numbered as at head.
+type Gap struct {
+	Start, End int  // head line numbers, inclusive
+	Offset     int  // base line number minus head line number, the same throughout
+	First      bool // the gap starts at the top of the file
+	Last       bool // the gap runs to the end of the file
+}
+
+// Size is the number of lines in the gap.
+func (g Gap) Size() int { return g.End - g.Start + 1 }
+
+// Direction is which end of a Gap to reveal lines from.
+type Direction string
+
+const (
+	Down Direction = "down" // below the hunk above
+	Up   Direction = "up"   // above the hunk below
+	All  Direction = "all"
+)
+
+// Reveal splits off the lines to show: step lines from one end (the
+// diff.expand_lines setting), or the whole gap when it is no bigger than
+// that. It returns what remains hidden, if anything, and whether that sits
+// before the shown lines.
+func (g Gap) Reveal(dir Direction, step int) (shown Gap, rest *Gap, restBefore bool) {
+	if dir == All || g.Size() <= step {
+		return g, nil, false
+	}
+	shown, remaining := g, g
+	if dir == Up {
+		shown.Start, shown.First = g.End-step+1, false
+		remaining.End, remaining.Last = shown.Start-1, false
+		return shown, &remaining, true
+	}
+	shown.End, shown.Last = g.Start+step-1, false
+	remaining.Start, remaining.First = shown.End+1, false
+	return shown, &remaining, false
 }
 
 // DiffLine is one highlighted diff line.
@@ -72,8 +118,9 @@ func (h DiffHunk) SplitRows() []SplitRow {
 
 // FileDiff loads one file's diff between base and head, highlighting each
 // side from the whole file at that commit so multi-line constructs colour
-// correctly, and placing the file's Review Threads on their lines.
-func (s *Service) FileDiff(ctx context.Context, ref domain.PRRef, base, head domain.SHA, change domain.FileChange) (DiffFile, error) {
+// correctly, and placing the file's Review Threads on their lines. With
+// full, every unchanged line is shown too.
+func (s *Service) FileDiff(ctx context.Context, ref domain.PRRef, base, head domain.SHA, change domain.FileChange, full bool) (DiffFile, error) {
 	repo := ref.Repo
 	snap, err := s.snapshot(ctx, ref)
 	if err != nil {
@@ -105,8 +152,81 @@ func (s *Service) FileDiff(ctx context.Context, ref domain.PRRef, base, head dom
 		}
 		out.Hunks[i] = dh
 	}
+	// Only files on both sides have unchanged lines to reveal.
+	if (change.Status == domain.Modified || change.Status == domain.Renamed) && newLines != nil {
+		out.findGaps(fd.Hunks, len(newLines))
+		if full {
+			out.fill(newLines)
+		}
+	}
 	out.place(snap, base, head)
 	return out, nil
+}
+
+// findGaps records the unchanged lines around each hunk. A hunk with no
+// lines on a side sits after its start line on that side.
+func (d *DiffFile) findGaps(hunks []domain.Hunk, lines int) {
+	first := func(start, count int) int {
+		if count == 0 {
+			return start + 1
+		}
+		return start
+	}
+	nextNew, nextOld := 1, 1
+	for i, h := range hunks {
+		newFirst, oldFirst := first(h.NewStart, h.NewLines), first(h.OldStart, h.OldLines)
+		if newFirst > nextNew {
+			d.Hunks[i].Gap = &Gap{Start: nextNew, End: newFirst - 1, Offset: oldFirst - newFirst, First: i == 0}
+		}
+		nextNew, nextOld = newFirst+h.NewLines, oldFirst+h.OldLines
+	}
+	if nextNew <= lines {
+		d.TailGap = &Gap{Start: nextNew, End: lines, Offset: nextOld - nextNew, Last: true}
+	}
+}
+
+// fill merges the hunks into one, with every gap's lines in place.
+func (d *DiffFile) fill(newLines [][]highlight.Token) {
+	var all []DiffLine
+	for _, h := range d.Hunks {
+		if h.Gap != nil {
+			all = append(all, contextLines(newLines, *h.Gap)...)
+		}
+		all = append(all, h.Lines...)
+	}
+	if d.TailGap != nil {
+		all = append(all, contextLines(newLines, *d.TailGap)...)
+	}
+	d.Hunks, d.TailGap, d.Full = []DiffHunk{{Lines: all}}, nil, true
+}
+
+func contextLines(newLines [][]highlight.Token, g Gap) []DiffLine {
+	var out []DiffLine
+	for n := g.Start; n <= g.End; n++ {
+		tokens := tokensAt(newLines, n)
+		if tokens == nil {
+			tokens = []highlight.Token{{}}
+		}
+		out = append(out, DiffLine{Kind: domain.Context, OldNo: n + g.Offset, NewNo: n, Tokens: tokens})
+	}
+	return out
+}
+
+// ContextLines returns the unchanged lines of a Gap in path at head,
+// highlighted, for expanding a diff.
+func (s *Service) ContextLines(ctx context.Context, ref domain.PRRef, head domain.SHA, path string, g Gap) ([]DiffLine, error) {
+	if !validPath(path) {
+		return nil, fmt.Errorf("%w: %q", ErrBadPath, path)
+	}
+	src, err := s.Repos.Blob(ctx, ref.Repo, head, path)
+	if err != nil {
+		return nil, err
+	}
+	newLines := s.Highlighter.Highlight(path, src)
+	if g.Start < 1 || g.End > len(newLines) || g.Start > g.End {
+		return nil, fmt.Errorf("%w: lines %d-%d of %s", ErrBadPath, g.Start, g.End, path)
+	}
+	return contextLines(newLines, g), nil
 }
 
 // place attaches each of the file's threads to the line it is anchored to.

@@ -65,6 +65,9 @@ type Diff struct {
 	// CollapseThreshold is the changed-line count above which a file's diff
 	// starts collapsed.
 	CollapseThreshold int `toml:"collapse_threshold"`
+	// ExpandLines is how many unchanged lines each click on a gap between
+	// changes reveals.
+	ExpandLines int `toml:"expand_lines"`
 }
 
 // Defaults returns the settings used for anything the config file leaves unset.
@@ -73,7 +76,7 @@ func Defaults() Settings {
 		Port:     7878,
 		Theme:    "gruvbox-dark",
 		ViewMode: Split,
-		Diff:     Diff{CollapseThreshold: 1000},
+		Diff:     Diff{CollapseThreshold: 1000, ExpandLines: 64},
 		Keys:     DefaultKeys(),
 	}
 }
@@ -87,6 +90,8 @@ func (s Settings) Validate() error {
 		return fmt.Errorf("port must be between 1 and 65535, got %d", s.Port)
 	case s.Diff.CollapseThreshold < 1:
 		return fmt.Errorf("diff.collapse_threshold must be positive, got %d", s.Diff.CollapseThreshold)
+	case s.Diff.ExpandLines < 1:
+		return fmt.Errorf("diff.expand_lines must be positive, got %d", s.Diff.ExpandLines)
 	}
 	if err := keyConflicts(s.Keys); err != nil {
 		return err

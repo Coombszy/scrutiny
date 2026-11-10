@@ -88,6 +88,8 @@ window.Scrutiny = { actions: {} };
     }
     const nav = e.target.closest("[data-comment-nav]");
     if (nav) navigate(nav.dataset.commentNav === "next" ? 1 : -1);
+    const toggle = e.target.closest("[data-full-toggle]");
+    if (toggle) toggleFullFile(toggle);
     const jump = e.target.closest("[data-jump-thread]");
     if (jump) {
       e.preventDefault();
@@ -96,6 +98,17 @@ window.Scrutiny = { actions: {} };
     }
   });
 
+  // toggleFullFile re-renders a file's diff with every line, or only the
+  // changes again.
+  async function toggleFullFile(button) {
+    const file = button.closest(".file");
+    const full = button.getAttribute("aria-pressed") !== "true";
+    file.classList.add("peek"); // show it without changing its Viewed state
+    await htmx.ajax("GET", file.dataset.fileUrl + (full ? "&full=1" : ""), { target: file.querySelector(".file-body"), swap: "innerHTML" });
+    button.setAttribute("aria-pressed", String(full));
+    button.textContent = full ? "Changes only" : "Full file";
+  }
+
   // jumpToThread scrolls to a thread, first loading (and un-collapsing) its
   // file's diff if the thread is not on the page yet.
   async function jumpToThread(id, path) {
@@ -103,7 +116,7 @@ window.Scrutiny = { actions: {} };
     if (!thread) {
       const file = [...document.querySelectorAll(".file[data-path]")].find((f) => f.dataset.path === path);
       if (file) {
-        file.classList.remove("viewed");
+        file.classList.add("peek");
         const lazy = file.querySelector(".lazy-diff");
         const load = file.querySelector(".file-body > .note button[hx-get]");
         if (lazy) await htmx.ajax("GET", lazy.getAttribute("hx-get"), { target: lazy, swap: "outerHTML" });
@@ -112,7 +125,7 @@ window.Scrutiny = { actions: {} };
       thread = document.getElementById("thread-" + id);
     }
     if (!thread) return toast("That comment is not shown in this Comparison.");
-    thread.closest(".file")?.classList.remove("viewed");
+    thread.closest(".file")?.classList.add("peek");
     thread.querySelector("details")?.setAttribute("open", "");
     document.querySelectorAll(".thread.current").forEach((t) => t.classList.remove("current"));
     thread.classList.add("current");
@@ -167,7 +180,9 @@ window.Scrutiny = { actions: {} };
   // Viewed files collapse straight away; the checkbox posts via htmx.
   document.addEventListener("change", (e) => {
     if (e.target.matches(".viewed-toggle input")) {
-      e.target.closest(".file")?.classList.toggle("viewed", e.target.checked);
+      const file = e.target.closest(".file");
+      file?.classList.toggle("viewed", e.target.checked);
+      file?.classList.remove("peek");
     }
   });
 
@@ -280,11 +295,7 @@ window.Scrutiny = { actions: {} };
   async function reveal(path, line) {
     const file = [...document.querySelectorAll(".file[data-path]")].find((f) => f.dataset.path === path);
     if (!file) return false;
-    if (file.classList.contains("viewed")) {
-      file.classList.remove("viewed");
-      const box = file.querySelector(".viewed-toggle input");
-      if (box) box.checked = false;
-    }
+    file.classList.add("peek"); // show it without changing its Viewed state
     const lazy = file.querySelector(".lazy-diff");
     if (lazy) await htmx.ajax("GET", lazy.getAttribute("hx-get"), { target: lazy, swap: "outerHTML" });
     const cell = file.querySelector(`td.code[data-line="${line}"]`);

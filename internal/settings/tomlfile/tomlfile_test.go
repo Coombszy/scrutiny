@@ -33,7 +33,7 @@ func TestPartialFileKeepsDefaultsForUnsetFields(t *testing.T) {
 	if got.ViewMode != settings.Unified {
 		t.Errorf("ViewMode = %q, want unified", got.ViewMode)
 	}
-	if got.Port != 7878 || got.Theme != "gruvbox-dark" || got.Diff.CollapseThreshold != 1000 {
+	if got.Port != 7878 || got.Theme != "gruvbox-dark" || got.Diff.CollapseThreshold != 1000 || got.Diff.ExpandLines != 64 {
 		t.Errorf("unset fields lost their defaults: %+v", got)
 	}
 }
@@ -114,5 +114,13 @@ func TestConflictingKeysAreRejected(t *testing.T) {
 		if err == nil {
 			t.Errorf("Load(%q) succeeded, want a conflict error", bad)
 		}
+	}
+}
+
+func TestExpandLinesMustBePositive(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	write(t, path, "[diff]\nexpand_lines = 0\n")
+	if _, err := tomlfile.New(path).Load(); err == nil {
+		t.Error("expand_lines = 0 was accepted")
 	}
 }
