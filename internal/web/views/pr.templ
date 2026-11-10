@@ -45,11 +45,6 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 			} else {
 				<button hx-post="/settings/view-mode" hx-vals={ `{"mode":"split"}` }>Split</button>
 			}
-			<span class="comment-nav">
-				<button data-comment-nav="prev" title="Previous comment">↑ Comment</button>
-				<button data-comment-nav="next" title="Next comment">↓ Comment</button>
-				<label><input type="checkbox" id="nav-include-resolved"/> include resolved</label>
-			</span>
 		</div>
 		if p.Review.Pending != nil && p.Review.Pending.Commit != p.Comparison.Head {
 			<p class="notice">
@@ -59,7 +54,14 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 		}
 		<div class="files-bar">
 			<span class="muted">{ itoa(len(p.Files)) } files changed</span>
-			<button class="primary" data-open-dialog="submit-review">Review @PendingCount(p.Review.Pending, false)</button>
+			<span class="files-bar-actions">
+				<span class="comment-nav">
+					<button data-comment-nav="prev" title="Previous comment">↑ Comment</button>
+					<button data-comment-nav="next" title="Next comment">↓ Comment</button>
+					<label><input type="checkbox" id="nav-include-resolved"/> include resolved</label>
+				</span>
+				<button class="primary" data-open-dialog="submit-review">Review @PendingCount(p.Review.Pending, false)</button>
+			</span>
 		</div>
 		for i, f := range p.Files {
 			@fileSection(p, i, f)

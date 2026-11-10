@@ -125,12 +125,13 @@ func TestEveryPageHasAnActivitySpinner(t *testing.T) {
 	}
 }
 
-func TestReviewButtonSitsOnTheFilesChangedLine(t *testing.T) {
+func TestReviewAndCommentNavigationSitOnTheFilesChangedLine(t *testing.T) {
 	a := newApp(t)
 	body := a.do(t, http.MethodGet, prPath, nil).Body.String()
 	bar := body[strings.Index(body, `class="files-bar"`):]
 	bar = bar[:strings.Index(bar, "</div>")]
-	mustContain(t, bar, "4 files changed", `data-open-dialog="submit-review"`, `id="pending-count"`)
+	mustContain(t, bar, "4 files changed", `data-open-dialog="submit-review"`, `id="pending-count"`,
+		`data-comment-nav="prev"`, `data-comment-nav="next"`, `id="nav-include-resolved"`)
 	if strings.Count(body, `data-open-dialog="submit-review"`) != 1 {
 		t.Error("more than one Review button")
 	}
