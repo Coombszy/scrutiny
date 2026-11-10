@@ -20,6 +20,17 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 				{ p.PR.Author } wants to merge <code>{ p.PR.HeadBranch }</code> into <code>{ p.PR.BaseBranch }</code>
 				· <a href={ templ.SafeURL(p.PR.URL) }>GitHub</a>
 			</p>
+			if st := p.Review.Stack; st != nil {
+				<nav class="stack-nav" aria-label="Stack">
+					<span class="badge">Stack { itoa(st.Position) }/{ itoa(st.Size) }</span>
+					if parent := st.Parent(); parent != nil {
+						<a id="stack-parent" href={ templ.SafeURL(stackURL(p.PR.Ref, parent.Number)) } title="Parent: the PR below this one">← #{ itoa(parent.Number) } { parent.Title }</a>
+					}
+					if child := st.Child(); child != nil {
+						<a id="stack-child" href={ templ.SafeURL(stackURL(p.PR.Ref, child.Number)) } title="Child: the PR above this one">#{ itoa(child.Number) } { child.Title } →</a>
+					}
+				</nav>
+			}
 			@Checks(p.Checks)
 			@Reactions(p.PR.Ref, p.Review.PRID, p.Review.Reactions)
 		</header>
@@ -71,6 +82,13 @@ templ comparisonPicker(p review.PRPage) {
 			<strong>All changes</strong>
 		} else {
 			<a href={ templ.SafeURL(p.PR.Ref.Path()) }>All changes</a>
+		}
+		if slr := p.SinceLastReview; slr != nil {
+			if p.Comparison.First == slr.First && p.Comparison.Last == slr.Last {
+				<strong id="since-last-review" data-href={ comparisonURL(p.PR.Ref, slr.First, slr.Last) }>Since your last review</strong>
+			} else {
+				<a id="since-last-review" href={ templ.SafeURL(comparisonURL(p.PR.Ref, slr.First, slr.Last)) }>Since your last review</a>
+			}
 		}
 		<label>
 			from

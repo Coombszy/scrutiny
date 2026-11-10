@@ -36,9 +36,11 @@ func (s *Store) Load() (settings.Settings, error) {
 	if err != nil {
 		return cfg, err
 	}
+	cfg.Keys = nil // decoded on its own so a partial [keys] keeps the other defaults
 	if err := toml.Unmarshal(b, &cfg); err != nil {
-		return cfg, fmt.Errorf("parse %s: %w", s.path, err)
+		return settings.Defaults(), fmt.Errorf("parse %s: %w", s.path, err)
 	}
+	cfg = cfg.WithKeyDefaults()
 	if err := cfg.Validate(); err != nil {
 		return cfg, fmt.Errorf("%s: %w", s.path, err)
 	}

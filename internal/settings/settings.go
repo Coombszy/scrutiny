@@ -2,7 +2,12 @@
 // is the config file.
 package settings
 
-import "fmt"
+import (
+	"fmt"
+	"maps"
+	"regexp"
+	"strings"
+)
 
 // ViewMode is whether a diff is shown Split (side-by-side) or Unified.
 type ViewMode string
@@ -18,6 +23,39 @@ type Settings struct {
 	Theme    string   `toml:"theme"`
 	ViewMode ViewMode `toml:"view_mode"`
 	Diff     Diff     `toml:"diff"`
+	// Keys binds actions to key sequences: keys separated by spaces, each
+	// optionally with modifiers, e.g. "ctrl+k" or "] c".
+	Keys map[string]string `toml:"keys"`
+}
+
+// DefaultKeys are the hotkeys before any are rebound.
+func DefaultKeys() map[string]string {
+	return map[string]string{
+		"symbol_search":    "ctrl+k",
+		"command_palette":  "ctrl+j",
+		"next_comment":     "] c",
+		"prev_comment":     "[ c",
+		"toggle_view_mode": "s",
+		"refresh":          "r",
+	}
+}
+
+// keyPattern is one key of a binding: modifiers, then a single character
+// or a named key.
+var keyPattern = regexp.MustCompile(`^((ctrl|alt|shift|meta)\+)*([^\s+]|\+|[a-z][a-z0-9]+)$`)
+
+// ValidBinding reports whether binding is a well-formed key sequence.
+func ValidBinding(binding string) bool {
+	keys := strings.Fields(binding)
+	if len(keys) == 0 || len(keys) > 3 {
+		return false
+	}
+	for _, k := range keys {
+		if !keyPattern.MatchString(k) {
+			return false
+		}
+	}
+	return true
 }
 
 // Diff holds settings for rendering diffs.
@@ -34,6 +72,7 @@ func Defaults() Settings {
 		Theme:    "gruvbox-dark",
 		ViewMode: Split,
 		Diff:     Diff{CollapseThreshold: 1000},
+		Keys:     DefaultKeys(),
 	}
 }
 
@@ -47,7 +86,24 @@ func (s Settings) Validate() error {
 	case s.Diff.CollapseThreshold < 1:
 		return fmt.Errorf("diff.collapse_threshold must be positive, got %d", s.Diff.CollapseThreshold)
 	}
+	defaults := DefaultKeys()
+	for action, binding := range s.Keys {
+		if _, ok := defaults[action]; !ok {
+			return fmt.Errorf("keys: unknown action %q", action)
+		}
+		if !ValidBinding(binding) {
+			return fmt.Errorf("keys.%s: %q is not a key sequence", action, binding)
+		}
+	}
 	return nil
+}
+
+// WithKeyDefaults fills in any action Keys leaves unbound.
+func (s Settings) WithKeyDefaults() Settings {
+	keys := DefaultKeys()
+	maps.Copy(keys, s.Keys)
+	s.Keys = keys
+	return s
 }
 
 // Store loads and saves Settings.

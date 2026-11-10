@@ -98,6 +98,35 @@ const (
 	CommentOnly    ReviewEvent = "COMMENT"
 )
 
+// StackPR is one PR in a Stack.
+type StackPR struct {
+	Number   int
+	Title    string
+	State    PRState
+	Position int // 1 is closest to the base branch
+}
+
+// Stack is GitHub's native ordered chain of PRs, seen from one of them.
+type Stack struct {
+	Position, Size int
+	Entries        []StackPR // by Position
+}
+
+// Parent is the PR directly below this one, or nil at the bottom.
+func (s *Stack) Parent() *StackPR { return s.at(s.Position - 1) }
+
+// Child is the PR directly above this one, or nil at the top.
+func (s *Stack) Child() *StackPR { return s.at(s.Position + 1) }
+
+func (s *Stack) at(position int) *StackPR {
+	for i := range s.Entries {
+		if s.Entries[i].Position == position {
+			return &s.Entries[i]
+		}
+	}
+	return nil
+}
+
 // ReviewState is the review activity on a PR, as seen by the viewer.
 type ReviewState struct {
 	PRID         string // the PR's node ID
@@ -107,4 +136,8 @@ type ReviewState struct {
 	Conversation []Comment // Conversation Comments, oldest first
 	Pending      *PendingReview
 	Viewed       map[string]ViewedState // by path
+	// LastReviewed is the head commit when the viewer last submitted a
+	// review, or empty if they have not.
+	LastReviewed SHA
+	Stack        *Stack // nil when the PR is not in a Stack
 }

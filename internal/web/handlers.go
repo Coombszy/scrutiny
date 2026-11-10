@@ -125,22 +125,8 @@ func (s *Server) file(w http.ResponseWriter, r *http.Request) {
 
 // setViewMode saves the View Mode to the config file and reloads the page.
 func (s *Server) setViewMode(w http.ResponseWriter, r *http.Request) {
-	cfg, err := s.settings.Load()
-	if err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	cfg.ViewMode = settings.ViewMode(r.PostFormValue("mode"))
-	if err := cfg.Validate(); err != nil {
-		s.fail(w, r, fmt.Errorf("%w: %v", errBadRequest, err))
-		return
-	}
-	if err := s.settings.Save(cfg); err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	w.Header().Set("HX-Refresh", "true")
-	w.WriteHeader(http.StatusNoContent)
+	mode := settings.ViewMode(r.PostFormValue("mode"))
+	s.updateSettings(w, r, func(cfg *settings.Settings) { cfg.ViewMode = mode }, true)
 }
 
 func prRef(r *http.Request) (domain.PRRef, bool) {

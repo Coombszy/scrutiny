@@ -9,11 +9,17 @@ templ Layout(title string) {
 			<meta name="csrf-token" content={ pageFrom(ctx).CSRFToken }/>
 			<title>{ title } · Scrutiny</title>
 			<link rel="stylesheet" href="/static/scrutiny.css"/>
+			<link rel="stylesheet" href={ "/theme.css?v=" + pageFrom(ctx).Theme }/>
 			<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"/>
 			<script src="/static/htmx.min.js" defer></script>
 			<script src="/static/scrutiny.js" defer></script>
 		</head>
-		<body hx-headers={ csrfHeaders(ctx) }>
+		<body
+			hx-headers={ csrfHeaders(ctx) }
+			data-keys={ toJSON(pageFrom(ctx).Keys) }
+			data-themes={ toJSON(pageFrom(ctx).Themes) }
+			data-view-mode={ pageFrom(ctx).ViewMode }
+		>
 			<header class="topbar">
 				<a class="brand" href="/">Scrutiny</a>
 				<span class="topbar-hint muted">ctrl+k search</span>
@@ -23,6 +29,10 @@ templ Layout(title string) {
 			<main>
 				{ children... }
 			</main>
+			<dialog id="commands" class="palette">
+				<input type="search" placeholder="Type a command" autocomplete="off" spellcheck="false"/>
+				<div class="palette-results"><ul class="results"></ul></div>
+			</dialog>
 		</body>
 	</html>
 }

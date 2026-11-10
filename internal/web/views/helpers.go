@@ -248,3 +248,8 @@ func groupByPath(refs []review.Reference) [][]review.Reference {
 	}
 	return groups
 }
+
+// stackURL is another PR in the same repository's Stack.
+func stackURL(pr domain.PRRef, number int) string {
+	return domain.PRRef{Repo: pr.Repo, Number: number}.Path()
+}

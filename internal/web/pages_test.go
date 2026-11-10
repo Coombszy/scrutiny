@@ -35,13 +35,14 @@ const (
 )
 
 type app struct {
-	inst     *installer.Fake
-	nav      *navigator.Fake
-	hub      *live.Hub
-	host     *codehost.Fake
-	repos    *repostore.Fake
-	settings *settings.Memory
-	handler  http.Handler
+	themesDir string
+	inst      *installer.Fake
+	nav       *navigator.Fake
+	hub       *live.Hub
+	host      *codehost.Fake
+	repos     *repostore.Fake
+	settings  *settings.Memory
+	handler   http.Handler
 }
 
 func newApp(t *testing.T) *app {
@@ -75,7 +76,11 @@ func newApp(t *testing.T) *app {
 		Cache: cache.NewMemory(), Settings: a.settings, Navigator: a.nav,
 	})
 	lookPath := func(string) (string, error) { return "", exec.ErrNotFound }
-	a.handler = web.NewServer(token, svc, a.settings, a.hub, servers.New(a.inst, lookPath)).Handler()
+	a.themesDir = t.TempDir()
+	a.handler = web.NewServer(web.Deps{
+		CSRFToken: token, Review: svc, Settings: a.settings, Hub: a.hub,
+		Servers: servers.New(a.inst, lookPath), ThemesDir: a.themesDir,
+	}).Handler()
 	return a
 }
 

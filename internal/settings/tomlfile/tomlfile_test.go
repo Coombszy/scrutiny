@@ -3,6 +3,7 @@ package tomlfile_test
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/Coombszy/scrutiny/internal/settings"
@@ -16,7 +17,7 @@ func TestMissingFileLoadsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != settings.Defaults() {
+	if !reflect.DeepEqual(got, settings.Defaults()) {
 		t.Errorf("Load() = %+v, want defaults %+v", got, settings.Defaults())
 	}
 }
@@ -51,7 +52,7 @@ func TestSaveThenLoadRoundTrips(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Load() = %+v, want %+v", got, want)
 	}
 }
@@ -69,5 +70,28 @@ func write(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestKeysMergeOverDefaults(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	write(t, path, "[keys]\nnext_comment = \"n\"\n")
+
+	got, err := tomlfile.New(path).Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Keys["next_comment"] != "n" || got.Keys["symbol_search"] != "ctrl+k" || got.Keys["prev_comment"] != "[ c" {
+		t.Errorf("Keys = %v", got.Keys)
+	}
+}
+
+func TestInvalidKeysAreRejected(t *testing.T) {
+	for _, bad := range []string{"[keys]\nfly = \"f\"\n", "[keys]\nrefresh = \"ctrl+\"\n", "[keys]\nrefresh = \"hyper+r\"\n", "[keys]\nrefresh = \"\"\n"} {
+		path := filepath.Join(t.TempDir(), "config.toml")
+		write(t, path, bad)
+		if _, err := tomlfile.New(path).Load(); err == nil {
+			t.Errorf("Load(%q) succeeded, want an error", bad)
+		}
 	}
 }

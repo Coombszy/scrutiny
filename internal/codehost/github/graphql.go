@@ -129,6 +129,30 @@ type gqlReviewState struct {
 					} `json:"comments"`
 				} `json:"nodes"`
 			} `json:"reviews"`
+			Submitted struct {
+				Nodes []struct {
+					ViewerDidAuthor bool `json:"viewerDidAuthor"`
+					Commit          *struct {
+						OID string `json:"oid"`
+					} `json:"commit"`
+				} `json:"nodes"`
+			} `json:"submitted"`
+			StackEntry *struct {
+				Position int `json:"position"`
+				Stack    struct {
+					Size    int `json:"size"`
+					Entries struct {
+						Nodes []struct {
+							Position    int `json:"position"`
+							PullRequest struct {
+								Number int    `json:"number"`
+								Title  string `json:"title"`
+								State  string `json:"state"`
+							} `json:"pullRequest"`
+						} `json:"nodes"`
+					} `json:"entries"`
+				} `json:"stack"`
+			} `json:"stackEntry"`
 			ReviewThreads struct {
 				PageInfo gqlPageInfo `json:"pageInfo"`
 				Nodes    []gqlThread `json:"nodes"`
@@ -165,6 +189,21 @@ func (c *Client) ReviewState(ctx context.Context, ref domain.PRRef) (domain.Revi
 			state.Reactions = reactions(pr.ReactionGroups)
 			for _, c := range pr.Comments.Nodes {
 				state.Conversation = append(state.Conversation, comment(c))
+			}
+			for _, r := range pr.Submitted.Nodes { // oldest first
+				if r.ViewerDidAuthor && r.Commit != nil {
+					state.LastReviewed = domain.SHA(r.Commit.OID)
+				}
+			}
+			if e := pr.StackEntry; e != nil {
+				stack := &domain.Stack{Position: e.Position, Size: e.Stack.Size}
+				for _, n := range e.Stack.Entries.Nodes {
+					stack.Entries = append(stack.Entries, domain.StackPR{
+						Number: n.PullRequest.Number, Title: n.PullRequest.Title,
+						State: domain.PRState(strings.ToLower(n.PullRequest.State)), Position: n.Position,
+					})
+				}
+				state.Stack = stack
 			}
 			if n := pr.Reviews.Nodes; len(n) > 0 {
 				p := &domain.PendingReview{ID: n[0].ID, Comments: n[0].Comments.TotalCount}

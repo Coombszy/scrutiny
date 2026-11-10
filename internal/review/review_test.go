@@ -238,3 +238,26 @@ func TestRetargetingAPRRecomputesTheMergeBase(t *testing.T) {
 		t.Errorf("Base = %s, want the merge base with the new base branch", page.Comparison.Base.Short())
 	}
 }
+
+func TestSinceLastReviewStartsAfterTheReviewedCommit(t *testing.T) {
+	for _, c := range []struct {
+		name     string
+		reviewed domain.SHA
+		want     *review.ComparisonRequest
+	}{
+		{"reviewed c1", c1, &review.ComparisonRequest{First: c2, Last: c3}},
+		{"reviewed the head", c3, nil},
+		{"commit left the branch (force-push)", "gone000000000000000000000000000000000000", nil},
+		{"never reviewed", "", nil},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			f := newFixture(t)
+			f.host.State(ref).LastReviewed = c.reviewed
+			page := f.openPage(t)
+			got := page.SinceLastReview
+			if (got == nil) != (c.want == nil) || (got != nil && *got != *c.want) {
+				t.Errorf("SinceLastReview = %+v, want %+v", got, c.want)
+			}
+		})
+	}
+}

@@ -7,6 +7,18 @@ query ReviewState($owner: String!, $name: String!, $number: Int!, $threads: Stri
       reviews(states: PENDING, first: 1) {
         nodes { id commit { oid } comments { totalCount } }
       }
+      submitted: reviews(last: 50, states: [APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED]) {
+        nodes { viewerDidAuthor commit { oid } }
+      }
+      stackEntry {
+        position
+        stack {
+          size
+          entries(first: 100) {
+            nodes { position pullRequest { number title state } }
+          }
+        }
+      }
       reviewThreads(first: 50, after: $threads) {
         pageInfo { hasNextPage endCursor }
         nodes {

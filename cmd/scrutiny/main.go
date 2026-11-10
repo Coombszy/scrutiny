@@ -104,7 +104,10 @@ func serve(portOverride int) error {
 		return err
 	}
 	srv := &http.Server{
-		Handler:           web.NewServer(web.NewCSRFToken(), svc, settings, hub, languageServers).Handler(),
+		Handler: web.NewServer(web.Deps{
+			CSRFToken: web.NewCSRFToken(), Review: svc, Settings: settings, Hub: hub,
+			Servers: languageServers, ThemesDir: filepath.Join(dirs.Config, "themes"),
+		}).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		// Requests share ctx so that open event streams end on shutdown.
 		BaseContext: func(net.Listener) context.Context { return ctx },

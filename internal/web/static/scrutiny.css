@@ -1,13 +1,4 @@
-/* Gruvbox Dark */
-:root {
-  --bg0: #282828; --bg1: #3c3836; --bg2: #504945; --bg-soft: #32302f;
-  --fg: #ebdbb2; --fg-dim: #bdae93; --gray: #928374;
-  --red: #fb4934; --green: #b8bb26; --yellow: #fabd2f; --blue: #83a598;
-  --purple: #d3869b; --aqua: #8ec07c; --orange: #fe8019;
-  --add-bg: rgba(184, 187, 38, 0.14); --add-ln: rgba(184, 187, 38, 0.24);
-  --del-bg: rgba(251, 73, 52, 0.14); --del-ln: rgba(251, 73, 52, 0.24);
-  --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-}
+:root { --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; }
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg0); color: var(--fg); font: 14px/1.5 system-ui, sans-serif; }
@@ -72,24 +63,12 @@ main { padding: 1rem; max-width: 100%; }
 .diff.split td.empty { background: var(--bg-soft); }
 .diff tr.hunk td { background: var(--bg1); color: var(--gray); padding: .15rem .5rem; }
 
-/* Syntax: tree-sitter capture classes */
-.hl-keyword, .hl-label { color: var(--red); }
-.hl-string, .hl-text-literal, .hl-embedded { color: var(--green); }
-.hl-string-special-key, .hl-property, .hl-attribute { color: var(--blue); }
-.hl-escape, .hl-string-escape { color: var(--orange); }
-.hl-comment { color: var(--gray); font-style: italic; }
-.hl-function { color: var(--green); font-weight: 600; }
-.hl-function-method { color: var(--aqua); font-weight: normal; }
-.hl-function-builtin { color: var(--orange); }
-.hl-type { color: var(--yellow); }
-.hl-number, .hl-boolean, .hl-constant { color: var(--purple); }
-.hl-constant-builtin { color: var(--purple); }
-.hl-operator { color: var(--orange); }
-.hl-punctuation { color: var(--fg-dim); }
-.hl-punctuation-special { color: var(--orange); }
-.hl-variable { color: var(--fg); }
-.hl-text-title { color: var(--green); font-weight: 700; }
-.hl-text-uri, .hl-text-reference { color: var(--blue); text-decoration: underline; }
+/* Syntax: colours come from the Theme (/theme.css); only styles live here. */
+.hl-comment { font-style: italic; }
+.hl-function { font-weight: 600; }
+.hl-function-method { font-weight: normal; }
+.hl-text-title { font-weight: 700; }
+.hl-text-uri, .hl-text-reference { text-decoration: underline; }
 
 /* Phones */
 @media (max-width: 700px) {
@@ -231,3 +210,10 @@ tr:target td { background: rgba(250, 189, 47, .18); }
 .requires { color: var(--yellow); }
 .install-error { flex-basis: 100%; white-space: pre-wrap; color: var(--red); font-size: .8rem; max-height: 12rem; overflow: auto; background: var(--bg1); padding: .4rem; }
 #refresh-banner:has(#refresh-commits:empty):has(#refresh-comments:empty) { display: none; }
+
+/* Stacks and the Command Palette */
+.stack-nav { display: flex; gap: .8rem; align-items: center; flex-wrap: wrap; margin: .3rem 0; }
+.stack-nav a { text-decoration: none; }
+.palette .hint { margin-left: auto; font-family: var(--mono); font-size: .75rem; color: var(--gray); }
+.palette .capture { padding: .8rem; text-align: center; color: var(--fg-dim); }
+.palette .capture kbd { font-family: var(--mono); background: var(--bg2); padding: .1rem .4rem; border-radius: 4px; margin: 0 .15rem; }

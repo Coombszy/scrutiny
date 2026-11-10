@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -133,5 +134,44 @@ func TestReviewStateFollowsThreadPagination(t *testing.T) {
 	}
 	if len(*reqs) != 2 || len(got.Threads) != 8 {
 		t.Errorf("requests = %d, threads = %d; want 2 and 8", len(*reqs), len(got.Threads))
+	}
+}
+
+func TestReviewStateMapsTheStack(t *testing.T) {
+	body := fixture(t, "review_state.json") // cli/cli#14956 is 6th of 8 in a Stack
+	srv, _ := graphqlServer(t, func(gqlRequest) []byte { return body })
+
+	got, err := newClient(srv, cache.NewMemory()).ReviewState(context.Background(), pr14956)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := got.Stack
+	if s == nil || s.Position != 6 || s.Size != 8 || len(s.Entries) != 8 {
+		t.Fatalf("Stack = %+v", s)
+	}
+	if p := s.Parent(); p == nil || p.Number != 14955 || p.Title != "Add Git and configuration fixtures to ghmock" || p.State != domain.Merged {
+		t.Errorf("Parent = %+v", p)
+	}
+	if c := s.Child(); c == nil || c.Number != 14957 {
+		t.Errorf("Child = %+v", c)
+	}
+}
+
+func TestReviewStateFindsTheViewersLastSubmittedReview(t *testing.T) {
+	var doc map[string]any
+	json.Unmarshal(fixture(t, "review_state.json"), &doc)
+	pr := doc["data"].(map[string]any)["repository"].(map[string]any)["pullRequest"].(map[string]any)
+	nodes := pr["submitted"].(map[string]any)["nodes"].([]any)
+	nodes[1].(map[string]any)["viewerDidAuthor"] = true // 9e4e44a…
+	nodes[3].(map[string]any)["viewerDidAuthor"] = true // 9e4e44a…, later
+	body, _ := json.Marshal(doc)
+	srv, _ := graphqlServer(t, func(gqlRequest) []byte { return body })
+
+	got, err := newClient(srv, cache.NewMemory()).ReviewState(context.Background(), pr14956)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(got.LastReviewed), "9e4e44a") {
+		t.Errorf("LastReviewed = %q", got.LastReviewed)
 	}
 }

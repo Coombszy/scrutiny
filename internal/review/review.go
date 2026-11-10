@@ -73,6 +73,10 @@ type PRPage struct {
 	// OtherThreads are Review Threads on files not in this Comparison.
 	OtherThreads []domain.ReviewThread
 	Checks       domain.Checks
+	// SinceLastReview selects the commits pushed since the viewer's last
+	// submitted review; nil when there are none or that commit has left
+	// the branch.
+	SinceLastReview *ComparisonRequest
 	// Offline is set when the code host is unreachable and the page is
 	// served from the cache; review actions are then unavailable.
 	Offline bool
@@ -133,6 +137,7 @@ func (s *Service) PRPage(ctx context.Context, ref domain.PRRef, req ComparisonRe
 	page := PRPage{
 		PR: pr, Commits: commits, Comparison: cmp, MergeBase: mergeBase, Files: files,
 		Review: snap.State, Checks: snap.Checks, Offline: snap.Offline,
+		SinceLastReview: sinceLastReview(commits, snap.State.LastReviewed),
 	}
 	inComparison := map[string]bool{}
 	for i := range page.Files {
@@ -209,4 +214,18 @@ func resolve(req ComparisonRequest, commits []domain.Commit, mergeBase, head dom
 		base = commits[first-1].SHA
 	}
 	return Comparison{Base: base, Head: req.Last, First: req.First, Last: req.Last}, nil
+}
+
+// sinceLastReview is the run of commits after reviewed, if reviewed is
+// still on the branch and is not its head.
+func sinceLastReview(commits []domain.Commit, reviewed domain.SHA) *ComparisonRequest {
+	if reviewed == "" {
+		return nil
+	}
+	for i, c := range commits {
+		if c.SHA == reviewed && i+1 < len(commits) {
+			return &ComparisonRequest{First: commits[i+1].SHA, Last: commits[len(commits)-1].SHA}
+		}
+	}
+	return nil
 }
