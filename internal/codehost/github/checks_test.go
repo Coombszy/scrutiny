@@ -94,3 +94,34 @@ func TestUnreachableGitHubServesReadsFromCache(t *testing.T) {
 		t.Errorf("ReviewState: err = %v, want ErrOffline", err)
 	}
 }
+
+func TestChecksIncludeReviewStatus(t *testing.T) {
+	var doc map[string]any
+	json.Unmarshal(fixture(t, "checks.json"), &doc) // cli/go-gh#324: a review is required, none given
+	pr := doc["data"].(map[string]any)["repository"].(map[string]any)["pullRequest"].(map[string]any)
+	srv, _ := graphqlServer(t, func(gqlRequest) []byte { b, _ := json.Marshal(doc); return b })
+	client := newClient(srv, cache.NewMemory())
+
+	got, err := client.Checks(context.Background(), pr325)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ReviewDecision != domain.ReviewRequired || len(got.Verdicts) != 0 || got.Draft || got.PRState != domain.Open {
+		t.Errorf("recorded status = %+v", got)
+	}
+
+	pr["reviewDecision"] = "CHANGES_REQUESTED"
+	pr["isDraft"] = true
+	pr["latestOpinionatedReviews"] = map[string]any{"nodes": []any{
+		map[string]any{"state": "APPROVED", "author": map[string]any{"login": "ana"}},
+		map[string]any{"state": "CHANGES_REQUESTED", "author": map[string]any{"login": "bo"}},
+	}}
+	got, err = client.Checks(context.Background(), pr325)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []domain.Verdict{{Reviewer: "ana", State: domain.VerdictApproved}, {Reviewer: "bo", State: domain.VerdictChangesRequested}}
+	if got.ReviewDecision != domain.ChangesRequestedDecision || !got.Draft || len(got.Verdicts) != 2 || got.Verdicts[0] != want[0] || got.Verdicts[1] != want[1] {
+		t.Errorf("status = %+v", got)
+	}
+}

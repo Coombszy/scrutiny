@@ -11,9 +11,12 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 		@OfflineBanner(p.Offline, false)
 		@RefreshBanner()
 		<header class="pr-header">
+			<div class="pr-header-side">
+				<button class="primary" data-open-dialog="submit-review">Review @PendingCount(p.Review.Pending, false)</button>
+				@StatusBox(p.Checks)
+			</div>
 			<div class="pr-title">
 				<h1>{ p.PR.Title } <span class="muted">#{ itoa(p.PR.Ref.Number) }</span></h1>
-				<button class="primary" data-open-dialog="submit-review">Review @PendingCount(p.Review.Pending, false)</button>
 			</div>
 			<p class="muted">
 				<span class={ "badge", "state-" + string(p.PR.State) }>{ string(p.PR.State) }</span>
@@ -31,7 +34,6 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 					}
 				</nav>
 			}
-			@Checks(p.Checks)
 		</header>
 		<details class="conversation-panel">
 			<summary>Conversation (<span id="conversation-count">{ itoa(len(p.Review.Conversation)) }</span>)</summary>

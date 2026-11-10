@@ -22,7 +22,7 @@ templ LiveUpdate(pr domain.PRRef, u review.Update) {
 		@PendingCount(u.Pending, true)
 	}
 	if u.Checks != nil {
-		@checksView(*u.Checks, true)
+		@statusBox(*u.Checks, true)
 	}
 	if u.Indexing != nil {
 		@IndexingSpinner(*u.Indexing, true)
@@ -68,50 +68,78 @@ templ OfflineBanner(offline bool, oob bool) {
 	</div>
 }
 
-// Checks is the header pill that expands into the Checks panel.
-templ Checks(c domain.Checks) {
-	@checksView(c, false)
+// StatusBox is the PR's state at the right of the header: whether it is
+// draft, merged or closed, where reviews stand, its Checks (expandable when
+// there are any) and whether it can merge.
+templ StatusBox(c domain.Checks) {
+	@statusBox(c, false)
 }
 
-templ checksView(c domain.Checks, oob bool) {
-	<details
-		id="checks"
+templ statusBox(c domain.Checks, oob bool) {
+	<aside
+		id="pr-status"
+		class="pr-status"
 		if oob {
 			hx-swap-oob="true"
 		}
-		class="checks"
 	>
-		<summary>
-			if c.ShowMergeState() {
-				<span class={ "merge-state", "merge-" + string(c.MergeState) }>{ mergeStateLabel(c.MergeState) }</span>
-			}
-			if n := c.Count(domain.CheckFailure); n > 0 {
-				<span class="check-count failure">✗ { itoa(n) }</span>
-			}
-			if n := c.Count(domain.CheckPending); n > 0 {
-				<span class="check-count pending">● { itoa(n) }</span>
-			}
-			if n := c.Count(domain.CheckSuccess); n > 0 {
-				<span class="check-count success">✓ { itoa(n) }</span>
-			}
-			if len(c.Checks) == 0 {
-				<span class="muted">No Checks</span>
-			}
-		</summary>
-		<ul class="check-list">
-			for _, ch := range sortedChecks(c.Checks) {
-				<li class={ "check", "check-" + string(ch.State) }>
-					<span class="check-icon">{ checkIcon(ch.State) }</span>
-					if ch.URL != "" {
-						<a href={ templ.SafeURL(ch.URL) } target="_blank" rel="noopener">{ checkName(ch) }</a>
-					} else {
-						{ checkName(ch) }
+		switch c.PRState {
+			case domain.Merged:
+				<div class="status-row status-merged"><span class="status-icon">⇄</span> Merged</div>
+			case domain.Closed:
+				<div class="status-row status-closed"><span class="status-icon">✕</span> Closed</div>
+			default:
+				if c.Draft {
+					<div class="status-row muted"><span class="status-icon">✎</span> Draft: not ready for review</div>
+				}
+		}
+		@reviewsRow(c)
+		if len(c.Checks) == 0 {
+			<div class="status-row muted"><span class="status-icon">○</span> No Checks</div>
+		} else {
+			<details id="checks" class="status-row checks">
+				<summary>
+					<span class={ "status-icon", "check-" + string(checksOutcome(c)) }>{ checkIcon(checksOutcome(c)) }</span>
+					{ checksSummary(c) }
+				</summary>
+				<ul class="check-list">
+					for _, ch := range sortedChecks(c.Checks) {
+						<li class={ "check", "check-" + string(ch.State) }>
+							<span class="check-icon">{ checkIcon(ch.State) }</span>
+							if ch.URL != "" {
+								<a href={ templ.SafeURL(ch.URL) } target="_blank" rel="noopener">{ checkName(ch) }</a>
+							} else {
+								{ checkName(ch) }
+							}
+							if ch.Required {
+								<span class="badge">Required</span>
+							}
+						</li>
 					}
-					if ch.Required {
-						<span class="badge">Required</span>
-					}
-				</li>
+				</ul>
+			</details>
+		}
+		if c.ShowMergeState() {
+			<div class={ "status-row", "merge-" + string(c.MergeState) }>
+				<span class="status-icon">{ mergeIcon(c.MergeState) }</span> { mergeStateLabel(c.MergeState) }
+			</div>
+		}
+	</aside>
+}
+
+templ reviewsRow(c domain.Checks) {
+	if blockers := c.Reviewers(domain.VerdictChangesRequested); len(blockers) > 0 || c.ReviewDecision == domain.ChangesRequestedDecision {
+		<div class="status-row status-blocked"><span class="status-icon">✗</span> { byReviewers("Changes requested", blockers) }</div>
+	} else if approvers := c.Reviewers(domain.VerdictApproved); c.ReviewDecision == domain.ReviewRequired && c.PRState == domain.Open {
+		<div class="status-row status-waiting">
+			<span class="status-icon">●</span> Waiting on approval
+			if len(approvers) > 0 {
+				<span class="muted">({ byReviewers("approved", approvers) })</span>
 			}
-		</ul>
-	</details>
+		</div>
+	} else if len(approvers) > 0 || c.ReviewDecision == domain.ApprovedDecision {
+		<div class="status-row status-approved"><span class="status-icon">✓</span> { byReviewers("Approved", approvers) }</div>
+	} else {
+		<div class="status-row muted"><span class="status-icon">○</span> No reviews yet</div>
+	}
 }

@@ -2,6 +2,11 @@ query Checks($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       state
+      isDraft
+      reviewDecision
+      latestOpinionatedReviews(first: 20, writersOnly: true) {
+        nodes { state author { login } }
+      }
       mergeStateStatus
       headRefOid
       statusCheckRollup {

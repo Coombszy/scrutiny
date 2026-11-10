@@ -275,3 +275,56 @@ func commentCount(n int) string {
 	}
 	return strconv.Itoa(n) + " comments"
 }
+
+// checksOutcome is the worst state among the Checks.
+func checksOutcome(c domain.Checks) domain.CheckState {
+	switch {
+	case c.Count(domain.CheckFailure) > 0:
+		return domain.CheckFailure
+	case c.Count(domain.CheckPending) > 0:
+		return domain.CheckPending
+	}
+	return domain.CheckSuccess
+}
+
+// checksSummary is e.g. "All 17 Checks passed" or "1 failing · 2 pending · 14 passed".
+func checksSummary(c domain.Checks) string {
+	failing, pending, passed := c.Count(domain.CheckFailure), c.Count(domain.CheckPending), c.Count(domain.CheckSuccess)
+	if failing == 0 && pending == 0 {
+		if len(c.Checks) == 1 {
+			return "All 1 Check passed"
+		}
+		return fmt.Sprintf("All %d Checks passed", len(c.Checks))
+	}
+	var parts []string
+	for _, p := range []struct {
+		n    int
+		what string
+	}{{failing, "failing"}, {pending, "pending"}, {passed, "passed"}} {
+		if p.n > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", p.n, p.what))
+		}
+	}
+	return strings.Join(parts, " · ")
+}
+
+func mergeIcon(m domain.MergeState) string {
+	switch m {
+	case domain.MergeClean:
+		return "✓"
+	case domain.MergeBlocked, domain.MergeConflicting:
+		return "✗"
+	}
+	return "●"
+}
+
+// byReviewers is e.g. "Approved by ana and bo", or just what when nobody is named.
+func byReviewers(what string, names []string) string {
+	switch len(names) {
+	case 0:
+		return what
+	case 1:
+		return what + " by " + names[0]
+	}
+	return what + " by " + strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+}

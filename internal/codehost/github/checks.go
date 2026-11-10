@@ -16,7 +16,17 @@ var checksQuery string
 type gqlChecks struct {
 	Repository struct {
 		PullRequest *struct {
-			State             string `json:"state"`
+			State                    string `json:"state"`
+			IsDraft                  bool   `json:"isDraft"`
+			ReviewDecision           string `json:"reviewDecision"`
+			LatestOpinionatedReviews struct {
+				Nodes []struct {
+					State  string `json:"state"`
+					Author *struct {
+						Login string `json:"login"`
+					} `json:"author"`
+				} `json:"nodes"`
+			} `json:"latestOpinionatedReviews"`
 			MergeStateStatus  string `json:"mergeStateStatus"`
 			HeadRefOid        string `json:"headRefOid"`
 			StatusCheckRollup *struct {
@@ -62,7 +72,19 @@ func (c *Client) Checks(ctx context.Context, ref domain.PRRef) (domain.Checks, e
 	}
 	checks := domain.Checks{
 		Head: domain.SHA(pr.HeadRefOid), MergeState: mergeState(pr.MergeStateStatus),
-		PRState: domain.PRState(strings.ToLower(pr.State)),
+		PRState: domain.PRState(strings.ToLower(pr.State)), Draft: pr.IsDraft,
+		ReviewDecision: domain.ReviewDecision(strings.ToLower(pr.ReviewDecision)),
+	}
+	for _, r := range pr.LatestOpinionatedReviews.Nodes {
+		if r.Author == nil {
+			continue
+		}
+		switch r.State {
+		case "APPROVED":
+			checks.Verdicts = append(checks.Verdicts, domain.Verdict{Reviewer: r.Author.Login, State: domain.VerdictApproved})
+		case "CHANGES_REQUESTED":
+			checks.Verdicts = append(checks.Verdicts, domain.Verdict{Reviewer: r.Author.Login, State: domain.VerdictChangesRequested})
+		}
 	}
 	if pr.StatusCheckRollup != nil {
 		for _, n := range pr.StatusCheckRollup.Contexts.Nodes {

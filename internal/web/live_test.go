@@ -24,7 +24,7 @@ func TestPRPageShowsChecksAndConnectsForLiveUpdates(t *testing.T) {
 
 	body := a.do(t, http.MethodGet, prPath, nil).Body.String()
 	mustContain(t, body,
-		`id="checks"`, "Blocked", `class="check-count failure"`, `href="https://ci.example/run/1"`, "Required",
+		`id="pr-status"`, `id="checks"`, "Blocked", "1 failing", `href="https://ci.example/run/1"`, "Required",
 		`data-live="/github.com/o/r/pull/7/events?head=`+string(c2)+`"`, `id="refresh-banner"`, `id="offline-banner"`,
 	)
 }
@@ -108,18 +108,32 @@ func TestEventsCatchUpAPageFromBeforeAPush(t *testing.T) {
 	}
 }
 
-func TestMergeStateIsShownOnlyWhereItMeansSomething(t *testing.T) {
+func TestStatusBoxSummarisesReviewsChecksAndMergeState(t *testing.T) {
 	for _, c := range []struct {
 		name      string
 		checks    domain.Checks
 		state     domain.PRState
-		want      string
-		forbidden string
+		want      []string
+		forbidden []string
 	}{
-		{"clean with no checks", domain.Checks{MergeState: domain.MergeClean}, domain.Open, "No Checks", "Ready to merge"},
-		{"clean with checks", domain.Checks{MergeState: domain.MergeClean, Checks: []domain.Check{{Name: "ci", State: domain.CheckSuccess}}}, domain.Open, "Ready to merge", ""},
-		{"blocked with no checks", domain.Checks{MergeState: domain.MergeBlocked}, domain.Open, "Blocked", ""},
-		{"merged", domain.Checks{MergeState: domain.MergeConflicting, Checks: []domain.Check{{Name: "ci", State: domain.CheckSuccess}}}, domain.Merged, "✓ 1", "Conflicts"},
+		{"nothing enforced, nothing run", domain.Checks{MergeState: domain.MergeClean}, domain.Open,
+			[]string{"No reviews yet", "No Checks"}, []string{"Ready to merge", `<details id="checks"`}},
+		{"waiting on a required approval", domain.Checks{MergeState: domain.MergeBlocked, ReviewDecision: domain.ReviewRequired,
+			Checks: []domain.Check{{Name: "ci", State: domain.CheckSuccess}, {Name: "lint", State: domain.CheckSuccess}}}, domain.Open,
+			[]string{"Waiting on approval", "All 2 Checks passed", `<details id="checks"`, "Blocked"}, nil},
+		{"changes requested", domain.Checks{MergeState: domain.MergeBlocked, ReviewDecision: domain.ChangesRequestedDecision,
+			Verdicts: []domain.Verdict{{Reviewer: "ana", State: domain.VerdictApproved}, {Reviewer: "bo", State: domain.VerdictChangesRequested}},
+			Checks:   []domain.Check{{Name: "ci", State: domain.CheckFailure}, {Name: "e2e", State: domain.CheckPending}, {Name: "lint", State: domain.CheckSuccess}}}, domain.Open,
+			[]string{"Changes requested by bo", "1 failing", "1 pending", "1 passed"}, nil},
+		{"approved and clean", domain.Checks{MergeState: domain.MergeClean, ReviewDecision: domain.ApprovedDecision,
+			Verdicts: []domain.Verdict{{Reviewer: "ana", State: domain.VerdictApproved}},
+			Checks:   []domain.Check{{Name: "ci", State: domain.CheckSuccess}}}, domain.Open,
+			[]string{"Approved by ana", "Ready to merge"}, nil},
+		{"draft", domain.Checks{MergeState: domain.MergeBlocked, Draft: true}, domain.Open, []string{"Draft"}, nil},
+		{"merged", domain.Checks{MergeState: domain.MergeConflicting, ReviewDecision: domain.ApprovedDecision,
+			Verdicts: []domain.Verdict{{Reviewer: "ana", State: domain.VerdictApproved}},
+			Checks:   []domain.Check{{Name: "ci", State: domain.CheckSuccess}}}, domain.Merged,
+			[]string{"Merged", "Approved by ana", "All 1 Check passed"}, []string{"Conflicts", "Waiting"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			a := newApp(t)
@@ -128,11 +142,17 @@ func TestMergeStateIsShownOnlyWhereItMeansSomething(t *testing.T) {
 			a.host.PRs[ref] = pr
 			a.host.ChecksOf[ref] = c.checks
 			body := a.do(t, http.MethodGet, prPath, nil).Body.String()
-			checks := body[strings.Index(body, `id="checks"`):]
-			checks = checks[:strings.Index(checks, "</summary>")]
-			mustContain(t, checks, c.want)
-			if c.forbidden != "" && strings.Contains(checks, c.forbidden) {
-				t.Errorf("Checks pill shows %q: %s", c.forbidden, checks)
+			i := strings.Index(body, `id="pr-status"`)
+			if i < 0 {
+				t.Fatal("no status box")
+			}
+			box := body[i:]
+			box = box[:strings.Index(box, "</aside>")]
+			mustContain(t, box, c.want...)
+			for _, f := range c.forbidden {
+				if strings.Contains(box, f) {
+					t.Errorf("status box contains %q:\n%s", f, box)
+				}
 			}
 		})
 	}
