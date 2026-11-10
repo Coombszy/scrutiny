@@ -1,6 +1,7 @@
-# Live reload for development: `just run-live`, then open http://127.0.0.1:7878.
-# air rebuilds and restarts Scrutiny on changes and reloads the browser
-# through its proxy, which sits in front of the app on the usual port.
+# Live reload for development: `just run-live [--port N]`, then open
+# http://127.0.0.1:N (default 7878). air rebuilds and restarts Scrutiny on
+# changes and reloads the browser through its proxy on N, with Scrutiny on
+# N+1; the justfile sets both ports and Scrutiny's arguments.
 root = "."
 tmp_dir = "tmp"
 
@@ -8,8 +9,6 @@ tmp_dir = "tmp"
   # Templ output is generated here, so it is excluded below to avoid loops.
   cmd = "go tool templ generate && go build -o ./tmp/scrutiny ./cmd/scrutiny"
   entrypoint = ["./tmp/scrutiny"]
-  # -dev lets the proxy's inline reload script past the CSP.
-  args_bin = ["serve", "-dev", "-port", "7879"]
   include_ext = ["go", "templ", "css", "js", "toml", "graphql", "scm"]
   exclude_dir = ["tmp", "bin", ".beans", ".git", "docs", "testdata"]
   exclude_regex = ["_templ\\.go$", "_test\\.go$"]
@@ -21,8 +20,6 @@ tmp_dir = "tmp"
 
 [proxy]
   enabled = true
-  proxy_port = 7878
-  app_port = 7879
 
 [misc]
   clean_on_exit = true
