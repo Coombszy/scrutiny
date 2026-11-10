@@ -219,3 +219,14 @@ h1.path { font-family: var(--mono); font-size: 1.1rem; overflow-wrap: anywhere; 
 .result.marker-removed .marker { background: var(--red); }
 .result.marker-removed .name { text-decoration: line-through; color: var(--fg-dim); }
 tr:target td { background: rgba(250, 189, 47, .18); }
+
+/* Language Servers */
+.topbar-link { color: var(--fg-dim); font-size: .85rem; text-decoration: none; }
+.indexing:not([hidden]) + .topbar-link { margin-left: 1rem; }
+.indexing[hidden] + .topbar-link { margin-left: auto; }
+.server-list { display: flex; flex-direction: column; max-width: 60rem; }
+.server { display: flex; gap: 1rem; justify-content: space-between; align-items: center; padding: .6rem 0; border-bottom: 1px solid var(--bg1); flex-wrap: wrap; }
+.server-info p { margin: .2rem 0 0; font-size: .85rem; }
+.server-state { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.requires { color: var(--yellow); }
+.install-error { flex-basis: 100%; white-space: pre-wrap; color: var(--red); font-size: .8rem; max-height: 12rem; overflow: auto; background: var(--bg1); padding: .4rem; }

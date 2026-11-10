@@ -19,11 +19,13 @@ import (
 	"github.com/Coombszy/scrutiny/internal/cache/sqlite"
 	"github.com/Coombszy/scrutiny/internal/codehost/github"
 	"github.com/Coombszy/scrutiny/internal/highlight/treesitter"
+	"github.com/Coombszy/scrutiny/internal/installer/mason"
 	"github.com/Coombszy/scrutiny/internal/live"
 	"github.com/Coombszy/scrutiny/internal/navigator"
 	"github.com/Coombszy/scrutiny/internal/navigator/lsp"
 	"github.com/Coombszy/scrutiny/internal/repostore/gitcli"
 	"github.com/Coombszy/scrutiny/internal/review"
+	"github.com/Coombszy/scrutiny/internal/servers"
 	"github.com/Coombszy/scrutiny/internal/settings/tomlfile"
 	"github.com/Coombszy/scrutiny/internal/web"
 	"github.com/Coombszy/scrutiny/internal/xdg"
@@ -74,7 +76,9 @@ func serve(portOverride int) error {
 	if err != nil {
 		return err
 	}
-	nav := lsp.NewManager(languageServers(dirs), 10*time.Minute)
+	serverDir := filepath.Join(dirs.Data, "servers")
+	languageServers := servers.New(mason.New(mason.Options{Dir: serverDir}), exec.LookPath)
+	nav := lsp.NewManager(languageServers.Command, 10*time.Minute)
 	defer nav.Close()
 	repos := gitcli.New(filepath.Join(dirs.State, "repos"), filepath.Join(dirs.State, "worktrees"), gitcli.HTTPSCloneURL, gitcli.GHCredentialConfig("github.com")...)
 	svc := review.NewService(review.Deps{
@@ -100,7 +104,7 @@ func serve(portOverride int) error {
 		return err
 	}
 	srv := &http.Server{
-		Handler:           web.NewServer(web.NewCSRFToken(), svc, settings, hub).Handler(),
+		Handler:           web.NewServer(web.NewCSRFToken(), svc, settings, hub, languageServers).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		// Requests share ctx so that open event streams end on shutdown.
 		BaseContext: func(net.Listener) context.Context { return ctx },
@@ -117,19 +121,4 @@ func serve(portOverride int) error {
 		defer cancel()
 		return srv.Shutdown(shutdownCtx)
 	}
-}
-
-// languageServers finds a Language Server for each supported language:
-// first among those Scrutiny installed, then on $PATH.
-func languageServers(dirs xdg.Dirs) map[string][]string {
-	servers := map[string][]string{}
-	for lang, bin := range map[string]string{"go": "gopls"} {
-		installed := filepath.Join(dirs.Data, "servers", "bin", bin)
-		if _, err := os.Stat(installed); err == nil {
-			servers[lang] = []string{installed}
-		} else if path, err := exec.LookPath(bin); err == nil {
-			servers[lang] = []string{path}
-		}
-	}
-	return servers
 }

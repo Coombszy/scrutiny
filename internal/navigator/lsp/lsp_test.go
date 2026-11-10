@@ -48,7 +48,7 @@ func module(t *testing.T) navigator.Workspace {
 
 func newManager(t *testing.T, idle time.Duration) *lsp.Manager {
 	t.Helper()
-	m := lsp.NewManager(map[string][]string{"go": {gopls(t)}}, idle)
+	m := lsp.NewManager(lsp.Static(map[string][]string{"go": {gopls(t)}}), idle)
 	t.Cleanup(m.Close)
 	return m
 }
@@ -162,7 +162,7 @@ func TestIdleServersStopAndRestartOnDemand(t *testing.T) {
 }
 
 func TestUnknownLanguageHasNoServer(t *testing.T) {
-	m := lsp.NewManager(map[string][]string{}, time.Minute)
+	m := lsp.NewManager(lsp.Static(nil), time.Minute)
 	defer m.Close()
 	_, err := m.Definition(context.Background(), navigator.Workspace{Root: t.TempDir(), Language: "cobol"}, "x.cbl", navigator.Position{Line: 1})
 	if err == nil || !errors.Is(err, navigator.ErrNoServer) {

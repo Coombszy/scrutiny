@@ -20,8 +20,8 @@ import (
 
 // Manager runs Language Servers on demand.
 type Manager struct {
-	commands map[string][]string // language -> argv
-	idle     time.Duration
+	command func(language string) []string // nil when no server is available
+	idle    time.Duration
 
 	mu         sync.Mutex
 	servers    map[navigator.Workspace]*server
@@ -32,12 +32,18 @@ type Manager struct {
 
 var _ navigator.Navigator = (*Manager)(nil)
 
-// NewManager returns a Manager that runs commands[language] for a
-// Workspace, stopping servers unused for idle.
-func NewManager(commands map[string][]string, idle time.Duration) *Manager {
-	m := &Manager{commands: commands, idle: idle, servers: map[navigator.Workspace]*server{}, done: make(chan struct{})}
+// NewManager returns a Manager that runs command(language) for a
+// Workspace, looked up each time a server starts so newly installed servers
+// are picked up, and stops servers unused for idle.
+func NewManager(command func(language string) []string, idle time.Duration) *Manager {
+	m := &Manager{command: command, idle: idle, servers: map[navigator.Workspace]*server{}, done: make(chan struct{})}
 	go m.reap()
 	return m
+}
+
+// Static launches servers from a fixed table of language -> argv.
+func Static(commands map[string][]string) func(string) []string {
+	return func(language string) []string { return commands[language] }
 }
 
 // OnIndexing registers fn to be told when a Workspace's Indexing changes.
@@ -143,7 +149,7 @@ func (m *Manager) server(ctx context.Context, ws navigator.Workspace) (*server, 
 	m.mu.Lock()
 	s, ok := m.servers[ws]
 	if !ok {
-		argv := m.commands[ws.Language]
+		argv := m.command(ws.Language)
 		if len(argv) == 0 {
 			m.mu.Unlock()
 			return nil, fmt.Errorf("%w for %s", navigator.ErrNoServer, ws.Language)

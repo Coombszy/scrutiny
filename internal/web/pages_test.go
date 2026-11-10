@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -11,10 +12,12 @@ import (
 	"github.com/Coombszy/scrutiny/internal/codehost"
 	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/highlight"
+	"github.com/Coombszy/scrutiny/internal/installer"
 	"github.com/Coombszy/scrutiny/internal/live"
 	"github.com/Coombszy/scrutiny/internal/navigator"
 	"github.com/Coombszy/scrutiny/internal/repostore"
 	"github.com/Coombszy/scrutiny/internal/review"
+	"github.com/Coombszy/scrutiny/internal/servers"
 	"github.com/Coombszy/scrutiny/internal/settings"
 	"github.com/Coombszy/scrutiny/internal/web"
 )
@@ -32,6 +35,7 @@ const (
 )
 
 type app struct {
+	inst     *installer.Fake
 	nav      *navigator.Fake
 	hub      *live.Hub
 	host     *codehost.Fake
@@ -42,7 +46,11 @@ type app struct {
 
 func newApp(t *testing.T) *app {
 	t.Helper()
-	a := &app{nav: navigator.NewFake(), hub: live.NewHub(), host: codehost.NewFake(), repos: repostore.NewFake(), settings: settings.NewMemory(settings.Defaults())}
+	a := &app{inst: installer.NewFake(
+		installer.Package{Name: "gopls", Languages: []string{"Go"}, Version: "v0.23.0", Source: "golang", Requires: []string{"go"}},
+		installer.Package{Name: "pyright", Languages: []string{"Python"}, Version: "1.1.414", Source: "npm", Requires: []string{"node", "npm"}},
+		installer.Package{Name: "jdtls", Languages: []string{"Java"}, Source: "generic", Unsupported: "installs from generic"},
+	), nav: navigator.NewFake(), hub: live.NewHub(), host: codehost.NewFake(), repos: repostore.NewFake(), settings: settings.NewMemory(settings.Defaults())}
 	a.host.PRs[ref] = domain.PullRequest{Ref: ref, Title: "Teach the parser <generics>", Author: "octo", BaseBranch: "main", HeadBranch: "feat", HeadSHA: c2, State: domain.Open}
 	a.host.CommitsOf[ref] = []domain.Commit{{SHA: c1, Headline: "first step"}, {SHA: c2, Headline: "second step"}}
 	a.repos.Remotes[ref] = repostore.FakeRemote{BaseTip: tip, Commits: []domain.SHA{c1, c2}}
@@ -66,7 +74,8 @@ func newApp(t *testing.T) *app {
 		CodeHost: a.host, Repos: a.repos, Highlighter: highlight.PlainHighlighter{},
 		Cache: cache.NewMemory(), Settings: a.settings, Navigator: a.nav,
 	})
-	a.handler = web.NewServer(token, svc, a.settings, a.hub).Handler()
+	lookPath := func(string) (string, error) { return "", exec.ErrNotFound }
+	a.handler = web.NewServer(token, svc, a.settings, a.hub, servers.New(a.inst, lookPath)).Handler()
 	return a
 }
 

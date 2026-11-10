@@ -147,3 +147,6 @@ func TestSubmittingAReviewReloadsThePage(t *testing.T) {
 		t.Errorf("Submissions = %+v", a.host.Submissions)
 	}
 }
+
+// formValues is an empty form, so that a.do sends the CSRF token.
+func formValues() url.Values { return url.Values{} }

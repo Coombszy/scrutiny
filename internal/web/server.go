@@ -10,10 +10,12 @@ import (
 	"net/http"
 
 	"github.com/Coombszy/scrutiny/internal/codehost"
+	"github.com/Coombszy/scrutiny/internal/installer"
 	"github.com/Coombszy/scrutiny/internal/live"
 	"github.com/Coombszy/scrutiny/internal/navigator"
 	"github.com/Coombszy/scrutiny/internal/repostore"
 	"github.com/Coombszy/scrutiny/internal/review"
+	"github.com/Coombszy/scrutiny/internal/servers"
 	"github.com/Coombszy/scrutiny/internal/settings"
 	"github.com/Coombszy/scrutiny/internal/web/views"
 )
@@ -24,13 +26,14 @@ type Server struct {
 	review    *review.Service
 	settings  settings.Store
 	hub       *live.Hub
+	servers   *servers.Service
 	mux       *http.ServeMux
 }
 
 // NewServer returns a Server whose mutating requests must carry csrfToken.
-// Pages stream live updates from hub.
-func NewServer(csrfToken string, svc *review.Service, st settings.Store, hub *live.Hub) *Server {
-	s := &Server{csrfToken: csrfToken, review: svc, settings: st, hub: hub, mux: http.NewServeMux()}
+// Pages stream live updates from hub; Language Servers are managed by srv.
+func NewServer(csrfToken string, svc *review.Service, st settings.Store, hub *live.Hub, srv *servers.Service) *Server {
+	s := &Server{csrfToken: csrfToken, review: svc, settings: st, hub: hub, servers: srv, mux: http.NewServeMux()}
 	static, _ := fs.Sub(staticFS, "static")
 	s.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
 	s.mux.HandleFunc("GET /{$}", s.dashboard)
@@ -40,6 +43,7 @@ func NewServer(csrfToken string, svc *review.Service, st settings.Store, hub *li
 	s.mux.HandleFunc("POST /settings/view-mode", s.setViewMode)
 	s.mux.HandleFunc("GET /github.com/{owner}/{repo}/pull/{number}/events", s.events)
 	s.routeNavigation()
+	s.routeServers()
 	s.routeReview()
 	return s
 }
@@ -77,7 +81,7 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, codehost.ErrNotFound), errors.Is(err, repostore.ErrNotFound):
 		status = http.StatusNotFound
-	case errors.Is(err, navigator.ErrNoServer):
+	case errors.Is(err, navigator.ErrNoServer), errors.Is(err, installer.ErrNotFound):
 		status = http.StatusNotFound
 	case errors.Is(err, codehost.ErrOffline):
 		status = http.StatusServiceUnavailable

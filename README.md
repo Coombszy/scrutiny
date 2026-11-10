@@ -17,7 +17,9 @@ just run     # build and run `scrutiny serve`
 - `cmd/scrutiny`: the CLI entry point.
 - `internal/domain`: core types shared by every layer.
 - `internal/xdg`: XDG config/state/data directories (used on Linux and macOS).
-- `internal/<port>`: one package per port (`codehost`, `repostore`, `cache`, `settings`, `highlight`), holding the interface and its in-memory fake (`highlight.PlainHighlighter` doubles as the Highlighter's).
-- `internal/<port>/<adapter>`: the real adapters (`codehost/github`, `repostore/gitcli`, `cache/sqlite`, `settings/tomlfile`, `highlight/treesitter`).
-- `internal/review`: application services that compose the ports.
+- `internal/<port>`: one package per port (`codehost`, `repostore`, `cache`, `settings`, `highlight`, `navigator` (CodeNavigator), `installer` (ServerInstaller)), holding the interface and its in-memory fake (`highlight.PlainHighlighter` doubles as the Highlighter's).
+- `internal/<port>/<adapter>`: the real adapters (`codehost/github`, `repostore/gitcli`, `cache/sqlite`, `settings/tomlfile`, `highlight/treesitter`, `navigator/lsp`, `installer/mason`).
+- `internal/review`: application services that compose the ports (PR pages, review activity, polling, navigation).
+- `internal/live`: the SSE hub and the poller that pushes PR changes to open pages.
+- `internal/servers`: which Language Server launches for a language, and background installs.
 - `internal/web`: the driving HTTP adapter (handlers, Templ views, embedded static assets).

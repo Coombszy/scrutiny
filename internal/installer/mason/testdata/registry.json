@@ -1,0 +1,644 @@
+[
+ {
+  "name": "gopls",
+  "description": "gopls (pronounced \"Go please\") is the official Go language server developed by the Go team. It provides IDE features\nto any LSP-compatible editor.\n",
+  "homepage": "https://pkg.go.dev/golang.org/x/tools/gopls",
+  "licenses": [
+   "BSD-3-Clause"
+  ],
+  "languages": [
+   "Go"
+  ],
+  "categories": [
+   "LSP"
+  ],
+  "source": {
+   "id": "pkg:golang/golang.org/x/tools/gopls@v0.23.0"
+  },
+  "bin": {
+   "gopls": "golang:gopls"
+  },
+  "neovim": {
+   "lspconfig": "gopls"
+  }
+ },
+ {
+  "name": "jdtls",
+  "description": "Java language server.",
+  "homepage": "https://github.com/eclipse/eclipse.jdt.ls",
+  "licenses": [
+   "EPL-2.0"
+  ],
+  "languages": [
+   "Java"
+  ],
+  "categories": [
+   "LSP"
+  ],
+  "source": {
+   "id": "pkg:generic/eclipse/eclipse.jdt.ls@v1.63.0",
+   "download": [
+    {
+     "target": [
+      "darwin_x64",
+      "darwin_arm64"
+     ],
+     "files": {
+      "jdtls.tar.gz": "https://download.eclipse.org/jdtls/snapshots/jdt-language-server-{{ version | strip_prefix \"v\" }}-202610191322.tar.gz",
+      "lombok.jar": "https://projectlombok.org/downloads/lombok.jar"
+     },
+     "config": "config_mac/"
+    },
+    {
+     "target": "linux",
+     "files": {
+      "jdtls.tar.gz": "https://download.eclipse.org/jdtls/snapshots/jdt-language-server-{{ version | strip_prefix \"v\" }}-202610191322.tar.gz",
+      "lombok.jar": "https://projectlombok.org/downloads/lombok.jar"
+     },
+     "config": "config_linux/"
+    },
+    {
+     "target": "win",
+     "files": {
+      "jdtls.tar.gz": "https://download.eclipse.org/jdtls/snapshots/jdt-language-server-{{ version | strip_prefix \"v\" }}-202610191322.tar.gz",
+      "lombok.jar": "https://projectlombok.org/downloads/lombok.jar"
+     },
+     "config": "config_win/"
+    }
+   ]
+  },
+  "schemas": {
+   "lsp": "vscode:https://raw.githubusercontent.com/redhat-developer/vscode-java/master/package.json"
+  },
+  "bin": {
+   "jdtls": "python:bin/jdtls"
+  },
+  "share": {
+   "jdtls/lombok.jar": "lombok.jar",
+   "jdtls/plugins/": "plugins/",
+   "jdtls/plugins/org.eclipse.equinox.launcher.jar": "plugins/org.eclipse.equinox.launcher_1.8.0.v20260804-1928.jar",
+   "jdtls/config/": "{{source.download.config}}"
+  },
+  "neovim": {
+   "lspconfig": "jdtls"
+  }
+ },
+ {
+  "name": "json-lsp",
+  "description": "Language Server Protocol implementation for JSON.",
+  "homepage": "https://github.com/microsoft/vscode-json-languageservice",
+  "licenses": [
+   "MIT"
+  ],
+  "languages": [
+   "JSON"
+  ],
+  "categories": [
+   "LSP"
+  ],
+  "source": {
+   "id": "pkg:npm/vscode-langservers-extracted@4.10.0"
+  },
+  "schemas": {
+   "lsp": "vscode:https://raw.githubusercontent.com/microsoft/vscode/master/extensions/json-language-features/package.json"
+  },
+  "bin": {
+   "vscode-json-language-server": "npm:vscode-json-language-server"
+  },
+  "neovim": {
+   "lspconfig": "jsonls"
+  }
+ },
+ {
+  "name": "lua-language-server",
+  "description": "A language server that offers Lua language support - programmed in Lua.",
+  "homepage": "https://github.com/LuaLS/lua-language-server",
+  "licenses": [
+   "MIT"
+  ],
+  "languages": [
+   "Lua"
+  ],
+  "categories": [
+   "LSP"
+  ],
+  "source": {
+   "id": "pkg:github/LuaLS/lua-language-server@3.19.2",
+   "asset": [
+    {
+     "target": "darwin_arm64",
+     "file": "lua-language-server-{{version}}-darwin-arm64.tar.gz:libexec/",
+     "bin": "exec:libexec/bin/lua-language-server"
+    },
+    {
+     "target": "darwin_x64",
+     "file": "lua-language-server-{{version}}-darwin-x64.tar.gz:libexec/",
+     "bin": "exec:libexec/bin/lua-language-server"
+    },
+    {
+     "target": "linux_arm64_gnu",
+     "file": "lua-language-server-{{version}}-linux-arm64.tar.gz:libexec/",
+     "bin": "exec:libexec/bin/lua-language-server"
+    },
+    {
+     "target": "linux_x64_gnu",
+     "file": "lua-language-server-{{version}}-linux-x64.tar.gz:libexec/",
+     "bin": "exec:libexec/bin/lua-language-server"
+    },
+    {
+     "target": "win_x64",
+     "file": "lua-language-server-{{version}}-win32-x64.zip",
+     "bin": "bin/lua-language-server.exe"
+    }
+   ],
+   "version_overrides": [
+    {
+     "constraint": "semver:<=3.15.0",
+     "id": "pkg:github/LuaLS/lua-language-server@3.19.2",
+     "asset": [
+      {
+       "target": "darwin_arm64",
+       "file": "lua-language-server-{{version}}-darwin-arm64.tar.gz:libexec/",
+       "bin": "exec:libexec/bin/lua-language-server"
+      },
+      {
+       "target": "darwin_x64",
+       "file": "lua-language-server-{{version}}-darwin-x64.tar.gz:libexec/",
+       "bin": "exec:libexec/bin/lua-language-server"
+      },
+      {
+       "target": "linux_arm64_gnu",
+       "file": "lua-language-server-{{version}}-linux-arm64.tar.gz:libexec/",
+       "bin": "exec:libexec/bin/lua-language-server"
+      },
+      {
+       "target": "linux_x64_gnu",
+       "file": "lua-language-server-{{version}}-linux-x64.tar.gz:libexec/",
+       "bin": "exec:libexec/bin/lua-language-server"
+      },
+      {
+       "target": "linux_x64_musl",
+       "file": "lua-language-server-{{version}}-linux-x64-musl.tar.gz:libexec/",
+       "bin": "exec:libexec/bin/lua-language-server"
+      },
+      {
+       "target": "win_x64",
+       "file": "lua-language-server-{{version}}-win32-x64.zip",
+       "bin": "bin/lua-language-server.exe"
+      }
+     ]
+    },
+    {
+     "constraint": "semver:<=3.8.3",
+     "id": "pkg:github/LuaLS/lua-language-server@3.8.3",
+     "asset": [
+      {
+       "target": "darwin_arm64",
+       "file": "lua-language-server-{{version}}-darwin-arm64.tar.gz:libexec/",
+       "bin": "exec:libexec/bin/lua-language-server"
+      },
+      {
+       "target": "darwin_x64",
+       "file": "lua-language-server-{{version}}-darwin-x64.tar.gz:libexec/",
+       "bin": "exec:libexec/bin/lua-language-server"
+      },
+      {
+       "target": "linux_x64_gnu",
+       "file": "lua-language-server-{{version}}-linux-x64.tar.gz:libexec/",
+       "bin": "exec:libexec/bin/lua-language-server"
+      },
+      {
+       "target": "linux_x64_musl",
+       "file": "lua-language-server-{{version}}-linux-x64-musl.tar.gz:libexec/",
+       "bin": "exec:libexec/bin/lua-language-server"
+      },
+      {
+       "target": "win_x64",
+       "file": "lua-language-server-{{version}}-win32-x64.zip",
+       "bin": "bin/lua-language-server.exe"
+      }
+     ]
+    },
+    {
+     "constraint": "semver:<=3.7.4",
+     "id": "pkg:github/LuaLS/lua-language-server@3.7.4",
+     "asset": [
+      {
+       "target": "darwin_arm64",
+       "file": "lua-language-server-{{version}}-darwin-arm64.tar.gz:libexec/",
+       "bin": "exec:libexec/bin/lua-language-server"
+      },
+      {
+       "target": "darwin_x64",
+       "file": "lua-language-server-{{version}}-darwin-x64.tar.gz:libexec/",
+       "bin": "exec:libexec/bin/lua-language-server"
+      },
+      {
+       "target": "linux_arm64_gnu",
+       "file": "lua-language-server-{{version}}-linux-arm64.tar.gz:libexec/",
+       "bin": "exec:libexec/bin/lua-language-server"
+      },
+      {
+       "target": "linux_x64_gnu",
+       "file": "lua-language-server-{{version}}-linux-x64.tar.gz:libexec/",
+       "bin": "exec:libexec/bin/lua-language-server"
+      },
+      {
+       "target": "linux_x64_musl",
+       "file": "lua-language-server-{{version}}-linux-x64-musl.tar.gz:libexec/",
+       "bin": "exec:libexec/bin/lua-language-server"
+      },
+      {
+       "target": "win_x64",
+       "file": "lua-language-server-{{version}}-win32-x64.zip",
+       "bin": "bin/lua-language-server.exe"
+      }
+     ]
+    }
+   ]
+  },
+  "schemas": {
+   "lsp": "vscode:https://raw.githubusercontent.com/LuaLS/vscode-lua/master/package.json"
+  },
+  "bin": {
+   "lua-language-server": "{{source.asset.bin}}"
+  },
+  "neovim": {
+   "lspconfig": "lua_ls"
+  }
+ },
+ {
+  "name": "omnisharp",
+  "description": "OmniSharp language server based on Roslyn workspaces. This version of Omnisharp requires dotnet (.NET 6.0) to be\ninstalled.\n",
+  "homepage": "https://github.com/OmniSharp/omnisharp-roslyn",
+  "licenses": [
+   "MIT"
+  ],
+  "languages": [
+   "C#"
+  ],
+  "categories": [
+   "LSP"
+  ],
+  "source": {
+   "id": "pkg:github/OmniSharp/omnisharp-roslyn@v1.39.15",
+   "asset": [
+    {
+     "target": "darwin_x64",
+     "file": "omnisharp-osx-x64-net6.0.zip:libexec/"
+    },
+    {
+     "target": "darwin_arm64",
+     "file": "omnisharp-osx-arm64-net6.0.zip:libexec/"
+    },
+    {
+     "target": "linux_x64",
+     "file": "omnisharp-linux-x64-net6.0.zip:libexec/"
+    },
+    {
+     "target": "linux_arm64",
+     "file": "omnisharp-linux-arm64-net6.0.zip:libexec/"
+    },
+    {
+     "target": "win_x64",
+     "file": "omnisharp-win-x64-net6.0.zip:libexec/"
+    },
+    {
+     "target": "win_arm64",
+     "file": "omnisharp-win-arm64-net6.0.zip:libexec/"
+    }
+   ]
+  },
+  "schemas": {
+   "lsp": "vscode:https://raw.githubusercontent.com/OmniSharp/omnisharp-vscode/master/package.json"
+  },
+  "bin": {
+   "OmniSharp": "dotnet:libexec/OmniSharp.dll"
+  },
+  "neovim": {
+   "lspconfig": "omnisharp"
+  }
+ },
+ {
+  "name": "prettier",
+  "description": "Prettier is an opinionated code formatter.",
+  "homepage": "https://prettier.io",
+  "licenses": [
+   "MIT"
+  ],
+  "languages": [
+   "Angular",
+   "CSS",
+   "Flow",
+   "GraphQL",
+   "HTML",
+   "JSON",
+   "JSX",
+   "JavaScript",
+   "LESS",
+   "Markdown",
+   "SCSS",
+   "TypeScript",
+   "Vue",
+   "YAML"
+  ],
+  "categories": [
+   "Formatter"
+  ],
+  "source": {
+   "id": "pkg:npm/prettier@3.9.10"
+  },
+  "bin": {
+   "prettier": "npm:prettier"
+  }
+ },
+ {
+  "name": "pyright",
+  "description": "Static type checker for Python.",
+  "homepage": "https://github.com/microsoft/pyright",
+  "licenses": [
+   "MIT"
+  ],
+  "languages": [
+   "Python"
+  ],
+  "categories": [
+   "LSP"
+  ],
+  "source": {
+   "id": "pkg:npm/pyright@1.1.414"
+  },
+  "schemas": {
+   "lsp": "vscode:https://raw.githubusercontent.com/microsoft/pyright/{{version}}/packages/vscode-pyright/package.json"
+  },
+  "bin": {
+   "pyright": "npm:pyright",
+   "pyright-langserver": "npm:pyright-langserver"
+  },
+  "neovim": {
+   "lspconfig": "pyright"
+  }
+ },
+ {
+  "name": "rust-analyzer",
+  "description": "rust-analyzer is an implementation of the Language Server Protocol for the\nRust programming language. It provides features like completion and goto\ndefinition for many code editors, including VS Code, Emacs and Vim.\n",
+  "homepage": "https://github.com/rust-lang/rust-analyzer",
+  "licenses": [
+   "Apache-2.0",
+   "MIT"
+  ],
+  "languages": [
+   "Rust"
+  ],
+  "categories": [
+   "LSP"
+  ],
+  "source": {
+   "id": "pkg:github/rust-lang/rust-analyzer@2026-11-09",
+   "asset": [
+    {
+     "target": "linux_x64_gnu",
+     "file": "rust-analyzer-x86_64-unknown-linux-gnu.gz",
+     "bin": "rust-analyzer-x86_64-unknown-linux-gnu"
+    },
+    {
+     "target": "linux_arm64_gnu",
+     "file": "rust-analyzer-aarch64-unknown-linux-gnu.gz",
+     "bin": "rust-analyzer-aarch64-unknown-linux-gnu"
+    },
+    {
+     "target": "linux_x64_musl",
+     "file": "rust-analyzer-x86_64-unknown-linux-musl.gz",
+     "bin": "rust-analyzer-x86_64-unknown-linux-musl"
+    },
+    {
+     "target": "darwin_x64",
+     "file": "rust-analyzer-x86_64-apple-darwin.gz",
+     "bin": "rust-analyzer-x86_64-apple-darwin"
+    },
+    {
+     "target": "darwin_arm64",
+     "file": "rust-analyzer-aarch64-apple-darwin.gz",
+     "bin": "rust-analyzer-aarch64-apple-darwin"
+    },
+    {
+     "target": "win_x64",
+     "file": "rust-analyzer-x86_64-pc-windows-msvc.zip",
+     "bin": "rust-analyzer.exe"
+    },
+    {
+     "target": "win_arm64",
+     "file": "rust-analyzer-aarch64-pc-windows-msvc.zip",
+     "bin": "rust-analyzer.exe"
+    }
+   ]
+  },
+  "schemas": {
+   "lsp": "vscode:https://raw.githubusercontent.com/rust-analyzer/rust-analyzer/{{version}}/editors/code/package.json"
+  },
+  "bin": {
+   "rust-analyzer": "{{source.asset.bin}}"
+  },
+  "neovim": {
+   "lspconfig": "rust_analyzer"
+  }
+ },
+ {
+  "name": "solargraph",
+  "description": "Solargraph is a Ruby gem that provides intellisense features through the language server protocol.",
+  "homepage": "https://solargraph.org",
+  "licenses": [
+   "MIT"
+  ],
+  "languages": [
+   "Ruby"
+  ],
+  "categories": [
+   "LSP"
+  ],
+  "source": {
+   "id": "pkg:gem/solargraph@0.62.1"
+  },
+  "schemas": {
+   "lsp": "vscode:https://raw.githubusercontent.com/castwide/vscode-solargraph/master/package.json"
+  },
+  "bin": {
+   "solargraph": "gem:solargraph"
+  },
+  "neovim": {
+   "lspconfig": "solargraph"
+  }
+ },
+ {
+  "name": "typescript-language-server",
+  "description": "TypeScript & JavaScript Language Server.",
+  "homepage": "https://github.com/typescript-language-server/typescript-language-server",
+  "licenses": [
+   "MIT"
+  ],
+  "languages": [
+   "TypeScript",
+   "JavaScript"
+  ],
+  "categories": [
+   "LSP"
+  ],
+  "source": {
+   "id": "pkg:npm/typescript-language-server@6.0.3",
+   "extra_packages": [
+    "typescript@6.0.3"
+   ]
+  },
+  "schemas": {
+   "lsp": "vscode:https://raw.githubusercontent.com/microsoft/vscode/main/extensions/typescript-language-features/package.json"
+  },
+  "bin": {
+   "typescript-language-server": "npm:typescript-language-server"
+  },
+  "neovim": {
+   "lspconfig": "ts_ls"
+  }
+ },
+ {
+  "name": "zls",
+  "description": "Zig LSP implementation + Zig Language Server.",
+  "homepage": "https://github.com/zigtools/zls",
+  "licenses": [
+   "MIT"
+  ],
+  "languages": [
+   "Zig"
+  ],
+  "categories": [
+   "LSP"
+  ],
+  "source": {
+   "id": "pkg:github/zigtools/zls@0.17.0",
+   "asset": [
+    {
+     "target": "darwin_arm64",
+     "file": "zls-aarch64-macos.tar.xz",
+     "bin": "zls"
+    },
+    {
+     "target": "darwin_x64",
+     "file": "zls-x86_64-macos.tar.xz",
+     "bin": "zls"
+    },
+    {
+     "target": "linux_arm64",
+     "file": "zls-aarch64-linux.tar.xz",
+     "bin": "zls"
+    },
+    {
+     "target": "linux_x64",
+     "file": "zls-x86_64-linux.tar.xz",
+     "bin": "zls"
+    },
+    {
+     "target": "linux_x86",
+     "file": "zls-x86-linux.tar.xz",
+     "bin": "zls"
+    },
+    {
+     "target": "win_x86",
+     "file": "zls-x86-windows.zip",
+     "bin": "zls.exe"
+    },
+    {
+     "target": "win_x64",
+     "file": "zls-x86_64-windows.zip",
+     "bin": "zls.exe"
+    }
+   ],
+   "version_overrides": [
+    {
+     "constraint": "semver:<=0.11.0",
+     "id": "pkg:github/zigtools/zls@0.11.0",
+     "asset": [
+      {
+       "target": "darwin_arm64",
+       "file": "zls-aarch64-macos.tar.gz",
+       "bin": "bin/zls"
+      },
+      {
+       "target": "darwin_x64",
+       "file": "zls-x86_64-macos.tar.gz",
+       "bin": "bin/zls"
+      },
+      {
+       "target": "linux_arm64",
+       "file": "zls-aarch64-linux.tar.gz",
+       "bin": "bin/zls"
+      },
+      {
+       "target": "linux_x64",
+       "file": "zls-x86_64-linux.tar.gz",
+       "bin": "bin/zls"
+      },
+      {
+       "target": "linux_x86",
+       "file": "zls-x86-linux.tar.gz",
+       "bin": "bin/zls"
+      },
+      {
+       "target": "win_x86",
+       "file": "zls-x86-windows.zip",
+       "bin": "bin/zls.exe"
+      },
+      {
+       "target": "win_x64",
+       "file": "zls-x86_64-windows.zip",
+       "bin": "bin/zls.exe"
+      }
+     ]
+    },
+    {
+     "constraint": "semver:<=0.10.0",
+     "id": "pkg:github/zigtools/zls@0.10.0",
+     "asset": [
+      {
+       "target": "darwin_arm64",
+       "file": "aarch64-macos.tar.zst",
+       "bin": "bin/zls"
+      },
+      {
+       "target": "darwin_x64",
+       "file": "x86_64-macos.tar.zst",
+       "bin": "bin/zls"
+      },
+      {
+       "target": "linux_x64",
+       "file": "x86_64-linux.tar.zst",
+       "bin": "bin/zls"
+      },
+      {
+       "target": "linux_x86",
+       "file": "i386-linux.tar.zst",
+       "bin": "bin/zls"
+      },
+      {
+       "target": "win_x86",
+       "file": "i386-windows.tar.zst",
+       "bin": "bin/zls.exe"
+      },
+      {
+       "target": "win_x64",
+       "file": "x86_64-windows.tar.zst",
+       "bin": "bin/zls.exe"
+      }
+     ]
+    }
+   ]
+  },
+  "schemas": {
+   "lsp": "https://raw.githubusercontent.com/zigtools/zls/{{version}}/schema.json"
+  },
+  "bin": {
+   "zls": "{{source.asset.bin}}"
+  },
+  "neovim": {
+   "lspconfig": "zls"
+  }
+ }
+]

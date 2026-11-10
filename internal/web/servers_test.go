@@ -1,0 +1,70 @@
+package web_test
+
+import (
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/Coombszy/scrutiny/internal/installer"
+)
+
+func TestServersPageShowsEachPackagesState(t *testing.T) {
+	a := newApp(t)
+	a.inst.Have["gopls"] = installer.Installed{Name: "gopls", Version: "v0.23.0", Languages: []string{"Go"}}
+	a.inst.Absent["node"] = true
+
+	body := a.do(t, http.MethodGet, "/settings/servers", nil).Body.String()
+	mustContain(t, body,
+		"Language Servers", `id="server-gopls"`, "Installed v0.23.0", `hx-post="/settings/servers/gopls/remove"`,
+		`id="server-pyright"`, "Requires node",
+		`id="server-jdtls"`, "installs from generic",
+		`hx-get="/settings/servers/list"`, `hx-post="/settings/servers/refresh"`,
+	)
+	if strings.Contains(body, `hx-post="/settings/servers/pyright/install"`) {
+		t.Error("pyright offers Install although node is missing")
+	}
+}
+
+func TestInstallingShowsProgressThenTheInstalledVersion(t *testing.T) {
+	a := newApp(t)
+	a.inst.Block = make(chan struct{})
+
+	rec := a.do(t, http.MethodPost, "/settings/servers/gopls/install", formValues())
+	mustContain(t, rec.Body.String(), `id="server-gopls"`, "Installing", `hx-trigger="every 1s"`)
+
+	close(a.inst.Block)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		body := a.do(t, http.MethodGet, "/settings/servers/gopls", nil).Body.String()
+		if strings.Contains(body, "Installed v0.23.0") {
+			if strings.Contains(body, "every 1s") {
+				t.Error("still polling once installed")
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("never installed: %s", body)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestRemovingAServer(t *testing.T) {
+	a := newApp(t)
+	a.inst.Have["gopls"] = installer.Installed{Name: "gopls", Version: "v0.23.0"}
+	body := a.do(t, http.MethodPost, "/settings/servers/gopls/remove", formValues()).Body.String()
+	mustContain(t, body, `hx-post="/settings/servers/gopls/install"`)
+}
+
+func TestServerSearchFilters(t *testing.T) {
+	a := newApp(t)
+	body := a.do(t, http.MethodGet, "/settings/servers/list?q=pyth", nil).Body.String()
+	mustContain(t, body, "pyright")
+	if strings.Contains(body, "gopls") {
+		t.Error("gopls matched pyth")
+	}
+	if rec := a.do(t, http.MethodGet, "/settings/servers/nope", nil); rec.Code != http.StatusNotFound {
+		t.Errorf("unknown server: status %d", rec.Code)
+	}
+}

@@ -1,0 +1,77 @@
+package views
+
+import (
+	"strings"
+
+	"github.com/Coombszy/scrutiny/internal/servers"
+)
+
+templ ServersPage(list []servers.Status) {
+	@Layout("Language Servers") {
+		<header class="pr-header">
+			<h1>Language Servers</h1>
+			<p class="muted">
+				Code navigation runs a Language Server per language. These come from the
+				<a href="https://github.com/mason-org/mason-registry">Mason registry</a>
+				and install into Scrutiny's data directory; Scrutiny never installs runtimes such as node or go.
+			</p>
+		</header>
+		<div class="toolbar">
+			<input type="search" name="q" placeholder="Filter by name or language" hx-get="/settings/servers/list" hx-trigger="input changed delay:200ms, search" hx-target="#server-list"/>
+			<button hx-post="/settings/servers/refresh" hx-target="#server-list">Update registry</button>
+		</div>
+		@ServerList(list)
+	}
+}
+
+templ ServerList(list []servers.Status) {
+	<div id="server-list" class="server-list">
+		if len(list) == 0 {
+			<p class="muted">No matching Language Servers.</p>
+		}
+		for _, st := range list {
+			@ServerRow(st)
+		}
+	</div>
+}
+
+templ ServerRow(st servers.Status) {
+	<div
+		class="server"
+		id={ "server-" + st.Name }
+		if st.Job != nil && st.Job.State == servers.Installing {
+			hx-get={ "/settings/servers/" + st.Name }
+			hx-trigger="every 1s"
+			hx-swap="outerHTML"
+		}
+	>
+		<div class="server-info">
+			<strong>{ st.Name }</strong>
+			<span class="muted">{ strings.Join(st.Languages, ", ") }</span>
+			if st.Description != "" {
+				<p class="muted">{ st.Description }</p>
+			}
+		</div>
+		<div class="server-state">
+			switch {
+				case st.Job != nil && st.Job.State == servers.Installing:
+					<span class="spinner"></span> Installing { st.Version }…
+				case st.Installed != nil:
+					<span class="badge state-open">Installed { st.Installed.Version }</span>
+					if st.Installed.Version != st.Version && st.Version != "" {
+						<button hx-post={ "/settings/servers/" + st.Name + "/install" } hx-target="closest .server" hx-swap="outerHTML">Update to { st.Version }</button>
+					}
+					<button hx-post={ "/settings/servers/" + st.Name + "/remove" } hx-target="closest .server" hx-swap="outerHTML">Remove</button>
+				case st.Unsupported != "":
+					<span class="muted">Not installable: { st.Unsupported }</span>
+				case len(st.Missing) > 0:
+					<span class="requires">Requires { strings.Join(st.Missing, " and ") }</span>
+				default:
+					<button hx-post={ "/settings/servers/" + st.Name + "/install" } hx-target="closest .server" hx-swap="outerHTML">Install { st.Version }</button>
+			}
+			if st.Job != nil && st.Job.State == servers.Failed {
+				<pre class="install-error">{ st.Job.Err }</pre>
+			}
+		</div>
+	</div>
+}
