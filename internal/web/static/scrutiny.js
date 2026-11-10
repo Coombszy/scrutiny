@@ -381,6 +381,20 @@ window.Scrutiny = { actions: {} };
   let pending = [];
   let timer;
   let capture = null; // set while the Command Palette records a new binding
+
+  // match finds the action bound to exactly typed, and whether typed starts
+  // a longer binding. cmd counts as ctrl, for macOS.
+  function match(typed) {
+    const norm = (s) => s.replaceAll("meta+", "ctrl+");
+    let prefix = false;
+    for (const [action, binding] of Object.entries(bindings)) {
+      const seq = norm(binding.split(/\s+/).join(" "));
+      if (seq === norm(typed)) return { action };
+      if (seq.startsWith(norm(typed) + " ")) prefix = true;
+    }
+    return { prefix };
+  }
+
   document.addEventListener("keydown", (e) => {
     if (capture) return;
     if (e.key === "Escape") {
@@ -390,27 +404,27 @@ window.Scrutiny = { actions: {} };
     }
     const k = spec(e);
     if (!k) return;
-    const modified = k.includes("+");
+    const modified = e.ctrlKey || e.altKey || e.metaKey;
     // Single-key bindings only work when no input has focus.
     if (!modified && typing(e.target)) return;
-    pending.push(k);
     clearTimeout(timer);
-    timer = setTimeout(() => (pending = []), 1000);
-    const typed = pending.join(" ");
-    let prefix = false;
-    for (const [action, binding] of Object.entries(bindings)) {
-      const seq = binding.split(/\s+/).join(" ");
-      if (seq === typed && (modified || !typing(e.target))) {
-        const run = Scrutiny.actions[action];
-        if (!run) continue;
+    // Try the sequence so far, then this key on its own, so a stray key
+    // never swallows the next hotkey.
+    for (const typed of [[...pending, k], [k]]) {
+      const m = match(typed.join(" "));
+      if (m.action && Scrutiny.actions[m.action]) {
         e.preventDefault();
         pending = [];
-        run();
+        Scrutiny.actions[m.action]();
         return;
       }
-      if (seq.startsWith(typed + " ")) prefix = true;
+      if (m.prefix) {
+        pending = typed;
+        timer = setTimeout(() => (pending = []), 1000);
+        return;
+      }
     }
-    if (!prefix) pending = modified ? [] : pending.slice(-1).filter((p) => Object.values(bindings).some((b) => b.startsWith(p + " ")));
+    pending = [];
   });
 
   // The Command Palette lists actions, and the page's own links that act
@@ -460,9 +474,27 @@ window.Scrutiny = { actions: {} };
     input.focus();
   }
 
+  // fuzzy scores label against q: its characters in order, preferring
+  // word starts and runs; -1 when they do not all appear.
+  function fuzzy(q, label) {
+    const t = label.toLowerCase();
+    let score = 0, ti = 0, prev = -2;
+    for (const ch of q) {
+      ti = t.indexOf(ch, ti);
+      if (ti < 0) return -1;
+      score += 1 + (ti === prev + 1 ? 5 : 0) + (ti === 0 || t[ti - 1] === " " ? 10 : 0);
+      prev = ti++;
+    }
+    return score;
+  }
+
   function render() {
-    const q = input.value.toLowerCase();
-    const shown = items.filter((c) => c.label.toLowerCase().includes(q));
+    const q = input.value.toLowerCase().replace(/\s+/g, "");
+    const shown = items
+      .map((c) => ({ c, score: fuzzy(q, c.label) }))
+      .filter((x) => x.score >= 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.c);
     list.replaceChildren(
       ...shown.map((c, i) => {
         const li = document.createElement("li");
@@ -517,7 +549,8 @@ window.Scrutiny = { actions: {} };
       dialog.close();
       return;
     }
-    if (e.key === "Enter" && capture.keys.length > 0) {
+    if (e.key === "Enter" && capture.keys.length === 0) return;
+    if (e.key === "Enter") {
       const { action, keys } = capture;
       capture = null;
       dialog.close();

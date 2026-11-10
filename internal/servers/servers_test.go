@@ -123,3 +123,25 @@ func waitFor(t *testing.T, cond func() bool) {
 		time.Sleep(5 * time.Millisecond)
 	}
 }
+
+func TestKnownServersWinOverOtherPackagesForALanguage(t *testing.T) {
+	inst := installer.NewFake(registry...)
+	inst.Have["golangci-lint-langserver"] = installer.Installed{Name: "golangci-lint-langserver", Languages: []string{"Go"},
+		Bin: map[string]string{"golangci-lint-langserver": "/servers/bin/golangci-lint-langserver"}}
+	inst.Have["gopls"] = installer.Installed{Name: "gopls", Languages: []string{"Go"}, Bin: map[string]string{"gopls": "/servers/bin/gopls"}}
+	if got := newService(inst).Command("go"); !slices.Equal(got, []string{"/servers/bin/gopls"}) {
+		t.Errorf("Command(go) = %v, want gopls", got)
+	}
+}
+
+func TestRemovingDuringAnInstallIsRefused(t *testing.T) {
+	inst := installer.NewFake(registry...)
+	inst.Block = make(chan struct{})
+	svc := newService(inst)
+	svc.Install("gopls")
+	if err := svc.Remove("gopls"); err == nil {
+		t.Error("Remove during an install succeeded")
+	}
+	close(inst.Block)
+	waitFor(t, func() bool { return status(t, svc, "gopls").Installed != nil })
+}

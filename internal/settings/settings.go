@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -86,6 +87,9 @@ func (s Settings) Validate() error {
 	case s.Diff.CollapseThreshold < 1:
 		return fmt.Errorf("diff.collapse_threshold must be positive, got %d", s.Diff.CollapseThreshold)
 	}
+	if err := keyConflicts(s.Keys); err != nil {
+		return err
+	}
 	defaults := DefaultKeys()
 	for action, binding := range s.Keys {
 		if _, ok := defaults[action]; !ok {
@@ -110,4 +114,19 @@ func (s Settings) WithKeyDefaults() Settings {
 type Store interface {
 	Load() (Settings, error)
 	Save(Settings) error
+}
+
+// keyConflicts finds two actions bound to the same keys, or one bound to a
+// prefix of another's sequence (which would always fire first).
+func keyConflicts(keys map[string]string) error {
+	actions := slices.Sorted(maps.Keys(keys))
+	for i, a := range actions {
+		for _, b := range actions[i+1:] {
+			sa, sb := strings.Join(strings.Fields(keys[a]), " "), strings.Join(strings.Fields(keys[b]), " ")
+			if sa == sb || strings.HasPrefix(sb, sa+" ") || strings.HasPrefix(sa, sb+" ") {
+				return fmt.Errorf("keys: %s (%q) and %s (%q) conflict", a, keys[a], b, keys[b])
+			}
+		}
+	}
+	return nil
 }

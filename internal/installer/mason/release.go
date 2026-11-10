@@ -56,14 +56,27 @@ func (i *Installer) fetchRelease(ctx context.Context, p plan, dir string) error 
 	}
 }
 
-// within resolves name inside dir, refusing entries that would escape it.
+// within resolves name inside dir, refusing entries that would escape it,
+// directly or through a symlink already extracted on the way there.
 func within(dir, name string) (string, error) {
 	p := filepath.Join(dir, filepath.FromSlash(name))
-	if p != dir && !strings.HasPrefix(p, dir+string(filepath.Separator)) {
+	if !inside(dir, p) {
 		return "", fmt.Errorf("archive entry %q escapes the package", name)
+	}
+	for q := p; q != dir; q = filepath.Dir(q) {
+		if fi, err := os.Lstat(q); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf("archive entry %q goes through a symlink", name)
+		}
 	}
 	return p, nil
 }
+
+func inside(dir, p string) bool {
+	return p == dir || strings.HasPrefix(p, dir+string(filepath.Separator))
+}
+
+// maxDownload bounds a release asset or registry download.
+const maxDownload = 1 << 30
 
 func untar(r io.Reader, dir string) error {
 	tr := tar.NewReader(r)
@@ -89,8 +102,9 @@ func untar(r io.Reader, dir string) error {
 				return err
 			}
 		case tar.TypeSymlink:
-			if _, err := within(dir, path.Join(path.Dir(h.Name), h.Linkname)); err != nil {
-				return err
+			if path.IsAbs(h.Linkname) || filepath.IsAbs(h.Linkname) ||
+				!inside(dir, filepath.Join(filepath.Dir(p), filepath.FromSlash(h.Linkname))) {
+				return fmt.Errorf("archive link %q -> %q escapes the package", h.Name, h.Linkname)
 			}
 			os.MkdirAll(filepath.Dir(p), 0o755)
 			if err := os.Symlink(h.Linkname, p); err != nil {

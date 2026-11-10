@@ -6,6 +6,7 @@ package servers
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -71,6 +72,7 @@ func New(inst installer.Installer, lookPath func(string) (string, error)) *Servi
 func (s *Service) Command(lang string) []string {
 	installed, _ := s.inst.Installed()
 	slices.SortFunc(installed, func(a, b installer.Installed) int { return cmp.Compare(a.Name, b.Name) })
+	var guess []string
 	for _, in := range installed {
 		if !slices.ContainsFunc(in.Languages, func(l string) bool { return language(l) == lang }) {
 			continue
@@ -80,9 +82,11 @@ func (s *Service) Command(lang string) []string {
 				return append([]string{bin}, argv[1:]...)
 			}
 		}
-		if len(in.Bin) == 1 {
+		// A package Scrutiny knows nothing about (often a linter) is only a
+		// last resort: launched bare, it may not speak LSP over stdio.
+		if len(in.Bin) == 1 && guess == nil {
 			for _, bin := range in.Bin {
-				return []string{bin}
+				guess = []string{bin}
 			}
 		}
 	}
@@ -91,7 +95,7 @@ func (s *Service) Command(lang string) []string {
 			return append([]string{bin}, argv[1:]...)
 		}
 	}
-	return nil
+	return guess
 }
 
 // JobState is how a background install is going.
@@ -206,13 +210,22 @@ func (s *Service) Install(name string) {
 			job.State, job.Err = Failed, err.Error()
 			return
 		}
-		delete(s.jobs, name)
+		if s.jobs[name] == job {
+			delete(s.jobs, name)
+		}
 	}()
 }
+
+// ErrBusy is returned when removing a package that is being installed.
+var ErrBusy = errors.New("still installing")
 
 // Remove uninstalls name.
 func (s *Service) Remove(name string) error {
 	s.mu.Lock()
+	if j := s.jobs[name]; j != nil && j.State == Installing {
+		s.mu.Unlock()
+		return fmt.Errorf("%w: %s", ErrBusy, name)
+	}
 	delete(s.jobs, name)
 	s.mu.Unlock()
 	return s.inst.Remove(name)

@@ -95,3 +95,24 @@ func TestInvalidKeysAreRejected(t *testing.T) {
 		}
 	}
 }
+
+func TestConflictingKeysAreRejected(t *testing.T) {
+	for _, bad := range []string{
+		"[keys]\nrefresh = \"s\"\n",      // same as toggle_view_mode
+		"[keys]\nrefresh = \"s x\"\n",    // "s" would always fire first
+		"[keys]\nnext_comment = \"]\"\n", // prefix of nothing, but "[ c" is fine; "]" vs "] c"? next is rebound, so no clash
+	} {
+		path := filepath.Join(t.TempDir(), "config.toml")
+		write(t, path, bad)
+		_, err := tomlfile.New(path).Load()
+		if bad == "[keys]\nnext_comment = \"]\"\n" {
+			if err != nil {
+				t.Errorf("Load(%q) = %v, want ok", bad, err)
+			}
+			continue
+		}
+		if err == nil {
+			t.Errorf("Load(%q) succeeded, want a conflict error", bad)
+		}
+	}
+}

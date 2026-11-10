@@ -184,7 +184,11 @@ func (i *Installer) get(ctx context.Context, u string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("GET %s: %s", u, resp.Status)
 	}
-	return io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDownload+1))
+	if err == nil && len(body) > maxDownload {
+		err = fmt.Errorf("GET %s: larger than %d bytes", u, maxDownload)
+	}
+	return body, err
 }
 
 func writeAtomic(path string, data []byte) error {

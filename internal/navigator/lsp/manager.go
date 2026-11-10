@@ -294,8 +294,11 @@ func (s *server) launch() error {
 	s.conn = newConn(stdin)
 	s.conn.onNotify = s.handleNotification
 	s.conn.onRequest = s.handleRequest
+	go s.conn.read(stdout)
+	// Reap the process itself, not when stdout closes: a child it spawned
+	// may hold stdout open after it exits. Wait then closes our end, ending
+	// the reader.
 	go func() {
-		s.conn.read(stdout) // until the process exits or is stopped
 		s.wait()
 		if s.onExit != nil {
 			s.onExit()

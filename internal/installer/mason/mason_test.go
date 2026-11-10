@@ -163,7 +163,7 @@ func TestInstallGoPackage(t *testing.T) {
 	run := e.runs[0]
 	pkgDir := filepath.Join(e.dir, "packages", "gopls")
 	if !slices.Equal(run.Argv, []string{"go", "install", "golang.org/x/tools/gopls@v0.23.0"}) ||
-		!slices.Contains(run.Env, "GOBIN="+pkgDir) || run.Dir != pkgDir {
+		!slices.Contains(run.Env, "GOBIN="+run.Dir) || filepath.Dir(run.Dir) != filepath.Join(e.dir, "packages") {
 		t.Errorf("ran %+v", run)
 	}
 	assertInstalled(t, e, "gopls", "v0.23.0", "gopls", filepath.Join(pkgDir, "gopls"))
@@ -177,7 +177,7 @@ func TestInstallNpmPackageWithExtraPackages(t *testing.T) {
 		t.Fatal(err)
 	}
 	pkgDir := filepath.Join(e.dir, "packages", "typescript-language-server")
-	want := []string{"npm", "install", "--prefix", pkgDir, "--no-save", "--no-audit", "--no-fund",
+	want := []string{"npm", "install", "--prefix", e.runs[0].Dir, "--no-save", "--no-audit", "--no-fund",
 		"typescript-language-server@6.0.3", "typescript@6.0.3"}
 	if !slices.Equal(e.runs[0].Argv, want) {
 		t.Errorf("ran %v\nwant %v", e.runs[0].Argv, want)
@@ -337,4 +337,90 @@ func tarGz(t *testing.T, files map[string]string) []byte {
 	tw.Close()
 	gw.Close()
 	return b.Bytes()
+}
+
+func tarWith(t *testing.T, entries []tar.Header, bodies map[string]string) []byte {
+	t.Helper()
+	var b bytes.Buffer
+	gw := gzip.NewWriter(&b)
+	tw := tar.NewWriter(gw)
+	for _, h := range entries {
+		h := h
+		if h.Typeflag == tar.TypeReg {
+			h.Size = int64(len(bodies[h.Name]))
+		}
+		tw.WriteHeader(&h)
+		if h.Typeflag == tar.TypeReg {
+			tw.Write([]byte(bodies[h.Name]))
+		}
+	}
+	tw.Close()
+	gw.Close()
+	return b.Bytes()
+}
+
+func TestArchivesCannotWriteOutsideThePackageThroughSymlinks(t *testing.T) {
+	outside := filepath.Join(t.TempDir(), "victim")
+	os.WriteFile(outside, []byte("safe"), 0o644)
+	const asset = "/LuaLS/lua-language-server/releases/download/3.19.2/lua-language-server-3.19.2-darwin-arm64.tar.gz"
+	for name, entries := range map[string][]tar.Header{
+		"absolute link": {
+			{Name: "bin", Typeflag: tar.TypeSymlink, Linkname: outside},
+			{Name: "bin", Typeflag: tar.TypeReg, Mode: 0o644},
+		},
+		"chained links": {
+			{Name: "a", Typeflag: tar.TypeSymlink, Linkname: "."},
+			{Name: "a/b", Typeflag: tar.TypeSymlink, Linkname: ".."},
+			{Name: "a/b/evil", Typeflag: tar.TypeReg, Mode: 0o644},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			e := newEnv(t)
+			e.platform = [2]string{"darwin", "arm64"}
+			e = rebuild(t, e)
+			e.assets[asset] = tarWith(t, entries, map[string]string{"bin": "pwned", "a/b/evil": "pwned"})
+			if err := e.inst.Install(context.Background(), "lua-language-server"); err == nil {
+				t.Error("Install succeeded")
+			}
+			if b, _ := os.ReadFile(outside); string(b) != "safe" {
+				t.Error("wrote outside the package")
+			}
+			if _, err := os.Stat(filepath.Join(e.dir, "packages", "evil")); err == nil {
+				t.Error("wrote beside the package")
+			}
+		})
+	}
+}
+
+func TestAFailedUpdateKeepsTheInstalledVersion(t *testing.T) {
+	e := newEnv(t)
+	e.onRun = func(c command) { touch(t, filepath.Join(c.Dir, "gopls")) }
+	if err := e.inst.Install(context.Background(), "gopls"); err != nil {
+		t.Fatal(err)
+	}
+	e.onRun = nil // the next install produces no executable
+	if err := e.inst.Install(context.Background(), "gopls"); err == nil {
+		t.Fatal("broken update succeeded")
+	}
+	assertInstalled(t, e, "gopls", "v0.23.0", "gopls", filepath.Join(e.dir, "packages", "gopls", "gopls"))
+}
+
+func TestPackagesCannotTakeOverEachOthersExecutables(t *testing.T) {
+	e := newEnv(t)
+	e.onRun = func(c command) { touch(t, filepath.Join(c.Dir, "gopls")) }
+	if err := e.inst.Install(context.Background(), "gopls"); err != nil {
+		t.Fatal(err)
+	}
+	// A foreign link at a name another package wants is left alone.
+	os.Symlink("/elsewhere/rust-analyzer", filepath.Join(e.dir, "bin", "rust-analyzer"))
+	e.assets["/rust-lang/rust-analyzer/releases/download/2026-11-09/rust-analyzer-x86_64-unknown-linux-gnu.gz"] = gz(t, "ELF")
+	if err := e.inst.Install(context.Background(), "rust-analyzer"); err == nil {
+		t.Error("installed over an executable it does not own")
+	}
+	if err := e.inst.Remove("rust-analyzer"); err != nil {
+		t.Fatal(err)
+	}
+	if target, _ := os.Readlink(filepath.Join(e.dir, "bin", "rust-analyzer")); target != "/elsewhere/rust-analyzer" {
+		t.Errorf("Remove deleted a link it does not own (now %q)", target)
+	}
 }

@@ -255,18 +255,53 @@ func (i *Installer) Install(ctx context.Context, name string) error {
 	if missing := i.Missing(p.pkg); len(missing) > 0 {
 		return fmt.Errorf("%w: %s requires %s", installer.ErrMissingRuntime, name, strings.Join(missing, " and "))
 	}
-	if err := i.Remove(name); err != nil {
+	// Install beside any current version, swapping it in only on success,
+	// so a failed update leaves the working one in place.
+	if err := os.MkdirAll(filepath.Join(i.opts.Dir, "packages"), 0o755); err != nil {
 		return err
 	}
-	dir := i.packageDir(name)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	staging, err := os.MkdirTemp(filepath.Join(i.opts.Dir, "packages"), "."+name+".")
+	if err != nil {
 		return err
 	}
-	if err := i.fetch(ctx, p, dir); err != nil {
-		os.RemoveAll(dir)
+	defer os.RemoveAll(staging)
+	if err := i.fetch(ctx, p, staging); err != nil {
 		return fmt.Errorf("install %s: %w", name, err)
 	}
+	for bin, rel := range p.bins {
+		if _, err := os.Stat(filepath.Join(staging, rel)); err != nil {
+			return fmt.Errorf("install %s: executable %s missing: %w", name, rel, err)
+		}
+		if owner := i.linkOwner(bin); owner != "" && owner != name {
+			return fmt.Errorf("install %s: executable %s already belongs to %s", name, bin, owner)
+		}
+	}
+	dir := i.packageDir(name)
+	old := staging + ".old"
+	if err := os.Rename(dir, old); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err := os.Rename(staging, dir); err != nil {
+		os.Rename(old, dir)
+		return err
+	}
+	defer os.RemoveAll(old)
 	return i.link(p, dir)
+}
+
+// linkOwner returns the package that bin/<name> belongs to: "" when there
+// is no link, or "?" when it points somewhere Scrutiny did not install.
+func (i *Installer) linkOwner(name string) string {
+	target, err := os.Readlink(filepath.Join(i.binDir(), name))
+	if err != nil {
+		return ""
+	}
+	rel, err := filepath.Rel(filepath.Join(i.opts.Dir, "packages"), target)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return "?"
+	}
+	pkg, _, _ := strings.Cut(filepath.ToSlash(rel), "/")
+	return pkg
 }
 
 // fetch installs the package's files into dir.
@@ -361,7 +396,9 @@ func (i *Installer) Remove(name string) error {
 	}
 	if r, err := i.receipt(name); err == nil {
 		for bin := range r.Bin {
-			os.Remove(filepath.Join(i.binDir(), bin))
+			if i.linkOwner(bin) == name {
+				os.Remove(filepath.Join(i.binDir(), bin))
+			}
 		}
 	}
 	return os.RemoveAll(i.packageDir(name))
