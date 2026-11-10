@@ -111,4 +111,3 @@ func (c *Cache) RecentVisits(ctx context.Context, limit int) ([]cache.Visit, err
 	}
 	return visits, rows.Err()
 }
-
