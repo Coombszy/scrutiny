@@ -204,9 +204,14 @@ tr:target td { background: rgba(250, 189, 47, .18); }
 .indexing:not([hidden]) + .topbar-link { margin-left: 1rem; }
 .indexing[hidden] + .topbar-link { margin-left: auto; }
 .server-list { display: flex; flex-direction: column; max-width: 60rem; }
-.server { display: flex; gap: 1rem; justify-content: space-between; align-items: center; padding: .6rem 0; border-bottom: 1px solid var(--bg1); flex-wrap: wrap; }
+.server { display: flex; gap: 1rem; justify-content: space-between; align-items: center; padding: .6rem 0; border-bottom: 1px solid var(--bg1); }
+.server-info { flex: 1 1 auto; min-width: 0; }
 .server-info p { margin: .2rem 0 0; font-size: .85rem; }
-.server-state { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.server-state { flex: 0 0 auto; max-width: 50%; display: flex; gap: .5rem; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+@media (max-width: 700px) {
+  .server { flex-wrap: wrap; }
+  .server-state { max-width: none; }
+}
 .requires { color: var(--yellow); }
 .install-error { flex-basis: 100%; white-space: pre-wrap; color: var(--red); font-size: .8rem; max-height: 12rem; overflow: auto; background: var(--bg1); padding: .4rem; }
 #refresh-banner:has(#refresh-commits:empty):has(#refresh-comments:empty) { display: none; }
