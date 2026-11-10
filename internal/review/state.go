@@ -1,6 +1,7 @@
 package review
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -278,4 +279,39 @@ func allComments(st domain.ReviewState) []domain.Comment {
 		cs = append(cs, t.Comments...)
 	}
 	return cs
+}
+
+// PendingComment is a comment in the viewer's Pending Review: a new
+// thread's first comment, or a reply to an existing thread.
+type PendingComment struct {
+	ThreadID string
+	Path     string
+	Line     int // zero for outdated threads
+	Body     string
+	Reply    bool
+}
+
+// PendingComments lists the viewer's Pending Review comments, by file and
+// line, as last read.
+func (s *Service) PendingComments(ctx context.Context, ref domain.PRRef) ([]PendingComment, error) {
+	snap, err := s.snapshot(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return pendingComments(snap.State), nil
+}
+
+func pendingComments(st domain.ReviewState) []PendingComment {
+	var out []PendingComment
+	for _, t := range st.Threads {
+		for i, c := range t.Comments {
+			if c.Pending {
+				out = append(out, PendingComment{ThreadID: t.ID, Path: t.Path, Line: t.Line, Body: c.Body, Reply: i > 0})
+			}
+		}
+	}
+	slices.SortStableFunc(out, func(a, b PendingComment) int {
+		return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.Line, b.Line))
+	})
+	return out
 }

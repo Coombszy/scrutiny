@@ -165,15 +165,21 @@ func (s *Server) submit(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// renderWithPending renders c followed by an out-of-band update of the
-// Pending Review count.
+// renderWithPending renders c followed by out-of-band updates of the
+// Pending Review's count and list.
 func (s *Server) renderWithPending(w http.ResponseWriter, r *http.Request, c component) {
-	anchors, err := s.review.Anchors(r.Context(), prRefOrZero(r))
+	ref := prRefOrZero(r)
+	anchors, err := s.review.Anchors(r.Context(), ref)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	s.render(w, r, http.StatusOK, c, views.PendingCount(anchors.Pending, true))
+	pending, err := s.review.PendingComments(r.Context(), ref)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.render(w, r, http.StatusOK, c, views.PendingCount(anchors.Pending, true), views.PendingList(pending, true))
 }
 
 func prRefOrZero(r *http.Request) domain.PRRef {

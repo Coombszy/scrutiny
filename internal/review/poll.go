@@ -23,6 +23,7 @@ type Update struct {
 	Conversation        []domain.Comment
 	ConversationChanged bool
 	Pending             *domain.PendingReview
+	PendingComments     []PendingComment // set with PendingChanged
 	PendingChanged      bool
 	Checks              *domain.Checks // set when the Checks changed
 
@@ -96,8 +97,9 @@ func (s *Service) Poll(ctx context.Context, ref domain.PRRef) (Update, error) {
 	if !sameJSON(prev.State.Conversation, next.State.Conversation) {
 		u.Conversation, u.ConversationChanged = next.State.Conversation, true
 	}
-	if !sameJSON(prev.State.Pending, next.State.Pending) {
-		u.Pending, u.PendingChanged = next.State.Pending, true
+	if pending := pendingComments(next.State); !sameJSON(prev.State.Pending, next.State.Pending) ||
+		!sameJSON(pendingComments(prev.State), pending) {
+		u.Pending, u.PendingComments, u.PendingChanged = next.State.Pending, pending, true
 	}
 	if !sameJSON(prev.Checks, next.Checks) {
 		u.Checks = &next.Checks

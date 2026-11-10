@@ -2,6 +2,7 @@ package views
 
 import (
 	"github.com/Coombszy/scrutiny/internal/domain"
+	"github.com/Coombszy/scrutiny/internal/review"
 )
 
 // Thread renders a Review Thread with its comments, reply form and resolve
@@ -126,8 +127,9 @@ templ NewThreadForm(pr domain.PRRef, a ThreadAnchor, cols int) {
 	</tr>
 }
 
-// PendingCount is the number of comments in the Pending Review, swapped
-// out-of-band after every write.
+// PendingCount says how many comments the Pending Review holds, e.g.
+// "(2 pending)", and nothing when it holds none. It is swapped out of band
+// after every write.
 templ PendingCount(p *domain.PendingReview, oob bool) {
 	<span
 		id="pending-count"
@@ -135,7 +137,41 @@ templ PendingCount(p *domain.PendingReview, oob bool) {
 			hx-swap-oob="true"
 		}
 		class="count"
-	>{ pendingCount(p) }</span>
+	>
+		if p != nil && p.Comments > 0 {
+			({ itoa(p.Comments) } pending)
+		}
+	</span>
+}
+
+// PendingList, in the submit dialog, lists the Pending Review's comments;
+// each jumps to its thread on the page.
+templ PendingList(comments []review.PendingComment, oob bool) {
+	<div
+		id="pending-list"
+		if oob {
+			hx-swap-oob="true"
+		}
+	>
+		if len(comments) > 0 {
+			<details class="pending-list">
+				<summary>{ pendingComments(len(comments)) }</summary>
+				<ul>
+					for _, c := range comments {
+						<li>
+							<a href={ templ.SafeURL("#thread-" + c.ThreadID) } data-jump-thread={ c.ThreadID } data-path={ c.Path }>
+								<span class="where">{ pendingLocation(c) }</span>
+								if c.Reply {
+									<span class="badge">Reply</span>
+								}
+								<span class="excerpt">{ excerpt(c.Body) }</span>
+							</a>
+						</li>
+					}
+				</ul>
+			</details>
+		}
+	</div>
 }
 
 // Conversation renders the Conversation Comments and the form for a new one.
@@ -160,10 +196,11 @@ templ conversationView(pr domain.PRRef, comments []domain.Comment, oob bool) {
 	</section>
 }
 
-templ submitDialog(pr domain.PRRef, head domain.SHA, p *domain.PendingReview) {
+templ submitDialog(pr domain.PRRef, head domain.SHA, pending []review.PendingComment) {
 	<dialog id="submit-review">
 		<form hx-post={ pr.Path() + "/review" }>
 			<h2>Finish your review</h2>
+			@PendingList(pending, false)
 			<input type="hidden" name="head" value={ string(head) }/>
 			<textarea name="body" rows="5" placeholder="Leave a comment"></textarea>
 			<fieldset>

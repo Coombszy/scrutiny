@@ -68,6 +68,7 @@ func TestEventsStreamRendersUpdatesAsOutOfBandSwaps(t *testing.T) {
 		Head:    "5555555555555555555555555555555555555555",
 		Threads: []domain.ReviewThread{{ID: "T9", Path: "parser.go", Comments: []domain.Comment{{ID: "C9", BodyHTML: "<p>edited</p>"}}}},
 		Pending: &domain.PendingReview{ID: "R", Comments: 3}, PendingChanged: true,
+		PendingComments: []review.PendingComment{{ThreadID: "T9", Path: "parser.go", Line: 1, Body: "x"}},
 	})
 
 	var event []string
@@ -79,7 +80,7 @@ func TestEventsStreamRendersUpdatesAsOutOfBandSwaps(t *testing.T) {
 		"event: update",
 		`id="refresh-commits" hx-swap-oob="true"`, "New commits",
 		`id="thread-T9"`, "<p>edited</p>",
-		`id="pending-count" hx-swap-oob="true"`, ">3<",
+		`id="pending-count" hx-swap-oob="true"`, "(3 pending)", `id="pending-list" hx-swap-oob="true"`,
 	)
 }
 

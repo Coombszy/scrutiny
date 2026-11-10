@@ -77,7 +77,8 @@ func TestCreatingAThreadReturnsItWithTheNewPendingCount(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
-	mustContain(t, rec.Body.String(), "Name this better", "Pending", `id="pending-count" hx-swap-oob="true"`, ">1<")
+	mustContain(t, rec.Body.String(), "Name this better", "Pending", `id="pending-count" hx-swap-oob="true"`, "(1 pending)",
+		`id="pending-list" hx-swap-oob="true"`, `data-jump-thread="`, "parser.go:3")
 	if p := a.host.State(ref).Pending; p == nil || p.Commit != c2 {
 		t.Errorf("Pending = %+v", p)
 	}
@@ -101,7 +102,7 @@ func TestReplyAndResolveReturnTheThread(t *testing.T) {
 	a.do(t, http.MethodGet, prPath, nil)
 
 	rec := a.do(t, http.MethodPost, prPath+"/threads/T1/replies", url.Values{"body": {"Because it is new"}})
-	mustContain(t, rec.Body.String(), `id="thread-T1"`, "Because it is new", `id="pending-count" hx-swap-oob="true"`)
+	mustContain(t, rec.Body.String(), `id="thread-T1"`, "Because it is new", `id="pending-count" hx-swap-oob="true"`, "(1 pending)", `data-jump-thread="T1"`)
 
 	rec = a.do(t, http.MethodPost, prPath+"/threads/T1/resolve", url.Values{"resolved": {"true"}})
 	mustContain(t, rec.Body.String(), `id="thread-T1"`, `data-resolved="true"`, "Unresolve")
@@ -150,3 +151,27 @@ func TestSubmittingAReviewReloadsThePage(t *testing.T) {
 
 // formValues is an empty form, so that a.do sends the CSRF token.
 func formValues() url.Values { return url.Values{} }
+
+func TestSubmitDialogListsPendingComments(t *testing.T) {
+	a := newApp(t)
+	page := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	mustContain(t, page, `id="pending-count"`, `id="pending-list"`)
+	if strings.Contains(page, "pending)") {
+		t.Error("the Review button counts pending comments when there are none")
+	}
+
+	a.withThread()
+	st := a.host.State(ref)
+	st.Pending = &domain.PendingReview{ID: "R", Commit: c2, Comments: 2}
+	st.Threads[0].Comments = append(st.Threads[0].Comments, domain.Comment{ID: "C9", Body: "A **draft** reply", Pending: true})
+	st.Threads = append(st.Threads, domain.ReviewThread{ID: "T2", Path: "lex/new.go", Line: 4, Side: domain.Right,
+		Comments: []domain.Comment{{ID: "C10", Body: "New thread here", Pending: true}}})
+
+	page = a.do(t, http.MethodGet, prPath, nil).Body.String()
+	dialog := page[strings.Index(page, `id="submit-review"`):]
+	dialog = dialog[:strings.Index(dialog, "</dialog>")]
+	mustContain(t, page, "Review", "(2 pending)")
+	mustContain(t, dialog, "2 pending comments",
+		`data-jump-thread="T2"`, "lex/new.go:4", "New thread here",
+		`data-jump-thread="T1"`, "parser.go:2", "Reply", "A **draft** reply")
+}

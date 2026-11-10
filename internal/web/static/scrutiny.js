@@ -88,7 +88,36 @@ window.Scrutiny = { actions: {} };
     }
     const nav = e.target.closest("[data-comment-nav]");
     if (nav) navigate(nav.dataset.commentNav === "next" ? 1 : -1);
+    const jump = e.target.closest("[data-jump-thread]");
+    if (jump) {
+      e.preventDefault();
+      jump.closest("dialog")?.close();
+      jumpToThread(jump.dataset.jumpThread, jump.dataset.path);
+    }
   });
+
+  // jumpToThread scrolls to a thread, first loading (and un-collapsing) its
+  // file's diff if the thread is not on the page yet.
+  async function jumpToThread(id, path) {
+    let thread = document.getElementById("thread-" + id);
+    if (!thread) {
+      const file = [...document.querySelectorAll(".file[data-path]")].find((f) => f.dataset.path === path);
+      if (file) {
+        file.classList.remove("viewed");
+        const lazy = file.querySelector(".lazy-diff");
+        const load = file.querySelector(".file-body > .note button[hx-get]");
+        if (lazy) await htmx.ajax("GET", lazy.getAttribute("hx-get"), { target: lazy, swap: "outerHTML" });
+        else if (load) await htmx.ajax("GET", load.getAttribute("hx-get"), { target: file.querySelector(".file-body"), swap: "innerHTML" });
+      }
+      thread = document.getElementById("thread-" + id);
+    }
+    if (!thread) return toast("That comment is not shown in this Comparison.");
+    thread.closest(".file")?.classList.remove("viewed");
+    thread.querySelector("details")?.setAttribute("open", "");
+    document.querySelectorAll(".thread.current").forEach((t) => t.classList.remove("current"));
+    thread.classList.add("current");
+    window.scrollTo({ top: window.scrollY + thread.getBoundingClientRect().top - 80, behavior: "smooth" });
+  }
 
   // Live updates arrive as out-of-band HTML over an event stream, held open
   // only while the page is visible: the server polls GitHub only for PRs

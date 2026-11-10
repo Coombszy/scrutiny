@@ -74,7 +74,7 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 				</div>
 			</section>
 		}
-		@submitDialog(p.PR.Ref, p.Comparison.Head, p.Review.Pending)
+		@submitDialog(p.PR.Ref, p.Comparison.Head, p.PendingComments)
 		@Palette(p.PR.Ref)
 	}
 }

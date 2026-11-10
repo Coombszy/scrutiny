@@ -73,6 +73,8 @@ type PRPage struct {
 	// OtherThreads are Review Threads on files not in this Comparison.
 	OtherThreads []domain.ReviewThread
 	Checks       domain.Checks
+	// PendingComments are the viewer's Pending Review comments.
+	PendingComments []PendingComment
 	// SinceLastReview selects the commits pushed since the viewer's last
 	// submitted review; nil when there are none or that commit has left
 	// the branch.
@@ -138,6 +140,7 @@ func (s *Service) PRPage(ctx context.Context, ref domain.PRRef, req ComparisonRe
 		PR: pr, Commits: commits, Comparison: cmp, MergeBase: mergeBase, Files: files,
 		Review: snap.State, Checks: snap.Checks, Offline: snap.Offline,
 		SinceLastReview: sinceLastReview(commits, snap.State.LastReviewed),
+		PendingComments: pendingComments(snap.State),
 	}
 	inComparison := map[string]bool{}
 	for i := range page.Files {

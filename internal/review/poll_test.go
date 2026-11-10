@@ -121,3 +121,19 @@ func TestOfflinePagesAreServedFromTheLastRead(t *testing.T) {
 		t.Errorf("back online: %+v", u)
 	}
 }
+
+func TestPollCarriesThePendingCommentsWhenTheyChange(t *testing.T) {
+	f := newFixture(t)
+	f.openPage(t)
+	st := f.host.State(ref)
+	st.Pending = &domain.PendingReview{ID: "R", Commit: c3, Comments: 1}
+	st.Threads = []domain.ReviewThread{{ID: "T1", Path: "a.go", Line: 2, Comments: []domain.Comment{{ID: "C1", Body: "from another tab", Pending: true}}}}
+
+	u, err := f.svc.Poll(context.Background(), ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !u.PendingChanged || len(u.PendingComments) != 1 || u.PendingComments[0].Body != "from another tab" {
+		t.Errorf("Update = %+v", u)
+	}
+}

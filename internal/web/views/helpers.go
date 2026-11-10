@@ -328,3 +328,26 @@ func byReviewers(what string, names []string) string {
 	}
 	return what + " by " + strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
 }
+
+func pendingComments(n int) string {
+	if n == 1 {
+		return "1 pending comment"
+	}
+	return strconv.Itoa(n) + " pending comments"
+}
+
+func pendingLocation(c review.PendingComment) string {
+	if c.Line == 0 {
+		return c.Path
+	}
+	return c.Path + ":" + strconv.Itoa(c.Line)
+}
+
+// excerpt is the start of a comment's Markdown on one line.
+func excerpt(body string) string {
+	s := strings.Join(strings.Fields(body), " ")
+	if r := []rune(s); len(r) > 80 {
+		return string(r[:79]) + "…"
+	}
+	return s
+}

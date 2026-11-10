@@ -295,3 +295,32 @@ func TestWritesAreRefusedForThingsNotOnThisPR(t *testing.T) {
 		t.Errorf("foreign comment: err = %v, want ErrThreadNotFound", err)
 	}
 }
+
+func TestPendingCommentsListEveryDraftInFileOrder(t *testing.T) {
+	f := newFixture(t)
+	f.withDiff(mb, c3)
+	st := f.host.State(ref)
+	st.Threads = []domain.ReviewThread{
+		{ID: "T2", Path: "b.go", Line: 9, Side: domain.Right, Comments: []domain.Comment{
+			{ID: "C1", Body: "submitted earlier"},
+			{ID: "C2", Body: "my draft reply", Pending: true},
+		}},
+		{ID: "T1", Path: "a.go", Line: 2, Side: domain.Right, Comments: []domain.Comment{{ID: "C3", Body: "new thread", Pending: true}}},
+		{ID: "T3", Path: "a.go", Line: 1, Side: domain.Right, Comments: []domain.Comment{{ID: "C4", Body: "nothing pending"}}},
+	}
+	if _, err := f.svc.PRPage(context.Background(), ref, review.ComparisonRequest{}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := f.svc.PendingComments(context.Background(), ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []review.PendingComment{
+		{ThreadID: "T1", Path: "a.go", Line: 2, Body: "new thread"},
+		{ThreadID: "T2", Path: "b.go", Line: 9, Body: "my draft reply", Reply: true},
+	}
+	if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("PendingComments = %+v\nwant %+v", got, want)
+	}
+}
