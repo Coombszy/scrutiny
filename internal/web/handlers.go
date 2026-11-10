@@ -94,7 +94,7 @@ func (s *Server) pullRequest(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	s.renderPage(w, r, http.StatusOK, views.Page{Indexing: s.review.Indexing(ref)}, views.PR(page, cfg.ViewMode))
+	s.renderPage(w, r, http.StatusOK, views.Page{Indexing: s.review.Indexing(ref), KeyHelp: true}, views.PR(page, cfg.ViewMode))
 }
 
 // file renders one file's diff as an htmx fragment.

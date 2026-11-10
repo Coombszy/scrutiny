@@ -354,6 +354,7 @@ window.Scrutiny = { actions: {} };
     prev_comment: "Previous comment",
     toggle_view_mode: "Toggle split/unified diff",
     refresh: "Refresh",
+    help: "Show keyboard shortcuts",
   };
 
   function toast(message) {
@@ -426,6 +427,28 @@ window.Scrutiny = { actions: {} };
     }
     pending = [];
   });
+
+  // Keyboard shortcuts help, built from the live bindings so it is right
+  // straight after a rebind. Only pages that include the dialog offer it.
+  const help = document.getElementById("help");
+  if (help) {
+    Scrutiny.actions.help = () => {
+      const kbd = (key) => Object.assign(document.createElement("kbd"), { textContent: key });
+      help.querySelector("tbody").replaceChildren(
+        ...Object.keys(labels)
+          .filter((a) => bindings[a] && Scrutiny.actions[a])
+          .map((a) => {
+            const keys = document.createElement("td");
+            keys.append(...bindings[a].split(/\s+/).flatMap((k, i) => (i ? [" then ", kbd(k)] : [kbd(k)])));
+            const what = Object.assign(document.createElement("td"), { textContent: labels[a] });
+            const tr = document.createElement("tr");
+            tr.append(keys, what);
+            return tr;
+          }),
+      );
+      if (!help.open) help.showModal();
+    };
+  }
 
   // The Command Palette lists actions, and the page's own links that act
   // like commands (Stack, Since Last Review).
@@ -562,6 +585,8 @@ window.Scrutiny = { actions: {} };
       }).then(async (res) => {
         if (!res.ok) return toast((await res.text()).trim());
         bindings = { ...bindings, [action]: binding };
+        const hint = action === "help" && document.querySelector("#help-hint kbd");
+        if (hint) hint.textContent = binding;
         toast(`${labels[action]}: ${binding}`);
       });
       return;

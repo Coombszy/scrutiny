@@ -93,3 +93,22 @@ func TestSettingsKeysRoundTripThroughTheConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestKeyboardHelpIsOfferedOnlyOnThePRPage(t *testing.T) {
+	a := newApp(t)
+	pr := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	mustContain(t, pr, `id="help-hint"`, "<kbd>?</kbd>", `id="help"`, `data-close-dialog`)
+	dash := a.do(t, http.MethodGet, "/", nil).Body.String()
+	for _, page := range []string{pr, dash} {
+		if strings.Contains(page, "ctrl+k search") {
+			t.Error("the top bar still advertises ctrl+k")
+		}
+	}
+	if strings.Contains(dash, `id="help-hint"`) || strings.Contains(dash, `id="help"`) {
+		t.Error("the Dashboard offers keyboard help")
+	}
+
+	// The hint follows a rebinding.
+	a.do(t, http.MethodPost, "/settings/keys", url.Values{"action": {"help"}, "binding": {"h"}})
+	mustContain(t, a.do(t, http.MethodGet, prPath, nil).Body.String(), "<kbd>h</kbd>")
+}

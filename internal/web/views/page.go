@@ -14,6 +14,9 @@ type Page struct {
 	Themes    []ThemeOption
 	Keys      map[string]string // action -> key sequence
 	ViewMode  string
+	// KeyHelp offers the keyboard shortcuts in the top bar; only pages with
+	// hotkeys to show (the PR page) set it.
+	KeyHelp bool
 }
 
 // ThemeOption is a Theme the Command Palette can switch to.

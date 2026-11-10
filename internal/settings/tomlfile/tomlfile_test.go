@@ -81,7 +81,7 @@ func TestKeysMergeOverDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Keys["next_comment"] != "n" || got.Keys["symbol_search"] != "ctrl+k" || got.Keys["prev_comment"] != "[ c" {
+	if got.Keys["next_comment"] != "n" || got.Keys["symbol_search"] != "ctrl+k" || got.Keys["prev_comment"] != "[ c" || got.Keys["help"] != "?" {
 		t.Errorf("Keys = %v", got.Keys)
 	}
 }

@@ -38,6 +38,7 @@ func DefaultKeys() map[string]string {
 		"prev_comment":     "[ c",
 		"toggle_view_mode": "s",
 		"refresh":          "r",
+		"help":             "?",
 	}
 }
 

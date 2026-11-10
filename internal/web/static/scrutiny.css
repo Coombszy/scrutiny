@@ -226,3 +226,14 @@ tr:target td { background: rgba(250, 189, 47, .18); }
 .dashboard-top .open-pr { flex: 1 1 24rem; margin-bottom: 0; }
 .dashboard-status { display: flex; gap: .6rem; align-items: center; font-size: .85rem; margin-left: auto; }
 .dashboard-status.htmx-request button { opacity: .5; pointer-events: none; }
+
+/* Keyboard shortcuts */
+kbd { font-family: var(--mono); font-size: .8em; background: var(--bg2); color: var(--fg); padding: .05rem .4rem; border-radius: 4px; border-bottom: 1px solid var(--bg0); }
+.help { width: min(34rem, calc(100vw - 32px)); }
+.help header { display: flex; justify-content: space-between; align-items: center; }
+.help h2 { margin: 0; font-size: 1.1rem; }
+.help h3 { font-size: .9rem; margin: 1rem 0 .3rem; color: var(--fg-dim); }
+.help .close { border: 0; background: none; font-size: 1.4rem; line-height: 1; padding: 0 .3rem; }
+.keys { width: 100%; border-collapse: collapse; }
+.keys td { padding: .3rem .2rem; border-bottom: 1px solid var(--bg1); }
+.keys td:first-child { white-space: nowrap; width: 40%; }
