@@ -18,7 +18,18 @@ type Dashboard struct {
 	Authored        []domain.PRSummary
 }
 
-// CodeHost reads Pull Requests.
+// NewThread is a Review Thread to add to a Pending Review. StartLine is zero
+// for a single-line thread.
+type NewThread struct {
+	Path            string
+	Line, StartLine int
+	Side, StartSide domain.DiffSide
+	Body            string
+}
+
+// CodeHost reads Pull Requests and their review state, and writes review
+// activity. Writes return only errors: callers re-read ReviewState, keeping
+// the code host the single source of truth.
 type CodeHost interface {
 	PullRequest(ctx context.Context, ref domain.PRRef) (domain.PullRequest, error)
 	// Commits lists the PR's commits, oldest first.
@@ -26,4 +37,23 @@ type CodeHost interface {
 	// Dashboard lists the open PRs awaiting the viewer's review and those
 	// they authored.
 	Dashboard(ctx context.Context) (Dashboard, error)
+
+	// ReviewState reads the PR's Review Threads, Conversation Comments,
+	// Reactions, the viewer's Pending Review and Viewed files.
+	ReviewState(ctx context.Context, ref domain.PRRef) (domain.ReviewState, error)
+	// StartReview creates a Pending Review anchored to commit.
+	StartReview(ctx context.Context, prID string, commit domain.SHA) (reviewID string, err error)
+	// AddThread adds a Review Thread to a Pending Review.
+	AddThread(ctx context.Context, reviewID string, t NewThread) error
+	// Reply adds a Review Comment to a thread, within a Pending Review.
+	Reply(ctx context.Context, reviewID, threadID, body string) error
+	SetThreadResolved(ctx context.Context, threadID string, resolved bool) error
+	// AddConversationComment posts a Conversation Comment immediately.
+	AddConversationComment(ctx context.Context, prID, body string) error
+	// SetReaction adds or removes the viewer's Reaction on a comment or PR.
+	SetReaction(ctx context.Context, subjectID string, r domain.Reaction, on bool) error
+	// SubmitReview submits the Pending Review, or when reviewID is empty
+	// creates and submits a review at commit in one step.
+	SubmitReview(ctx context.Context, prID, reviewID string, commit domain.SHA, event domain.ReviewEvent, body string) error
+	SetViewed(ctx context.Context, prID, path string, viewed bool) error
 }

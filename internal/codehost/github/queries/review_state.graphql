@@ -1,0 +1,40 @@
+query ReviewState($owner: String!, $name: String!, $number: Int!, $threads: String, $files: String) {
+  viewer { login }
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      id
+      reactionGroups { ...reactions }
+      reviews(states: PENDING, first: 1) {
+        nodes { id commit { oid } comments { totalCount } }
+      }
+      reviewThreads(first: 50, after: $threads) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          id isResolved isOutdated path line startLine diffSide startDiffSide viewerCanResolve viewerCanUnresolve
+          comments(first: 100) {
+            nodes {
+              id author { login } body bodyHTML createdAt state viewerDidAuthor
+              reactionGroups { ...reactions }
+            }
+          }
+        }
+      }
+      comments(last: 100) {
+        nodes {
+          id author { login } bodyHTML createdAt viewerDidAuthor
+          reactionGroups { ...reactions }
+        }
+      }
+      files(first: 100, after: $files) {
+        pageInfo { hasNextPage endCursor }
+        nodes { path viewerViewedState }
+      }
+    }
+  }
+}
+
+fragment reactions on ReactionGroup {
+  content
+  viewerHasReacted
+  reactors { totalCount }
+}
