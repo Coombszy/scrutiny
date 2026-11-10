@@ -16,7 +16,7 @@ templ LiveUpdate(pr domain.PRRef, u review.Update) {
 	}
 	if u.ConversationChanged {
 		@conversationView(pr, u.Conversation, true)
-		<span id="conversation-count" hx-swap-oob="true">{ itoa(len(u.Conversation)) }</span>
+		@ConversationCount(len(u.Conversation))
 	}
 	if u.PendingChanged {
 		@PendingCount(u.Pending, true)
@@ -143,4 +143,9 @@ templ reviewsRow(c domain.Checks) {
 	} else {
 		<div class="status-row muted"><span class="status-icon">○</span> No reviews yet</div>
 	}
+}
+
+// ConversationCount updates the Conversation panel's count out of band.
+templ ConversationCount(n int) {
+	<span id="conversation-count" hx-swap-oob="true">{ itoa(n) }</span>
 }

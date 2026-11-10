@@ -124,7 +124,7 @@ func TestConversationCommentIsPosted(t *testing.T) {
 	a := newApp(t)
 	a.do(t, http.MethodGet, prPath, nil)
 	rec := a.do(t, http.MethodPost, prPath+"/comments", url.Values{"body": {"Thanks all"}})
-	mustContain(t, rec.Body.String(), `id="conversation"`, "Thanks all")
+	mustContain(t, rec.Body.String(), `id="conversation"`, "Thanks all", `<span id="conversation-count" hx-swap-oob="true">1</span>`)
 }
 
 func TestViewedIsSynced(t *testing.T) {

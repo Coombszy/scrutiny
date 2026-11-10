@@ -129,7 +129,7 @@ func (s *Server) comment(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	s.render(w, r, http.StatusOK, views.Conversation(ref, comments))
+	s.render(w, r, http.StatusOK, views.Conversation(ref, comments), views.ConversationCount(len(comments)))
 }
 
 func (s *Server) viewed(w http.ResponseWriter, r *http.Request) {
