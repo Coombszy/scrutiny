@@ -12,6 +12,9 @@ import (
 type DiffFile struct {
 	domain.FileChange
 	Hunks []DiffHunk
+	// Unplaced are the file's Review Threads that cannot be shown on a line
+	// of this diff: outdated, outside its hunks, or from another Comparison.
+	Unplaced []domain.ReviewThread
 }
 
 // DiffHunk is a hunk of highlighted lines.
@@ -22,10 +25,11 @@ type DiffHunk struct {
 
 // DiffLine is one highlighted diff line.
 type DiffLine struct {
-	Kind   domain.LineKind
-	OldNo  int
-	NewNo  int
-	Tokens []highlight.Token
+	Kind    domain.LineKind
+	OldNo   int
+	NewNo   int
+	Tokens  []highlight.Token
+	Threads []domain.ReviewThread // anchored to this line
 }
 
 // SplitRow is one row of the Split View Mode. Either side may be nil.
@@ -68,8 +72,13 @@ func (h DiffHunk) SplitRows() []SplitRow {
 
 // FileDiff loads one file's diff between base and head, highlighting each
 // side from the whole file at that commit so multi-line constructs colour
-// correctly.
-func (s *Service) FileDiff(ctx context.Context, repo domain.Repo, base, head domain.SHA, change domain.FileChange) (DiffFile, error) {
+// correctly, and placing the file's Review Threads on their lines.
+func (s *Service) FileDiff(ctx context.Context, ref domain.PRRef, base, head domain.SHA, change domain.FileChange) (DiffFile, error) {
+	repo := ref.Repo
+	snap, err := s.snapshot(ctx, ref)
+	if err != nil {
+		return DiffFile{}, err
+	}
 	fd, err := s.Repos.FileDiff(ctx, repo, base, head, change)
 	if err != nil {
 		return DiffFile{}, err
@@ -96,7 +105,41 @@ func (s *Service) FileDiff(ctx context.Context, repo domain.Repo, base, head dom
 		}
 		out.Hunks[i] = dh
 	}
+	out.place(snap, base, head)
 	return out, nil
+}
+
+// place attaches each of the file's threads to the line it is anchored to.
+// Thread line numbers refer to the PR's head (RIGHT) and merge base (LEFT),
+// so they only line up when this diff has the same sides.
+func (d *DiffFile) place(snap snapshot, base, head domain.SHA) {
+	for _, t := range snap.State.Threads {
+		if t.Path != d.Path {
+			continue
+		}
+		var line *DiffLine
+		if t.Line != 0 && head == snap.Head && (t.Side == domain.Right || base == snap.MergeBase) {
+			line = d.lineAt(t.Side, t.Line)
+		}
+		if line == nil {
+			d.Unplaced = append(d.Unplaced, t)
+			continue
+		}
+		line.Threads = append(line.Threads, t)
+	}
+}
+
+func (d *DiffFile) lineAt(side domain.DiffSide, n int) *DiffLine {
+	for i := range d.Hunks {
+		for j := range d.Hunks[i].Lines {
+			l := &d.Hunks[i].Lines[j]
+			if side == domain.Right && l.Kind != domain.Delete && l.NewNo == n ||
+				side == domain.Left && l.Kind != domain.Add && l.OldNo == n {
+				return l
+			}
+		}
+	}
+	return nil
 }
 
 func (s *Service) highlightBlob(ctx context.Context, repo domain.Repo, sha domain.SHA, path string) [][]highlight.Token {

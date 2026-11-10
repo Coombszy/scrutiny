@@ -14,8 +14,9 @@ var ErrNotFound = errors.New("not found")
 // Store gives access to repository contents at specific commits.
 type Store interface {
 	// FetchPR makes the PR's head and its base branch available locally,
-	// returning the base branch's tip.
-	FetchPR(ctx context.Context, pr domain.PRRef, baseBranch string) (baseTip domain.SHA, err error)
+	// returning the base branch's tip. When the base branch no longer exists
+	// (e.g. a merged Stack), baseSHA is fetched and returned instead.
+	FetchPR(ctx context.Context, pr domain.PRRef, baseBranch string, baseSHA domain.SHA) (baseTip domain.SHA, err error)
 	// HasCommit reports whether sha is available locally.
 	HasCommit(ctx context.Context, repo domain.Repo, sha domain.SHA) (bool, error)
 	// MergeBase returns the best common ancestor of a and b.

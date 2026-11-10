@@ -8,13 +8,21 @@ import (
 templ PR(p review.PRPage, mode settings.ViewMode) {
 	@Layout(p.PR.Title) {
 		<header class="pr-header">
-			<h1>{ p.PR.Title } <span class="muted">#{ itoa(p.PR.Ref.Number) }</span></h1>
+			<div class="pr-title">
+				<h1>{ p.PR.Title } <span class="muted">#{ itoa(p.PR.Ref.Number) }</span></h1>
+				<button class="primary" data-open-dialog="submit-review">Review @PendingCount(p.Review.Pending, false)</button>
+			</div>
 			<p class="muted">
 				<span class={ "badge", "state-" + string(p.PR.State) }>{ string(p.PR.State) }</span>
 				{ p.PR.Author } wants to merge <code>{ p.PR.HeadBranch }</code> into <code>{ p.PR.BaseBranch }</code>
 				· <a href={ templ.SafeURL(p.PR.URL) }>GitHub</a>
 			</p>
+			@Reactions(p.PR.Ref, p.Review.PRID, p.Review.Reactions)
 		</header>
+		<details class="conversation-panel">
+			<summary>Conversation ({ itoa(len(p.Review.Conversation)) })</summary>
+			@Conversation(p.PR.Ref, p.Review.Conversation)
+		</details>
 		<div class="toolbar">
 			@comparisonPicker(p)
 			if mode == settings.Split {
@@ -22,11 +30,33 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 			} else {
 				<button hx-post="/settings/view-mode" hx-vals={ `{"mode":"split"}` }>Split</button>
 			}
+			<span class="comment-nav">
+				<button data-comment-nav="prev" title="Previous comment">↑ Comment</button>
+				<button data-comment-nav="next" title="Next comment">↓ Comment</button>
+				<label><input type="checkbox" id="nav-include-resolved"/> include resolved</label>
+			</span>
 		</div>
+		if p.Review.Pending != nil && p.Review.Pending.Commit != p.Comparison.Head {
+			<p class="notice">
+				Your Pending Review is on commit <code>{ p.Review.Pending.Commit.Short() }</code>, so new comments are
+				disabled in this Comparison. Replies still work.
+			</p>
+		}
 		<p class="muted">{ itoa(len(p.Files)) } files changed</p>
 		for i, f := range p.Files {
 			@fileSection(p, i, f)
 		}
+		if len(p.OtherThreads) > 0 {
+			<section class="file other-threads" data-threads={ itoa(len(p.OtherThreads)) } data-unresolved={ itoa(unresolvedThreads(p.OtherThreads)) }>
+				<header class="file-header">Review Threads on files outside this Comparison</header>
+				<div class="file-body">
+					for _, t := range p.OtherThreads {
+						@Thread(p.PR.Ref, t)
+					}
+				</div>
+			</section>
+		}
+		@submitDialog(p.PR.Ref, p.Comparison.Head, p.Review.Pending)
 	}
 }
 
@@ -58,7 +88,7 @@ templ comparisonPicker(p review.PRPage) {
 }
 
 templ fileSection(p review.PRPage, i int, f review.FileEntry) {
-	<section class="file" id={ fileID(i) }>
+	<section class={ "file", templ.KV("viewed", f.Viewed == "VIEWED") } id={ fileID(i) } data-threads={ itoa(f.Threads) } data-unresolved={ itoa(f.Unresolved) }>
 		<header class="file-header">
 			<span class={ "badge", "status-" + string(f.Status) }>{ string(f.Status) }</span>
 			if f.Path != f.OldPath {
@@ -66,7 +96,17 @@ templ fileSection(p review.PRPage, i int, f review.FileEntry) {
 			} else {
 				<span class="path">{ f.Path }</span>
 			}
+			if f.Threads > 0 {
+				<span class="badge" title="Unresolved / all Review Threads">💬 { itoa(f.Unresolved) }/{ itoa(f.Threads) }</span>
+			}
+			if f.Viewed == "DISMISSED" {
+				<span class="badge">Changed since viewed</span>
+			}
 			<span class="stat"><span class="plus">+{ itoa(f.Additions) }</span> <span class="minus">−{ itoa(f.Deletions) }</span></span>
+			<label class="viewed-toggle">
+				<input type="checkbox" name="viewed" value="true" checked?={ f.Viewed == "VIEWED" } hx-post={ p.PR.Ref.Path() + "/viewed" } hx-vals={ viewedVals(f.Path) } hx-swap="none"/>
+				Viewed
+			</label>
 		</header>
 		<div class="file-body">
 			switch {
@@ -82,10 +122,8 @@ templ fileSection(p review.PRPage, i int, f review.FileEntry) {
 						Large diff ({ itoa(f.ChangedLines()) } lines changed).
 						<button hx-get={ FileURL(p.PR.Ref, p.Comparison, f.FileChange) } hx-target="closest .file-body">Load diff</button>
 					</p>
-				case f.Status == "renamed" && f.ChangedLines() == 0:
-					<p class="note">File renamed without changes.</p>
 				default:
-					<div hx-get={ FileURL(p.PR.Ref, p.Comparison, f.FileChange) } hx-trigger="intersect once" hx-swap="outerHTML">
+					<div class="lazy-diff" hx-get={ FileURL(p.PR.Ref, p.Comparison, f.FileChange) } hx-trigger="intersect once" hx-swap="outerHTML">
 						<p class="note">Loading…</p>
 					</div>
 			}

@@ -1,0 +1,155 @@
+package views
+
+import (
+	"github.com/Coombszy/scrutiny/internal/domain"
+)
+
+// Thread renders a Review Thread with its comments, reply form and resolve
+// button. Every write inside it swaps the whole thread.
+templ Thread(pr domain.PRRef, t domain.ReviewThread) {
+	<div class="thread" id={ "thread-" + t.ID } data-resolved={ boolString(t.Resolved) }>
+		<details open?={ !t.Resolved }>
+			<summary class="thread-summary">
+				<span class="path">{ threadLocation(t) }</span>
+				if t.Resolved {
+					<span class="badge">Resolved</span>
+				}
+				if t.Outdated {
+					<span class="badge">Outdated</span>
+				}
+				<span class="muted">{ itoa(len(t.Comments)) } comments</span>
+			</summary>
+			for _, c := range t.Comments {
+				@commentView(pr, c)
+			}
+			<form class="reply" hx-post={ pr.Path() + "/threads/" + t.ID + "/replies" } hx-target="closest .thread" hx-swap="outerHTML">
+				<textarea name="body" rows="2" placeholder="Reply…" required></textarea>
+				<div class="actions">
+					<button type="submit">Reply</button>
+					if t.Resolved && t.ViewerCanUnresolve {
+						<button type="button" hx-post={ pr.Path() + "/threads/" + t.ID + "/resolve" } hx-vals={ `{"resolved":"false"}` } hx-target="closest .thread" hx-swap="outerHTML">Unresolve</button>
+					} else if !t.Resolved && t.ViewerCanResolve {
+						<button type="button" hx-post={ pr.Path() + "/threads/" + t.ID + "/resolve" } hx-vals={ `{"resolved":"true"}` } hx-target="closest .thread" hx-swap="outerHTML">Resolve</button>
+					}
+				</div>
+			</form>
+		</details>
+	</div>
+}
+
+templ commentView(pr domain.PRRef, c domain.Comment) {
+	<article class="comment" id={ "comment-" + c.ID }>
+		<header>
+			<strong>{ c.Author }</strong>
+			if !c.CreatedAt.IsZero() {
+				<span class="muted">{ c.CreatedAt.Local().Format("2 Jan 2006 15:04") }</span>
+			}
+			if c.Pending {
+				<span class="badge pending">Pending</span>
+			}
+		</header>
+		<div class="markdown">
+			@templ.Raw(c.BodyHTML)
+		</div>
+		@Reactions(pr, c.ID, c.Reactions)
+	</article>
+}
+
+// Reactions renders the Reactions on a comment or PR, with a picker.
+templ Reactions(pr domain.PRRef, subject string, groups []domain.ReactionGroup) {
+	<div class="reactions" id={ "reactions-" + subject }>
+		for _, g := range groups {
+			if g.Count > 0 {
+				<button class={ "reaction", templ.KV("reacted", g.ViewerHasReacted) } hx-post={ pr.Path() + "/reactions" } hx-vals={ reactionVals(subject, g.Content, !g.ViewerHasReacted) } hx-target="closest .reactions" hx-swap="outerHTML" title={ string(g.Content) }>
+					{ g.Content.Emoji() } <span>{ itoa(g.Count) }</span>
+				</button>
+			}
+		}
+		<details class="reaction-picker">
+			<summary title="Add reaction">☺+</summary>
+			<div class="picker">
+				for _, r := range domain.Reactions {
+					<button hx-post={ pr.Path() + "/reactions" } hx-vals={ reactionVals(subject, r, !hasReacted(groups, r)) } hx-target="closest .reactions" hx-swap="outerHTML" title={ string(r) }>{ r.Emoji() }</button>
+				}
+			</div>
+		</details>
+	</div>
+}
+
+// ThreadRows renders threads as a table row spanning cols columns.
+templ ThreadRows(pr domain.PRRef, threads []domain.ReviewThread, cols int) {
+	if len(threads) > 0 {
+		<tr class="thread-row">
+			<td colspan={ itoa(cols) }>
+				for _, t := range threads {
+					@Thread(pr, t)
+				}
+			</td>
+		</tr>
+	}
+}
+
+// NewThreadForm is the form for a new Review Thread, as a table row.
+templ NewThreadForm(pr domain.PRRef, a ThreadAnchor, cols int) {
+	<tr class="thread-row new-thread">
+		<td colspan={ itoa(cols) }>
+			<form hx-post={ pr.Path() + "/threads" } hx-target="closest tr" hx-swap="outerHTML">
+				<input type="hidden" name="base" value={ a.Base }/>
+				<input type="hidden" name="head" value={ a.Head }/>
+				<input type="hidden" name="path" value={ a.Path }/>
+				<input type="hidden" name="line" value={ itoa(a.Line) }/>
+				<input type="hidden" name="side" value={ a.Side }/>
+				<input type="hidden" name="cols" value={ itoa(cols) }/>
+				<textarea name="body" rows="3" placeholder="Leave a comment" required autofocus></textarea>
+				<div class="actions">
+					<button type="submit">Add to review</button>
+					<button type="button" class="cancel" data-remove-row>Cancel</button>
+				</div>
+			</form>
+		</td>
+	</tr>
+}
+
+// PendingCount is the number of comments in the Pending Review, swapped
+// out-of-band after every write.
+templ PendingCount(p *domain.PendingReview, oob bool) {
+	<span
+		id="pending-count"
+		if oob {
+			hx-swap-oob="true"
+		}
+		class="count"
+	>{ pendingCount(p) }</span>
+}
+
+// Conversation renders the Conversation Comments and the form for a new one.
+templ Conversation(pr domain.PRRef, comments []domain.Comment) {
+	<section id="conversation">
+		for _, c := range comments {
+			@commentView(pr, c)
+		}
+		<form class="reply" hx-post={ pr.Path() + "/comments" } hx-target="#conversation" hx-swap="outerHTML">
+			<textarea name="body" rows="3" placeholder="Add a comment" required></textarea>
+			<div class="actions"><button type="submit">Comment</button></div>
+		</form>
+	</section>
+}
+
+templ submitDialog(pr domain.PRRef, head domain.SHA, p *domain.PendingReview) {
+	<dialog id="submit-review">
+		<form hx-post={ pr.Path() + "/review" }>
+			<h2>Finish your review</h2>
+			<input type="hidden" name="head" value={ string(head) }/>
+			<textarea name="body" rows="5" placeholder="Leave a comment"></textarea>
+			<fieldset>
+				<label><input type="radio" name="event" value="COMMENT" checked/> Comment</label>
+				<label><input type="radio" name="event" value="APPROVE"/> Approve</label>
+				<label><input type="radio" name="event" value="REQUEST_CHANGES"/> Request changes</label>
+			</fieldset>
+			<div class="actions">
+				<button type="submit">Submit review</button>
+				<button type="button" data-close-dialog>Cancel</button>
+			</div>
+		</form>
+	</dialog>
+}

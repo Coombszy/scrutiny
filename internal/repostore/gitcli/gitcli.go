@@ -67,7 +67,7 @@ func (s *Store) lock(r domain.Repo) func() {
 	return l.Unlock
 }
 
-func (s *Store) FetchPR(ctx context.Context, pr domain.PRRef, baseBranch string) (domain.SHA, error) {
+func (s *Store) FetchPR(ctx context.Context, pr domain.PRRef, baseBranch string, baseSHA domain.SHA) (domain.SHA, error) {
 	defer s.lock(pr.Repo)()
 	dir := s.dir(pr.Repo)
 	if _, err := os.Stat(filepath.Join(dir, "HEAD")); errors.Is(err, os.ErrNotExist) {
@@ -78,11 +78,21 @@ func (s *Store) FetchPR(ctx context.Context, pr domain.PRRef, baseBranch string)
 			return "", err
 		}
 	}
-	n := strconv.Itoa(pr.Number)
+	prRef := "refs/pull/" + strconv.Itoa(pr.Number) + "/head"
 	baseRef := "refs/heads/" + baseBranch
-	if _, err := s.git(ctx, pr.Repo, "fetch", "-q", "--no-tags", "--force", s.cloneURL(pr.Repo),
-		"+"+baseRef+":"+baseRef,
-		"+refs/pull/"+n+"/head:refs/pull/"+n+"/head"); err != nil {
+	_, err := s.git(ctx, pr.Repo, "fetch", "-q", "--no-tags", "--force", s.cloneURL(pr.Repo),
+		"+"+baseRef+":"+baseRef, "+"+prRef+":"+prRef)
+	if err != nil && baseSHA != "" && strings.Contains(err.Error(), "couldn't find remote ref "+baseRef) {
+		if err := checkRevs(baseSHA); err != nil {
+			return "", err
+		}
+		if _, err := s.git(ctx, pr.Repo, "fetch", "-q", "--no-tags", "--force", s.cloneURL(pr.Repo),
+			"+"+prRef+":"+prRef, string(baseSHA)); err != nil {
+			return "", err
+		}
+		return baseSHA, nil
+	}
+	if err != nil {
 		return "", err
 	}
 	out, err := s.git(ctx, pr.Repo, "rev-parse", "--verify", baseRef+"^{commit}")

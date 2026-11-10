@@ -63,14 +63,25 @@ type PRPage struct {
 	PR         domain.PullRequest
 	Commits    []domain.Commit
 	Comparison Comparison
+	MergeBase  domain.SHA
 	Files      []FileEntry
+	Review     domain.ReviewState
+	// OtherThreads are Review Threads on files not in this Comparison.
+	OtherThreads []domain.ReviewThread
 }
 
 // FileEntry is a changed file as listed on the PR page.
 type FileEntry struct {
 	domain.FileChange
 	Collapse Collapse
+	Viewed   domain.ViewedState
+	// Threads and Unresolved count the file's Review Threads.
+	Threads, Unresolved int
 }
+
+// CanCommentLeft reports whether new threads may go on the left side: only
+// when it is the PR's merge base, which GitHub anchors LEFT lines to.
+func (p PRPage) CanCommentLeft() bool { return p.Comparison.Base == p.MergeBase }
 
 // PRPage loads the PR, makes its commits available locally and lists the
 // files changed in the requested Comparison.
@@ -102,7 +113,31 @@ func (s *Service) PRPage(ctx context.Context, ref domain.PRRef, req ComparisonRe
 	if err != nil {
 		return PRPage{}, err
 	}
-	return PRPage{PR: pr, Commits: commits, Comparison: cmp, Files: files}, nil
+	snap, err := s.readState(ctx, ref, pr.HeadSHA, mergeBase)
+	if err != nil {
+		return PRPage{}, err
+	}
+	page := PRPage{PR: pr, Commits: commits, Comparison: cmp, MergeBase: mergeBase, Files: files, Review: snap.State}
+	inComparison := map[string]bool{}
+	for i := range page.Files {
+		f := &page.Files[i]
+		inComparison[f.Path] = true
+		f.Viewed = snap.State.Viewed[f.Path]
+		for _, t := range snap.State.Threads {
+			if t.Path == f.Path {
+				f.Threads++
+				if !t.Resolved {
+					f.Unresolved++
+				}
+			}
+		}
+	}
+	for _, t := range snap.State.Threads {
+		if !inComparison[t.Path] {
+			page.OtherThreads = append(page.OtherThreads, t)
+		}
+	}
+	return page, nil
 }
 
 // mergeBase returns the merge base of the PR's head with its base branch,
@@ -123,7 +158,7 @@ func (s *Service) mergeBase(ctx context.Context, pr domain.PullRequest) (domain.
 			return domain.SHA(e.Value), nil
 		}
 	}
-	baseTip, err := s.Repos.FetchPR(ctx, pr.Ref, pr.BaseBranch)
+	baseTip, err := s.Repos.FetchPR(ctx, pr.Ref, pr.BaseBranch, pr.BaseSHA)
 	if err != nil {
 		return "", err
 	}

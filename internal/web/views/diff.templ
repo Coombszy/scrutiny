@@ -1,53 +1,93 @@
 package views
 
 import (
+	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/highlight"
 	"github.com/Coombszy/scrutiny/internal/review"
 	"github.com/Coombszy/scrutiny/internal/settings"
 )
 
-templ Diff(d review.DiffFile, mode settings.ViewMode) {
-	if len(d.Hunks) == 0 {
-		<p class="note">No content changes.</p>
-	} else if mode == settings.Unified {
-		<table class="diff unified">
-			<colgroup><col class="ln"/><col class="ln"/><col/></colgroup>
-			for _, h := range d.Hunks {
-				<tr class="hunk"><td colspan="3">{ h.Header }</td></tr>
-				for _, l := range h.Lines {
-					<tr class={ kindClass(l.Kind) }>
-						<td class="ln">{ lineNo(l.OldNo) }</td>
-						<td class="ln">{ lineNo(l.NewNo) }</td>
-						<td class="code">@tokens(l.Tokens)</td>
-					</tr>
+// DiffContext is what a file fragment needs besides the diff itself.
+type DiffContext struct {
+	PR         domain.PRRef
+	Base, Head domain.SHA
+	Mode       settings.ViewMode
+	// CanComment and CanCommentLeft gate the add-comment buttons.
+	CanComment, CanCommentLeft bool
+}
+
+templ Diff(c DiffContext, d review.DiffFile) {
+	<div class="diff-wrap">
+		if len(d.Unplaced) > 0 {
+			<div class="unplaced">
+				for _, t := range d.Unplaced {
+					@Thread(c.PR, t)
 				}
-			}
-		</table>
-	} else {
-		<table class="diff split">
-			<colgroup><col class="ln"/><col/><col class="ln"/><col/></colgroup>
-			for _, h := range d.Hunks {
-				<tr class="hunk"><td colspan="4">{ h.Header }</td></tr>
-				for _, row := range h.SplitRows() {
-					<tr>
-						if row.Left != nil {
-							<td class={ "ln", kindClass(row.Left.Kind) }>{ lineNo(row.Left.OldNo) }</td>
-							<td class={ "code", kindClass(row.Left.Kind) }>@tokens(row.Left.Tokens)</td>
-						} else {
-							<td class="ln empty"></td>
-							<td class="code empty"></td>
-						}
-						if row.Right != nil {
-							<td class={ "ln", kindClass(row.Right.Kind) }>{ lineNo(row.Right.NewNo) }</td>
-							<td class={ "code", kindClass(row.Right.Kind) }>@tokens(row.Right.Tokens)</td>
-						} else {
-							<td class="ln empty"></td>
-							<td class="code empty"></td>
-						}
-					</tr>
+			</div>
+		}
+		if len(d.Hunks) == 0 {
+			<p class="note">No content changes.</p>
+		} else if c.Mode == settings.Unified {
+			<table class="diff unified" data-new-thread={ newThreadURL(c.PR, c.Base, c.Head, d.Path, 3) }>
+				<colgroup><col class="ln"/><col class="ln"/><col/></colgroup>
+				for _, h := range d.Hunks {
+					<tr class="hunk"><td colspan="3">{ h.Header }</td></tr>
+					for _, l := range h.Lines {
+						<tr class={ kindClass(l.Kind) }>
+							<td class="ln">{ lineNo(l.OldNo) }</td>
+							<td class="ln">
+								@addComment(c, d.Path, unifiedSide(l), unifiedLine(l), 3)
+								{ lineNo(l.NewNo) }
+							</td>
+							<td class="code">@tokens(l.Tokens)</td>
+						</tr>
+						@ThreadRows(c.PR, l.Threads, 3)
+					}
 				}
-			}
-		</table>
+			</table>
+		} else {
+			<table class="diff split" data-new-thread={ newThreadURL(c.PR, c.Base, c.Head, d.Path, 4) }>
+				<colgroup><col class="ln"/><col/><col class="ln"/><col/></colgroup>
+				for _, h := range d.Hunks {
+					<tr class="hunk"><td colspan="4">{ h.Header }</td></tr>
+					for _, row := range h.SplitRows() {
+						<tr>
+							if row.Left != nil {
+								<td class={ "ln", kindClass(row.Left.Kind) }>
+									if row.Left.Kind == domain.Delete {
+										@addComment(c, d.Path, domain.Left, row.Left.OldNo, 4)
+									}
+									{ lineNo(row.Left.OldNo) }
+								</td>
+								<td class={ "code", kindClass(row.Left.Kind) }>@tokens(row.Left.Tokens)</td>
+							} else {
+								<td class="ln empty"></td>
+								<td class="code empty"></td>
+							}
+							if row.Right != nil {
+								<td class={ "ln", kindClass(row.Right.Kind) }>
+									@addComment(c, d.Path, domain.Right, row.Right.NewNo, 4)
+									{ lineNo(row.Right.NewNo) }
+								</td>
+								<td class={ "code", kindClass(row.Right.Kind) }>@tokens(row.Right.Tokens)</td>
+							} else {
+								<td class="ln empty"></td>
+								<td class="code empty"></td>
+							}
+						</tr>
+						@ThreadRows(c.PR, rowThreads(row), 4)
+					}
+				}
+			</table>
+		}
+	</div>
+}
+
+// addComment is a button that loads the new-thread form below its row; the
+// URL comes from the table's data-new-thread so each line stays small.
+templ addComment(c DiffContext, path string, side domain.DiffSide, line int, cols int) {
+	if c.CanComment && line > 0 && (side == domain.Right || c.CanCommentLeft) {
+		<button class="add-comment" title="Comment on this line" data-side={ string(side) } data-line={ itoa(line) }>+</button>
 	}
 }
 

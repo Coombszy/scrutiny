@@ -9,7 +9,9 @@ templ Layout(title string) {
 			<meta name="csrf-token" content={ pageFrom(ctx).CSRFToken }/>
 			<title>{ title } · Scrutiny</title>
 			<link rel="stylesheet" href="/static/scrutiny.css"/>
+			<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"/>
 			<script src="/static/htmx.min.js" defer></script>
+			<script src="/static/scrutiny.js" defer></script>
 		</head>
 		<body hx-headers={ csrfHeaders(ctx) }>
 			<header class="topbar">

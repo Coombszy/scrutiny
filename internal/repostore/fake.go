@@ -45,7 +45,7 @@ func NewFake() *Fake {
 	}
 }
 
-func (f *Fake) FetchPR(_ context.Context, pr domain.PRRef, _ string) (domain.SHA, error) {
+func (f *Fake) FetchPR(_ context.Context, pr domain.PRRef, _ string, _ domain.SHA) (domain.SHA, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.Fetches++

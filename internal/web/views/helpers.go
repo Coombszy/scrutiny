@@ -1,6 +1,7 @@
 package views
 
 import (
+	"encoding/json"
 	"net/url"
 	"strconv"
 	"strings"
@@ -56,3 +57,93 @@ func kindClass(k domain.LineKind) string {
 func fileID(i int) string { return "file-" + strconv.Itoa(i) }
 
 func itoa(n int) string { return strconv.Itoa(n) }
+
+// ThreadAnchor is where a new Review Thread is being added.
+type ThreadAnchor struct {
+	Base, Head, Path string
+	Line             int
+	Side             string
+}
+
+// newThreadURL is the new-thread form's URL without its side and line,
+// which the add-comment button appends.
+func newThreadURL(pr domain.PRRef, base, head domain.SHA, path string, cols int) string {
+	q := url.Values{"base": {string(base)}, "head": {string(head)}, "path": {path}, "cols": {strconv.Itoa(cols)}}
+	return pr.Path() + "/threads/new?" + q.Encode()
+}
+
+func boolString(b bool) string { return strconv.FormatBool(b) }
+
+func threadLocation(t domain.ReviewThread) string {
+	if t.Line == 0 {
+		return t.Path
+	}
+	return t.Path + ":" + strconv.Itoa(t.Line)
+}
+
+func reactionVals(subject string, r domain.Reaction, on bool) string {
+	b, _ := json.Marshal(map[string]string{"subject": subject, "content": string(r), "on": strconv.FormatBool(on)})
+	return string(b)
+}
+
+func hasReacted(groups []domain.ReactionGroup, r domain.Reaction) bool {
+	for _, g := range groups {
+		if g.Content == r {
+			return g.ViewerHasReacted
+		}
+	}
+	return false
+}
+
+func pendingCount(p *domain.PendingReview) string {
+	if p == nil {
+		return "0"
+	}
+	return strconv.Itoa(p.Comments)
+}
+
+func unresolvedThreads(ts []domain.ReviewThread) int {
+	n := 0
+	for _, t := range ts {
+		if !t.Resolved {
+			n++
+		}
+	}
+	return n
+}
+
+// viewedVals sends the file's path; htmx adds the checkbox's own value only
+// when it is checked, so an absent "viewed" means unviewed.
+func viewedVals(path string) string {
+	b, _ := json.Marshal(map[string]string{"path": path})
+	return string(b)
+}
+
+// unifiedSide is the side a comment on a unified diff line goes on: deleted
+// lines are LEFT, everything else RIGHT.
+func unifiedSide(l review.DiffLine) domain.DiffSide {
+	if l.Kind == domain.Delete {
+		return domain.Left
+	}
+	return domain.Right
+}
+
+func unifiedLine(l review.DiffLine) int {
+	if l.Kind == domain.Delete {
+		return l.OldNo
+	}
+	return l.NewNo
+}
+
+// rowThreads are the threads anchored to either side of a split row; a
+// context line appears on both sides but its threads only once.
+func rowThreads(row review.SplitRow) []domain.ReviewThread {
+	var ts []domain.ReviewThread
+	if row.Left != nil {
+		ts = append(ts, row.Left.Threads...)
+	}
+	if row.Right != nil && row.Right != row.Left {
+		ts = append(ts, row.Right.Threads...)
+	}
+	return ts
+}

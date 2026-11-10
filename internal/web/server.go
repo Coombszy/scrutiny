@@ -34,6 +34,7 @@ func NewServer(csrfToken string, svc *review.Service, st settings.Store) *Server
 	s.mux.HandleFunc("GET /github.com/{owner}/{repo}/pull/{number}", s.pullRequest)
 	s.mux.HandleFunc("GET /github.com/{owner}/{repo}/pull/{number}/file", s.file)
 	s.mux.HandleFunc("POST /settings/view-mode", s.setViewMode)
+	s.routeReview()
 	return s
 }
 
@@ -46,12 +47,15 @@ type component interface {
 	Render(ctx context.Context, w io.Writer) error
 }
 
-func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, c component) {
+func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, cs ...component) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	ctx := views.WithPage(r.Context(), views.Page{CSRFToken: s.csrfToken})
-	if err := c.Render(ctx, w); err != nil {
-		slog.Error("render", "path", r.URL.Path, "err", err)
+	for _, c := range cs {
+		if err := c.Render(ctx, w); err != nil {
+			slog.Error("render", "path", r.URL.Path, "err", err)
+			return
+		}
 	}
 }
 
@@ -61,7 +65,12 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, codehost.ErrNotFound), errors.Is(err, repostore.ErrNotFound):
 		status = http.StatusNotFound
-	case errors.Is(err, review.ErrInvalidComparison), errors.Is(err, errBadRequest):
+	case errors.Is(err, review.ErrThreadNotFound):
+		status = http.StatusNotFound
+	case errors.Is(err, review.ErrCannotComment):
+		status = http.StatusConflict
+	case errors.Is(err, review.ErrInvalidComparison), errors.Is(err, review.ErrInvalidReaction),
+		errors.Is(err, review.ErrInvalidEvent), errors.Is(err, errBadRequest):
 		status = http.StatusBadRequest
 	default:
 		slog.Error("request failed", "path", r.URL.Path, "err", err)

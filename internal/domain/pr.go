@@ -21,6 +21,7 @@ type PullRequest struct {
 	Draft        bool
 	BaseBranch   string
 	HeadBranch   string
+	BaseSHA      SHA // the base branch's tip when the PR was last updated
 	HeadSHA      SHA
 	URL          string // the PR on the code host
 	Additions    int

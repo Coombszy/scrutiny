@@ -97,3 +97,59 @@ main { padding: 1rem; max-width: 100%; }
   .diff col.ln { width: 2.5rem; }
   .diff .ln { padding: 0 .25rem; }
 }
+
+/* Review */
+.pr-title { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+button.primary { background: var(--green); color: var(--bg0); border-color: var(--green); font-weight: 600; }
+button.primary:hover { filter: brightness(1.1); background: var(--green); }
+.count { display: inline-block; min-width: 1.4em; margin-left: .3rem; padding: 0 .35rem; border-radius: 999px; background: var(--bg0); color: var(--fg); font-size: .8rem; }
+.notice { background: var(--bg1); border-left: 3px solid var(--yellow); padding: .5rem .8rem; }
+.comment-nav { display: flex; gap: .4rem; align-items: center; margin-left: auto; }
+
+.conversation-panel { margin: .5rem 0 1rem; }
+.conversation-panel > summary { cursor: pointer; color: var(--fg-dim); }
+#conversation { max-width: 60rem; }
+
+.file.viewed .file-body { display: none; }
+.viewed-toggle { display: flex; gap: .3rem; align-items: center; font-size: .85rem; color: var(--fg-dim); }
+
+.diff td.ln { position: relative; }
+.add-comment {
+  position: absolute; left: 2px; top: 0; padding: 0 .3rem; line-height: 1.3; font-size: .8rem;
+  background: var(--blue); color: var(--bg0); border: 0; opacity: 0;
+}
+.diff tr:hover .add-comment, .add-comment:focus { opacity: 1; }
+
+.thread-row > td { padding: .4rem .6rem !important; background: var(--bg-soft); }
+.thread, .unplaced .thread, .other-threads .thread {
+  font-family: system-ui, sans-serif; font-size: 14px; white-space: normal;
+  border: 1px solid var(--bg2); border-radius: 6px; background: var(--bg0); margin: .3rem 0; max-width: 60rem;
+}
+.unplaced, .other-threads .file-body { padding: .4rem .6rem; }
+.thread.current { outline: 2px solid var(--yellow); }
+.thread-summary { cursor: pointer; padding: .35rem .6rem; display: flex; gap: .6rem; align-items: center; }
+.thread-summary .path { font-family: var(--mono); font-size: .85rem; }
+.comment { padding: .5rem .8rem; border-top: 1px solid var(--bg1); }
+.comment header { display: flex; gap: .6rem; align-items: baseline; }
+.badge.pending { background: var(--yellow); color: var(--bg0); }
+.markdown { overflow-wrap: anywhere; }
+.markdown img { max-width: 100%; }
+.markdown pre { background: var(--bg1); padding: .5rem; overflow-x: auto; }
+.reply { padding: .5rem .8rem; display: flex; flex-direction: column; gap: .4rem; }
+textarea { font: inherit; color: var(--fg); background: var(--bg1); border: 1px solid var(--bg2); border-radius: 4px; padding: .4rem; width: 100%; resize: vertical; }
+.actions { display: flex; gap: .5rem; }
+
+.reactions { display: flex; gap: .3rem; align-items: center; flex-wrap: wrap; margin-top: .3rem; }
+.reaction { padding: 0 .45rem; border-radius: 999px; font-size: .85rem; }
+.reaction.reacted { border-color: var(--blue); background: rgba(131, 165, 152, .2); }
+.reaction-picker { position: relative; }
+.reaction-picker > summary { list-style: none; cursor: pointer; color: var(--gray); padding: 0 .3rem; }
+.reaction-picker .picker { position: absolute; z-index: 3; display: flex; gap: .2rem; padding: .3rem; background: var(--bg1); border: 1px solid var(--bg2); border-radius: 6px; }
+
+dialog { background: var(--bg0); color: var(--fg); border: 1px solid var(--bg2); border-radius: 8px; width: min(36rem, calc(100vw - 32px)); }
+dialog::backdrop { background: rgba(0, 0, 0, .5); }
+dialog form { display: flex; flex-direction: column; gap: .7rem; }
+dialog h2 { margin: 0; font-size: 1.1rem; }
+dialog fieldset { border: 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
+
+.toast { position: fixed; bottom: 1rem; right: 1rem; max-width: min(30rem, calc(100vw - 32px)); background: var(--red); color: var(--bg0); padding: .6rem .9rem; border-radius: 6px; z-index: 10; }

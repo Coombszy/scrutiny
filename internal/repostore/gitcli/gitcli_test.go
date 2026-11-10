@@ -19,7 +19,7 @@ func TestFetchPRMakesHeadAndBaseAvailable(t *testing.T) {
 	r.openPR(1, head)
 
 	store := storeFor(t, r)
-	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
+	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main", ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -40,14 +40,14 @@ func TestFetchPRAgainPicksUpNewHead(t *testing.T) {
 	r.openPR(1, first)
 	store := storeFor(t, r)
 	pr := domain.PRRef{Repo: testRepo, Number: 1}
-	if _, err := store.FetchPR(ctx, pr, "main"); err != nil {
+	if _, err := store.FetchPR(ctx, pr, "main", ""); err != nil {
 		t.Fatal(err)
 	}
 
 	r.write("a.txt", "two\n")
 	second := r.commit("second")
 	r.openPR(1, second)
-	if _, err := store.FetchPR(ctx, pr, "main"); err != nil {
+	if _, err := store.FetchPR(ctx, pr, "main", ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -76,7 +76,7 @@ func TestChangesSummarisesEachFile(t *testing.T) {
 	head := r.commit("head")
 	r.openPR(1, head)
 	store := storeFor(t, r)
-	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
+	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main", ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -111,7 +111,7 @@ func TestFileDiffNumbersEachLine(t *testing.T) {
 	head := r.commit("head")
 	r.openPR(1, head)
 	store := storeFor(t, r)
-	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
+	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main", ""); err != nil {
 		t.Fatal(err)
 	}
 	change := domain.FileChange{Path: "new.txt", OldPath: "old.txt", Status: domain.Renamed}
@@ -152,7 +152,7 @@ func TestListFilesAtSHA(t *testing.T) {
 	head := r.commit("head")
 	r.openPR(1, head)
 	store := storeFor(t, r)
-	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
+	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main", ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -176,7 +176,7 @@ func TestFetchPRReturnsBaseTipAndHasCommit(t *testing.T) {
 	if ok, _ := store.HasCommit(ctx, testRepo, baseTip); ok {
 		t.Error("HasCommit before any fetch = true")
 	}
-	got, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main")
+	got, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +201,7 @@ func TestGitAttributeAtSHA(t *testing.T) {
 	head := r.commit("head")
 	r.openPR(1, head)
 	store := storeFor(t, r)
-	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
+	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main", ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -223,10 +223,34 @@ func TestRevisionsThatLookLikeOptionsAreRejected(t *testing.T) {
 	head := r.commit("head")
 	r.openPR(1, head)
 	store := storeFor(t, r)
-	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
+	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main", ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.Changes(ctx, testRepo, "--output=/tmp/pwned", head); err == nil {
 		t.Error("Changes accepted an option as a revision")
+	}
+}
+
+func TestFetchPRFallsBackToTheBaseSHAWhenTheBranchIsGone(t *testing.T) {
+	ctx := context.Background()
+	r := newRemote(t)
+	r.write("a.txt", "one\n")
+	r.commit("root")
+	r.git("checkout", "-q", "-b", "stacked-base")
+	r.write("a.txt", "two\n")
+	base := r.commit("base")
+	r.write("a.txt", "three\n")
+	head := r.commit("head")
+	r.openPR(2, head)
+	r.git("checkout", "-q", "main")
+	r.git("branch", "-q", "-D", "stacked-base")
+
+	store := storeFor(t, r)
+	got, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 2}, "stacked-base", base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != base {
+		t.Errorf("base tip = %s, want the base SHA %s", got, base)
 	}
 }

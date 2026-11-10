@@ -56,6 +56,7 @@ func TestPullRequestMapsMetadata(t *testing.T) {
 		State:        domain.Closed,
 		BaseBranch:   "trunk",
 		HeadBranch:   "auth-token-port",
+		BaseSHA:      "4e83b33c301de3d1d4d30df34db06648f898c389",
 		HeadSHA:      "15fbe1db354aaa7ac0d966e5099f4c0064d4db02",
 		URL:          "https://github.com/cli/go-gh/pull/325",
 		Additions:    19,

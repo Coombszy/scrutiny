@@ -25,6 +25,7 @@ type restPull struct {
 	User         restUser   `json:"user"`
 	Base         struct {
 		Ref string `json:"ref"`
+		SHA string `json:"sha"`
 	} `json:"base"`
 	Head struct {
 		Ref string `json:"ref"`
@@ -46,6 +47,7 @@ func (p restPull) toDomain(ref domain.PRRef) domain.PullRequest {
 		Draft:        p.Draft,
 		BaseBranch:   p.Base.Ref,
 		HeadBranch:   p.Head.Ref,
+		BaseSHA:      domain.SHA(p.Base.SHA),
 		HeadSHA:      domain.SHA(p.Head.SHA),
 		URL:          p.HTMLURL,
 		Additions:    p.Additions,

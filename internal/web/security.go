@@ -9,6 +9,11 @@ import (
 	"net/url"
 )
 
+// contentSecurityPolicy only allows Scrutiny's own scripts, so HTML from
+// comment bodies cannot run script even if the code host's sanitising fails.
+const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+	"img-src 'self' https: data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+
 // NewCSRFToken returns a random per-process CSRF token.
 func NewCSRFToken() string {
 	b := make([]byte, 32)
@@ -43,6 +48,8 @@ func Secure(next http.Handler, csrfToken string) http.Handler {
 				return
 			}
 		}
+		w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		next.ServeHTTP(w, r)
 	})
 }

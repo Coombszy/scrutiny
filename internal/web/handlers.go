@@ -101,7 +101,12 @@ func (s *Server) file(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, fmt.Errorf("%w: base, head, path and old are required", errBadRequest))
 		return
 	}
-	d, err := s.review.FileDiff(r.Context(), ref.Repo, domain.SHA(base), domain.SHA(head), change)
+	d, err := s.review.FileDiff(r.Context(), ref, domain.SHA(base), domain.SHA(head), change)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	anchors, err := s.review.Anchors(r.Context(), ref)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -111,7 +116,11 @@ func (s *Server) file(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	s.render(w, r, http.StatusOK, views.Diff(d, cfg.ViewMode))
+	s.render(w, r, http.StatusOK, views.Diff(views.DiffContext{
+		PR: ref, Base: domain.SHA(base), Head: domain.SHA(head), Mode: cfg.ViewMode,
+		CanComment:     anchors.Pending == nil || anchors.Pending.Commit == domain.SHA(head),
+		CanCommentLeft: domain.SHA(base) == anchors.MergeBase,
+	}, d))
 }
 
 // setViewMode saves the View Mode to the config file and reloads the page.
