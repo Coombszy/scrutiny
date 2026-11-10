@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"html"
+	"slices"
 	"sync"
 
 	"github.com/Coombszy/scrutiny/internal/domain"
@@ -217,7 +218,7 @@ func (f *Fake) AddThread(_ context.Context, reviewID string, t NewThread) error 
 	s.Threads = append(s.Threads, domain.ReviewThread{
 		ID: f.id("PRRT"), Path: t.Path, Line: t.Line, StartLine: t.StartLine, Side: t.Side, StartSide: t.StartSide,
 		ViewerCanResolve: true,
-		Comments:         []domain.Comment{{ID: f.id("PRRC"), Author: s.Viewer, Body: t.Body, BodyHTML: renderBody(t.Body), Pending: true, ViewerDidAuthor: true}},
+		Comments:         []domain.Comment{{ID: f.id("PRRC"), Author: s.Viewer, Body: t.Body, BodyHTML: renderBody(t.Body), Pending: true, ViewerDidAuthor: true, ViewerCanUpdate: true, ViewerCanDelete: true}},
 	})
 	s.Pending.Comments++
 	return nil
@@ -236,7 +237,7 @@ func (f *Fake) Reply(_ context.Context, reviewID, threadID, body string) error {
 	for i := range s.Threads {
 		if s.Threads[i].ID == threadID {
 			s.Threads[i].Comments = append(s.Threads[i].Comments, domain.Comment{
-				ID: f.id("PRRC"), Author: s.Viewer, Body: body, BodyHTML: renderBody(body), Pending: true, ViewerDidAuthor: true,
+				ID: f.id("PRRC"), Author: s.Viewer, Body: body, BodyHTML: renderBody(body), Pending: true, ViewerDidAuthor: true, ViewerCanUpdate: true, ViewerCanDelete: true,
 			})
 			s.Pending.Comments++
 			return nil
@@ -273,7 +274,7 @@ func (f *Fake) AddConversationComment(_ context.Context, prID, body string) erro
 	if err != nil {
 		return err
 	}
-	s.Conversation = append(s.Conversation, domain.Comment{ID: f.id("IC"), Author: s.Viewer, Body: body, BodyHTML: renderBody(body), ViewerDidAuthor: true})
+	s.Conversation = append(s.Conversation, domain.Comment{ID: f.id("IC"), Author: s.Viewer, Body: body, BodyHTML: renderBody(body), ViewerDidAuthor: true, ViewerCanUpdate: true, ViewerCanDelete: true})
 	return nil
 }
 
@@ -379,4 +380,84 @@ func (f *Fake) Forget(_ context.Context, ref domain.PRRef) error {
 	defer f.mu.Unlock()
 	f.Forgotten = append(f.Forgotten, ref)
 	return nil
+}
+
+func (f *Fake) EditReviewComment(_ context.Context, commentID, body string) error {
+	return f.editComment(commentID, func(c *domain.Comment) { c.Body, c.BodyHTML = body, renderBody(body) })
+}
+
+// DeleteReviewComment removes the comment, and its thread once empty, as
+// GitHub does.
+func (f *Fake) DeleteReviewComment(_ context.Context, commentID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.Health.Online {
+		return ErrOffline
+	}
+	for _, s := range f.States {
+		for i := range s.Threads {
+			t := &s.Threads[i]
+			for j, c := range t.Comments {
+				if c.ID != commentID {
+					continue
+				}
+				t.Comments = slices.Delete(t.Comments, j, j+1)
+				if c.Pending && s.Pending != nil {
+					s.Pending.Comments--
+				}
+				if len(t.Comments) == 0 {
+					s.Threads = slices.Delete(s.Threads, i, i+1)
+				}
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("comment %s: %w", commentID, ErrNotFound)
+}
+
+func (f *Fake) EditConversationComment(_ context.Context, commentID, body string) error {
+	return f.editComment(commentID, func(c *domain.Comment) { c.Body, c.BodyHTML = body, renderBody(body) })
+}
+
+func (f *Fake) DeleteConversationComment(_ context.Context, commentID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.Health.Online {
+		return ErrOffline
+	}
+	for _, s := range f.States {
+		for i, c := range s.Conversation {
+			if c.ID == commentID {
+				s.Conversation = slices.Delete(s.Conversation, i, i+1)
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("comment %s: %w", commentID, ErrNotFound)
+}
+
+// editComment applies change to the comment with id, wherever it is.
+func (f *Fake) editComment(id string, change func(*domain.Comment)) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.Health.Online {
+		return ErrOffline
+	}
+	for _, s := range f.States {
+		for i := range s.Conversation {
+			if s.Conversation[i].ID == id {
+				change(&s.Conversation[i])
+				return nil
+			}
+		}
+		for i := range s.Threads {
+			for j := range s.Threads[i].Comments {
+				if s.Threads[i].Comments[j].ID == id {
+					change(&s.Threads[i].Comments[j])
+					return nil
+				}
+			}
+		}
+	}
+	return fmt.Errorf("comment %s: %w", id, ErrNotFound)
 }

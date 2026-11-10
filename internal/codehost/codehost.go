@@ -80,8 +80,16 @@ type CodeHost interface {
 	// Reply adds a Review Comment to a thread, within a Pending Review.
 	Reply(ctx context.Context, reviewID, threadID, body string) error
 	SetThreadResolved(ctx context.Context, threadID string, resolved bool) error
+	// EditReviewComment replaces a Review Comment's body, pending or not.
+	EditReviewComment(ctx context.Context, commentID, body string) error
+	// DeleteReviewComment deletes a Review Comment; a thread left with no
+	// comments goes with it.
+	DeleteReviewComment(ctx context.Context, commentID string) error
 	// AddConversationComment posts a Conversation Comment immediately.
 	AddConversationComment(ctx context.Context, prID, body string) error
+	// EditConversationComment replaces a Conversation Comment's body.
+	EditConversationComment(ctx context.Context, commentID, body string) error
+	DeleteConversationComment(ctx context.Context, commentID string) error
 	// SetReaction adds or removes the viewer's Reaction on a comment or PR.
 	SetReaction(ctx context.Context, subjectID string, r domain.Reaction, on bool) error
 	// SubmitReview submits the Pending Review, or when reviewID is empty

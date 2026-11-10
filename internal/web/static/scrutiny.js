@@ -169,6 +169,24 @@ window.Scrutiny = { actions: {} };
     if (e.detail.refocus) document.getElementById(e.detail.refocus)?.focus();
   });
 
+  // Edit swaps a comment's body for its edit form; Cancel restores it.
+  document.addEventListener("click", (e) => {
+    const edit = e.target.closest("[data-edit-comment], [data-cancel-edit]");
+    if (!edit) return;
+    const comment = edit.closest(".comment");
+    const form = comment?.querySelector(".edit-comment");
+    if (!form) return;
+    const editing = edit.matches("[data-edit-comment]");
+    if (!editing) form.reset();
+    form.hidden = !editing;
+    comment.querySelector(".markdown").hidden = editing;
+    if (editing) {
+      const box = form.querySelector("textarea");
+      box.focus();
+      box.setSelectionRange(box.value.length, box.value.length);
+    }
+  });
+
   // Ctrl/Cmd+Enter submits the form a textarea is in.
   document.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && e.target.matches("textarea")) {

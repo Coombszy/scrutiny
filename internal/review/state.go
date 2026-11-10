@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/Coombszy/scrutiny/internal/cache"
 	"github.com/Coombszy/scrutiny/internal/codehost"
@@ -21,6 +22,9 @@ var (
 	ErrInvalidReaction = errors.New("invalid reaction")
 	// ErrInvalidEvent is returned for an unknown review submission event.
 	ErrInvalidEvent = errors.New("invalid review event")
+	// ErrCannotChangeComment is returned for an edit or delete the code host
+	// does not allow the viewer, or an empty edit.
+	ErrCannotChangeComment = errors.New("cannot change this comment")
 	// ErrThreadNotFound is returned when a thread or comment is not on the PR.
 	ErrThreadNotFound = errors.New("not found on this pull request")
 )
@@ -314,4 +318,79 @@ func pendingComments(st domain.ReviewState) []PendingComment {
 		return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.Line, b.Line))
 	})
 	return out
+}
+
+// CommentChange is what an edited or deleted comment belongs to, re-read
+// afterwards: its thread, or the Conversation.
+type CommentChange struct {
+	InConversation bool
+	Conversation   []domain.Comment
+	ThreadID       string
+	// Thread is nil when deleting its last comment deleted the thread.
+	Thread *domain.ReviewThread
+}
+
+// EditComment replaces the body of a Review Comment (pending or submitted)
+// or a Conversation Comment.
+func (s *Service) EditComment(ctx context.Context, ref domain.PRRef, commentID, body string) (CommentChange, error) {
+	if strings.TrimSpace(body) == "" {
+		return CommentChange{}, fmt.Errorf("%w: a comment cannot be empty", ErrCannotChangeComment)
+	}
+	return s.changeComment(ctx, ref, commentID, func(c domain.Comment, inConversation bool) error {
+		switch {
+		case !c.ViewerCanUpdate:
+			return fmt.Errorf("%w: GitHub does not let you edit it", ErrCannotChangeComment)
+		case inConversation:
+			return s.CodeHost.EditConversationComment(ctx, commentID, body)
+		default:
+			return s.CodeHost.EditReviewComment(ctx, commentID, body)
+		}
+	})
+}
+
+// DeleteComment deletes a Review Comment (pending or submitted) or a
+// Conversation Comment.
+func (s *Service) DeleteComment(ctx context.Context, ref domain.PRRef, commentID string) (CommentChange, error) {
+	return s.changeComment(ctx, ref, commentID, func(c domain.Comment, inConversation bool) error {
+		switch {
+		case !c.ViewerCanDelete:
+			return fmt.Errorf("%w: GitHub does not let you delete it", ErrCannotChangeComment)
+		case inConversation:
+			return s.CodeHost.DeleteConversationComment(ctx, commentID)
+		default:
+			return s.CodeHost.DeleteReviewComment(ctx, commentID)
+		}
+	})
+}
+
+// changeComment finds the comment and runs change on it, returning what it
+// belongs to as re-read afterwards.
+func (s *Service) changeComment(ctx context.Context, ref domain.PRRef, commentID string, change func(c domain.Comment, inConversation bool) error) (CommentChange, error) {
+	var out CommentChange
+	snap, err := s.write(ctx, ref, func(snap snapshot) error {
+		for _, c := range snap.State.Conversation {
+			if c.ID == commentID {
+				out.InConversation = true
+				return change(c, true)
+			}
+		}
+		for _, t := range snap.State.Threads {
+			for _, c := range t.Comments {
+				if c.ID == commentID {
+					out.ThreadID = t.ID
+					return change(c, false)
+				}
+			}
+		}
+		return fmt.Errorf("comment %s: %w", commentID, ErrThreadNotFound)
+	})
+	if err != nil {
+		return CommentChange{}, err
+	}
+	if out.InConversation {
+		out.Conversation = snap.State.Conversation
+	} else if t, err := findThread(snap.State, out.ThreadID); err == nil {
+		out.Thread = &t
+	}
+	return out, nil
 }

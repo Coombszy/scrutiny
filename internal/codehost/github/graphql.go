@@ -91,6 +91,8 @@ type gqlComment struct {
 	CreatedAt       time.Time          `json:"createdAt"`
 	State           string             `json:"state"`
 	ViewerDidAuthor bool               `json:"viewerDidAuthor"`
+	ViewerCanUpdate bool               `json:"viewerCanUpdate"`
+	ViewerCanDelete bool               `json:"viewerCanDelete"`
 	ReactionGroups  []gqlReactionGroup `json:"reactionGroups"`
 }
 
@@ -267,6 +269,8 @@ func comment(c gqlComment) domain.Comment {
 		CreatedAt:       c.CreatedAt,
 		Pending:         c.State == "PENDING",
 		ViewerDidAuthor: c.ViewerDidAuthor,
+		ViewerCanUpdate: c.ViewerCanUpdate,
+		ViewerCanDelete: c.ViewerCanDelete,
 		Reactions:       reactions(c.ReactionGroups),
 	}
 }

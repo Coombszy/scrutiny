@@ -25,7 +25,7 @@ query ReviewState($owner: String!, $name: String!, $number: Int!, $threads: Stri
           id isResolved isOutdated path line startLine diffSide startDiffSide viewerCanResolve viewerCanUnresolve
           comments(first: 100) {
             nodes {
-              id author { login } body bodyHTML createdAt state viewerDidAuthor
+              id author { login } body bodyHTML createdAt state viewerDidAuthor viewerCanUpdate viewerCanDelete
               reactionGroups { ...reactions }
             }
           }
@@ -33,7 +33,7 @@ query ReviewState($owner: String!, $name: String!, $number: Int!, $threads: Stri
       }
       comments(last: 100) {
         nodes {
-          id author { login } bodyHTML createdAt viewerDidAuthor
+          id author { login } body bodyHTML createdAt viewerDidAuthor viewerCanUpdate viewerCanDelete
           reactionGroups { ...reactions }
         }
       }

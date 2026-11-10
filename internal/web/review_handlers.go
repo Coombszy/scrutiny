@@ -5,8 +5,11 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/a-h/templ"
+
 	"github.com/Coombszy/scrutiny/internal/codehost"
 	"github.com/Coombszy/scrutiny/internal/domain"
+	"github.com/Coombszy/scrutiny/internal/review"
 	"github.com/Coombszy/scrutiny/internal/web/views"
 )
 
@@ -18,6 +21,8 @@ func (s *Server) routeReview() {
 	s.mux.HandleFunc("POST "+pr+"/threads/{thread}/resolve", s.resolve)
 	s.mux.HandleFunc("POST "+pr+"/reactions", s.react)
 	s.mux.HandleFunc("POST "+pr+"/comments", s.comment)
+	s.mux.HandleFunc("POST "+pr+"/comments/{comment}/edit", s.editComment)
+	s.mux.HandleFunc("POST "+pr+"/comments/{comment}/delete", s.deleteComment)
 	s.mux.HandleFunc("POST "+pr+"/viewed", s.viewed)
 	s.mux.HandleFunc("POST "+pr+"/review", s.submit)
 }
@@ -130,6 +135,48 @@ func (s *Server) comment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.render(w, r, http.StatusOK, views.Conversation(ref, comments), views.ConversationCount(len(comments)))
+}
+
+func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
+	ref, ok := prRef(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	ch, err := s.review.EditComment(r.Context(), ref, r.PathValue("comment"), r.FormValue("body"))
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.renderCommentChange(w, r, ref, ch)
+}
+
+func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {
+	ref, ok := prRef(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	ch, err := s.review.DeleteComment(r.Context(), ref, r.PathValue("comment"))
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.renderCommentChange(w, r, ref, ch)
+}
+
+// renderCommentChange renders what an edited or deleted comment belongs
+// to: the Conversation, or its thread (nothing once the thread is gone)
+// with the Pending Review updated out of band.
+func (s *Server) renderCommentChange(w http.ResponseWriter, r *http.Request, ref domain.PRRef, ch review.CommentChange) {
+	switch {
+	case ch.InConversation:
+		s.render(w, r, http.StatusOK, views.Conversation(ref, ch.Conversation), views.ConversationCount(len(ch.Conversation)))
+	case ch.Thread != nil:
+		s.renderWithPending(w, r, views.Thread(ref, *ch.Thread))
+	default:
+		s.renderWithPending(w, r, templ.NopComponent)
+	}
 }
 
 func (s *Server) viewed(w http.ResponseWriter, r *http.Request) {

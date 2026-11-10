@@ -14,17 +14,21 @@ func mutation(name, inputType, selection string) string {
 }
 
 var (
-	addReview        = mutation("addPullRequestReview", "AddPullRequestReviewInput", "pullRequestReview { id }")
-	addThread        = mutation("addPullRequestReviewThread", "AddPullRequestReviewThreadInput", "thread { id }")
-	addThreadReply   = mutation("addPullRequestReviewThreadReply", "AddPullRequestReviewThreadReplyInput", "comment { id }")
-	resolveThread    = mutation("resolveReviewThread", "ResolveReviewThreadInput", "thread { id }")
-	unresolveThread  = mutation("unresolveReviewThread", "UnresolveReviewThreadInput", "thread { id }")
-	addComment       = mutation("addComment", "AddCommentInput", "commentEdge { node { id } }")
-	addReaction      = mutation("addReaction", "AddReactionInput", "reaction { content }")
-	removeReaction   = mutation("removeReaction", "RemoveReactionInput", "reaction { content }")
-	submitReview     = mutation("submitPullRequestReview", "SubmitPullRequestReviewInput", "pullRequestReview { id }")
-	markFileViewed   = mutation("markFileAsViewed", "MarkFileAsViewedInput", "clientMutationId")
-	unmarkFileViewed = mutation("unmarkFileAsViewed", "UnmarkFileAsViewedInput", "clientMutationId")
+	addReview           = mutation("addPullRequestReview", "AddPullRequestReviewInput", "pullRequestReview { id }")
+	addThread           = mutation("addPullRequestReviewThread", "AddPullRequestReviewThreadInput", "thread { id }")
+	addThreadReply      = mutation("addPullRequestReviewThreadReply", "AddPullRequestReviewThreadReplyInput", "comment { id }")
+	resolveThread       = mutation("resolveReviewThread", "ResolveReviewThreadInput", "thread { id }")
+	unresolveThread     = mutation("unresolveReviewThread", "UnresolveReviewThreadInput", "thread { id }")
+	addComment          = mutation("addComment", "AddCommentInput", "commentEdge { node { id } }")
+	addReaction         = mutation("addReaction", "AddReactionInput", "reaction { content }")
+	removeReaction      = mutation("removeReaction", "RemoveReactionInput", "reaction { content }")
+	submitReview        = mutation("submitPullRequestReview", "SubmitPullRequestReviewInput", "pullRequestReview { id }")
+	editReviewComment   = mutation("updatePullRequestReviewComment", "UpdatePullRequestReviewCommentInput", "pullRequestReviewComment { id }")
+	deleteReviewComment = mutation("deletePullRequestReviewComment", "DeletePullRequestReviewCommentInput", "clientMutationId")
+	editIssueComment    = mutation("updateIssueComment", "UpdateIssueCommentInput", "issueComment { id }")
+	deleteIssueComment  = mutation("deleteIssueComment", "DeleteIssueCommentInput", "clientMutationId")
+	markFileViewed      = mutation("markFileAsViewed", "MarkFileAsViewedInput", "clientMutationId")
+	unmarkFileViewed    = mutation("unmarkFileAsViewed", "UnmarkFileAsViewedInput", "clientMutationId")
 )
 
 type input map[string]any
@@ -90,4 +94,20 @@ func (c *Client) SetViewed(ctx context.Context, prID, path string, viewed bool) 
 		doc = markFileViewed
 	}
 	return c.mutate(ctx, doc, input{"pullRequestId": prID, "path": path}, nil)
+}
+
+func (c *Client) EditReviewComment(ctx context.Context, commentID, body string) error {
+	return c.mutate(ctx, editReviewComment, input{"pullRequestReviewCommentId": commentID, "body": body}, nil)
+}
+
+func (c *Client) DeleteReviewComment(ctx context.Context, commentID string) error {
+	return c.mutate(ctx, deleteReviewComment, input{"id": commentID}, nil)
+}
+
+func (c *Client) EditConversationComment(ctx context.Context, commentID, body string) error {
+	return c.mutate(ctx, editIssueComment, input{"id": commentID, "body": body}, nil)
+}
+
+func (c *Client) DeleteConversationComment(ctx context.Context, commentID string) error {
+	return c.mutate(ctx, deleteIssueComment, input{"id": commentID}, nil)
 }

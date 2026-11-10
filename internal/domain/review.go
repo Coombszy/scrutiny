@@ -55,6 +55,8 @@ type Comment struct {
 	CreatedAt       time.Time
 	Pending         bool // part of the viewer's Pending Review
 	ViewerDidAuthor bool
+	ViewerCanUpdate bool // the viewer may edit the body
+	ViewerCanDelete bool
 	Reactions       []ReactionGroup
 }
 

@@ -37,7 +37,7 @@ templ threadView(pr domain.PRRef, t domain.ReviewThread, oob bool) {
 				<span class="muted">{ commentCount(len(t.Comments)) }</span>
 			</summary>
 			for _, c := range t.Comments {
-				@commentView(pr, c)
+				@commentView(pr, c, "closest .thread")
 			}
 			<form class="reply" autocomplete="off" hx-post={ pr.Path() + "/threads/" + t.ID + "/replies" } hx-target="closest .thread" hx-swap="outerHTML">
 				<textarea autocomplete="off" id={ "reply-" + t.ID } name="body" rows="2" placeholder="Reply…" required></textarea>
@@ -54,7 +54,9 @@ templ threadView(pr domain.PRRef, t domain.ReviewThread, oob bool) {
 	</div>
 }
 
-templ commentView(pr domain.PRRef, c domain.Comment) {
+// commentView renders a comment; edits and deletes swap target, the thread
+// or Conversation it is in.
+templ commentView(pr domain.PRRef, c domain.Comment, target string) {
 	<article class="comment" id={ "comment-" + c.ID }>
 		<header>
 			<strong>{ c.Author }</strong>
@@ -64,10 +66,37 @@ templ commentView(pr domain.PRRef, c domain.Comment) {
 			if c.Pending {
 				<span class="badge pending">Pending</span>
 			}
+			if c.ViewerCanUpdate || c.ViewerCanDelete {
+				<span class="comment-actions">
+					if c.ViewerCanUpdate {
+						<button type="button" data-edit-comment title="Edit this comment">Edit</button>
+					}
+					if c.ViewerCanDelete {
+						<button
+							type="button"
+							class="danger"
+							hx-post={ pr.Path() + "/comments/" + c.ID + "/delete" }
+							hx-confirm="Delete this comment? This cannot be undone."
+							hx-target={ target }
+							hx-swap="outerHTML"
+							title="Delete this comment"
+						>Delete</button>
+					}
+				</span>
+			}
 		</header>
 		<div class="markdown" hx-disable>
 			@templ.Raw(c.BodyHTML)
 		</div>
+		if c.ViewerCanUpdate {
+			<form class="edit-comment" autocomplete="off" hidden hx-post={ pr.Path() + "/comments/" + c.ID + "/edit" } hx-target={ target } hx-swap="outerHTML">
+				<textarea autocomplete="off" name="body" rows="3" required>{ c.Body }</textarea>
+				<div class="actions">
+					<button type="submit">Save</button>
+					<button type="button" data-cancel-edit>Cancel</button>
+				</div>
+			</form>
+		}
 		@Reactions(pr, c.ID, c.Reactions)
 	</article>
 }
@@ -187,7 +216,7 @@ templ conversationView(pr domain.PRRef, comments []domain.Comment, oob bool) {
 		}
 	>
 		for _, c := range comments {
-			@commentView(pr, c)
+			@commentView(pr, c, "#conversation")
 		}
 		<form class="reply" autocomplete="off" hx-post={ pr.Path() + "/comments" } hx-target="#conversation" hx-swap="outerHTML">
 			<textarea autocomplete="off" id="conversation-new" name="body" rows="3" placeholder="Add a comment" required></textarea>

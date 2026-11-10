@@ -46,6 +46,30 @@ func TestMutationsSendTheRightOperation(t *testing.T) {
 			map[string]any{"input": map[string]any{"pullRequestReviewId": "PRR_1", "pullRequestReviewThreadId": "PRRT_1", "body": "agreed"}},
 		},
 		{
+			"edit review comment",
+			func(c *github.Client) error { return c.EditReviewComment(context.Background(), "PRRC_1", "better") },
+			"updatePullRequestReviewComment",
+			map[string]any{"input": map[string]any{"pullRequestReviewCommentId": "PRRC_1", "body": "better"}},
+		},
+		{
+			"delete review comment",
+			func(c *github.Client) error { return c.DeleteReviewComment(context.Background(), "PRRC_1") },
+			"deletePullRequestReviewComment",
+			map[string]any{"input": map[string]any{"id": "PRRC_1"}},
+		},
+		{
+			"edit conversation comment",
+			func(c *github.Client) error { return c.EditConversationComment(context.Background(), "IC_1", "better") },
+			"updateIssueComment",
+			map[string]any{"input": map[string]any{"id": "IC_1", "body": "better"}},
+		},
+		{
+			"delete conversation comment",
+			func(c *github.Client) error { return c.DeleteConversationComment(context.Background(), "IC_1") },
+			"deleteIssueComment",
+			map[string]any{"input": map[string]any{"id": "IC_1"}},
+		},
+		{
 			"resolve",
 			func(c *github.Client) error { return c.SetThreadResolved(context.Background(), "PRRT_1", true) },
 			"resolveReviewThread",

@@ -136,6 +136,11 @@ button.primary:hover { filter: brightness(1.1); background: var(--green); }
 .thread-summary .path { font-family: var(--mono); font-size: var(--fs-sm); }
 .comment { padding: .5rem .8rem; border-top: 1px solid var(--bg1); }
 .comment header { display: flex; gap: .6rem; align-items: baseline; }
+.comment-actions { margin-left: auto; display: flex; gap: .3rem; }
+.comment-actions button { background: none; border: none; padding: 0 .3rem; color: var(--gray); font-size: var(--fs-sm); }
+.comment-actions button:hover { color: var(--fg); background: none; }
+.comment-actions .danger:hover { color: var(--red); }
+.thread-row:not(:has(.thread)) { display: none; }
 .badge.pending { background: var(--yellow); color: var(--bg0); }
 .markdown { overflow-wrap: anywhere; }
 .markdown img { max-width: 100%; }
