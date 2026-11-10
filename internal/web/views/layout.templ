@@ -6,11 +6,12 @@ templ Layout(title string) {
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<meta name="csrf-token" content={ pageFrom(ctx).CSRFToken }/>
 			<title>{ title } · Scrutiny</title>
 			<link rel="stylesheet" href="/static/scrutiny.css"/>
 			<script src="/static/htmx.min.js" defer></script>
 		</head>
-		<body>
+		<body hx-headers={ csrfHeaders(ctx) }>
 			<header class="topbar">
 				<a class="brand" href="/">Scrutiny</a>
 			</header>

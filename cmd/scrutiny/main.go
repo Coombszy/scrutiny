@@ -11,10 +11,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
+	"github.com/Coombszy/scrutiny/internal/settings/tomlfile"
 	"github.com/Coombszy/scrutiny/internal/web"
+	"github.com/Coombszy/scrutiny/internal/xdg"
 )
 
 func main() {
@@ -29,11 +32,22 @@ func run(args []string) error {
 		return errors.New("usage: scrutiny serve [-port N]")
 	}
 	fl := flag.NewFlagSet("serve", flag.ContinueOnError)
-	port := fl.Int("port", 7878, "port to listen on (127.0.0.1 only)")
+	port := fl.Int("port", 0, "port to listen on, overriding the config file (127.0.0.1 only)")
 	if err := fl.Parse(args[1:]); err != nil {
 		return err
 	}
-	return serve(*port)
+	dirs, err := xdg.Resolve()
+	if err != nil {
+		return err
+	}
+	cfg, err := tomlfile.New(filepath.Join(dirs.Config, "config.toml")).Load()
+	if err != nil {
+		return err
+	}
+	if *port != 0 {
+		cfg.Port = *port
+	}
+	return serve(cfg.Port)
 }
 
 func serve(port int) error {
@@ -44,7 +58,7 @@ func serve(port int) error {
 	if err != nil {
 		return err
 	}
-	srv := &http.Server{Handler: web.NewHandler(), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Handler: web.NewServer(web.NewCSRFToken()).Handler(), ReadHeaderTimeout: 10 * time.Second}
 	slog.Info("scrutiny listening", "url", "http://"+ln.Addr().String())
 
 	errc := make(chan error, 1)
