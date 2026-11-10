@@ -33,7 +33,7 @@ templ threadView(pr domain.PRRef, t domain.ReviewThread, oob bool) {
 				if t.Outdated {
 					<span class="badge">Outdated</span>
 				}
-				<span class="muted">{ itoa(len(t.Comments)) } comments</span>
+				<span class="muted">{ commentCount(len(t.Comments)) }</span>
 			</summary>
 			for _, c := range t.Comments {
 				@commentView(pr, c)

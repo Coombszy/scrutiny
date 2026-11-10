@@ -106,7 +106,16 @@ button.primary:hover { filter: brightness(1.1); background: var(--green); }
 }
 .unplaced, .other-threads .file-body { padding: .4rem .6rem; }
 .thread.current { outline: 2px solid var(--yellow); }
-.thread-summary { cursor: pointer; padding: .35rem .6rem; display: flex; gap: .6rem; align-items: center; }
+.thread-summary { cursor: pointer; padding: .35rem .6rem; display: flex; gap: .6rem; align-items: center; list-style: none; }
+.thread-summary::-webkit-details-marker { display: none; }
+/* Flex drops the browser's disclosure arrow, so draw one: right when folded, down when open. */
+.thread-summary::before {
+  content: ""; flex: none; width: .45rem; height: .45rem; margin: 0 .15rem 0 .05rem;
+  border-right: 2px solid var(--fg-dim); border-bottom: 2px solid var(--fg-dim);
+  transform: rotate(-45deg); transition: transform .12s;
+}
+.thread > details[open] > .thread-summary::before { transform: rotate(45deg); margin-top: -.2rem; }
+.thread-summary:hover::before { border-color: var(--fg); }
 .thread-summary .path { font-family: var(--mono); font-size: .85rem; }
 .comment { padding: .5rem .8rem; border-top: 1px solid var(--bg1); }
 .comment header { display: flex; gap: .6rem; align-items: baseline; }
