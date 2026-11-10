@@ -29,6 +29,8 @@ type Fake struct {
 	Blobs      map[domain.SHA]map[string]string
 	Attrs      map[string]map[string]string // attribute -> path -> value, at any SHA
 	Fetches    int
+	// Worktrees maps each PR with a worktree to the commit checked out.
+	Worktrees map[domain.PRRef]domain.SHA
 }
 
 var _ Store = (*Fake)(nil)
@@ -42,7 +44,25 @@ func NewFake() *Fake {
 		Diffs:      map[Pair]map[string]domain.FileDiff{},
 		Blobs:      map[domain.SHA]map[string]string{},
 		Attrs:      map[string]map[string]string{},
+		Worktrees:  map[domain.PRRef]domain.SHA{},
 	}
+}
+
+func (f *Fake) Worktree(_ context.Context, pr domain.PRRef, sha domain.SHA) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.Present[sha] {
+		return "", fmt.Errorf("worktree at %s: %w", sha.Short(), ErrNotFound)
+	}
+	f.Worktrees[pr] = sha
+	return "/worktrees/" + pr.String(), nil
+}
+
+func (f *Fake) RemoveWorktree(_ context.Context, pr domain.PRRef) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.Worktrees, pr)
+	return nil
 }
 
 func (f *Fake) FetchPR(_ context.Context, pr domain.PRRef, _ string, _ domain.SHA) (domain.SHA, error) {

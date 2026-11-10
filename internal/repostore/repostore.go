@@ -29,6 +29,11 @@ type Store interface {
 	Blob(ctx context.Context, repo domain.Repo, sha domain.SHA, path string) ([]byte, error)
 	// ListFiles returns every file path at sha.
 	ListFiles(ctx context.Context, repo domain.Repo, sha domain.SHA) ([]string, error)
+	// Worktree checks sha out into the PR's own worktree, creating it or
+	// moving it as needed, and returns its directory.
+	Worktree(ctx context.Context, pr domain.PRRef, sha domain.SHA) (dir string, err error)
+	// RemoveWorktree deletes the PR's worktree, if it has one.
+	RemoveWorktree(ctx context.Context, pr domain.PRRef) error
 	// Attribute returns the gitattributes value of attr for each path, read
 	// from .gitattributes at sha: "set", "unset", "unspecified" or the value.
 	Attribute(ctx context.Context, repo domain.Repo, sha domain.SHA, attr string, paths []string) (map[string]string, error)

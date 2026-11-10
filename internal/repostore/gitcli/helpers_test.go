@@ -67,5 +67,5 @@ var testRepo = domain.Repo{Host: "github.com", Owner: "o", Name: "r"}
 // storeFor returns a Store whose clone URL for testRepo is the remote.
 func storeFor(t *testing.T, r *remote) *gitcli.Store {
 	t.Helper()
-	return gitcli.New(t.TempDir(), func(domain.Repo) string { return r.dir })
+	return gitcli.New(t.TempDir(), t.TempDir(), func(domain.Repo) string { return r.dir })
 }

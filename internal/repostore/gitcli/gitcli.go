@@ -19,9 +19,11 @@ import (
 	"github.com/Coombszy/scrutiny/internal/repostore"
 )
 
-// Store keeps bare clones under root, at <root>/<host>/<owner>/<repo>.git.
+// Store keeps bare clones under root, at <root>/<host>/<owner>/<repo>.git,
+// and PR worktrees under worktrees, at <worktrees>/<host>/<owner>/<repo>/<pr>.
 type Store struct {
 	root      string
+	worktrees string
 	cloneURL  func(domain.Repo) string
 	gitConfig []string
 
@@ -31,11 +33,57 @@ type Store struct {
 
 var _ repostore.Store = (*Store)(nil)
 
-// New returns a Store rooted at root. cloneURL maps a repository to the URL
-// it is fetched from, and each gitConfig entry ("key=value") is passed to
-// every git invocation with -c.
-func New(root string, cloneURL func(domain.Repo) string, gitConfig ...string) *Store {
-	return &Store{root: root, cloneURL: cloneURL, gitConfig: gitConfig, locks: map[domain.Repo]*sync.Mutex{}}
+// New returns a Store keeping clones under root and worktrees under
+// worktrees. cloneURL maps a repository to the URL it is fetched from, and
+// each gitConfig entry ("key=value") is passed to every git invocation
+// with -c.
+func New(root, worktrees string, cloneURL func(domain.Repo) string, gitConfig ...string) *Store {
+	return &Store{root: root, worktrees: worktrees, cloneURL: cloneURL, gitConfig: gitConfig, locks: map[domain.Repo]*sync.Mutex{}}
+}
+
+func (s *Store) worktreeDir(pr domain.PRRef) string {
+	return filepath.Join(s.worktrees, pr.Host, pr.Owner, pr.Name, strconv.Itoa(pr.Number))
+}
+
+func (s *Store) Worktree(ctx context.Context, pr domain.PRRef, sha domain.SHA) (string, error) {
+	if err := checkRevs(sha); err != nil {
+		return "", err
+	}
+	defer s.lock(pr.Repo)()
+	dir := s.worktreeDir(pr)
+	if _, err := os.Stat(filepath.Join(dir, ".git")); errors.Is(err, os.ErrNotExist) {
+		if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
+			return "", err
+		}
+		if _, err := s.git(ctx, pr.Repo, "worktree", "prune"); err != nil {
+			return "", err
+		}
+		_, err := s.git(ctx, pr.Repo, "worktree", "add", "-q", "--detach", "--force", dir, string(sha))
+		return dir, err
+	}
+	head, err := s.gitIn(ctx, dir, "rev-parse", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	if domain.SHA(strings.TrimSpace(string(head))) != sha {
+		if _, err := s.gitIn(ctx, dir, "checkout", "-q", "--detach", "--force", string(sha)); err != nil {
+			return "", err
+		}
+	}
+	return dir, nil
+}
+
+func (s *Store) RemoveWorktree(ctx context.Context, pr domain.PRRef) error {
+	defer s.lock(pr.Repo)()
+	dir := s.worktreeDir(pr)
+	if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if _, err := s.git(ctx, pr.Repo, "worktree", "remove", "--force", dir); err != nil {
+		return err
+	}
+	_, err := s.git(ctx, pr.Repo, "worktree", "prune")
+	return err
 }
 
 // GHCredentialConfig makes git authenticate to host through `gh auth`,
@@ -247,7 +295,16 @@ func (s *Store) FileDiff(ctx context.Context, repo domain.Repo, from, to domain.
 // git runs git inside repo's bare clone, ignoring the system config and
 // never prompting for credentials.
 func (s *Store) git(ctx context.Context, repo domain.Repo, args ...string) ([]byte, error) {
-	return s.gitWithInput(ctx, repo, nil, args...)
+	return s.run(ctx, s.dir(repo), nil, args...)
+}
+
+func (s *Store) gitWithInput(ctx context.Context, repo domain.Repo, stdin io.Reader, args ...string) ([]byte, error) {
+	return s.run(ctx, s.dir(repo), stdin, args...)
+}
+
+// gitIn runs git in dir, e.g. a worktree.
+func (s *Store) gitIn(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	return s.run(ctx, dir, nil, args...)
 }
 
 // checkRevs rejects revisions that git would parse as options.
@@ -260,13 +317,13 @@ func checkRevs(revs ...domain.SHA) error {
 	return nil
 }
 
-func (s *Store) gitWithInput(ctx context.Context, repo domain.Repo, stdin io.Reader, args ...string) ([]byte, error) {
+func (s *Store) run(ctx context.Context, dir string, stdin io.Reader, args ...string) ([]byte, error) {
 	full := []string{"-c", "core.quotePath=false"}
 	for _, kv := range s.gitConfig {
 		full = append(full, "-c", kv)
 	}
 	cmd := exec.CommandContext(ctx, "git", append(full, args...)...)
-	cmd.Dir = s.dir(repo)
+	cmd.Dir = dir
 	cmd.Stdin = stdin
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_NOSYSTEM=1")
 	var stderr bytes.Buffer

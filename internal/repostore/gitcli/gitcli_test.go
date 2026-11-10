@@ -2,6 +2,8 @@ package gitcli_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/Coombszy/scrutiny/internal/domain"
@@ -253,4 +255,58 @@ func TestFetchPRFallsBackToTheBaseSHAWhenTheBranchIsGone(t *testing.T) {
 	if got != base {
 		t.Errorf("base tip = %s, want the base SHA %s", got, base)
 	}
+}
+
+func TestWorktreeFollowsTheHeadAndCanBeRemoved(t *testing.T) {
+	ctx := context.Background()
+	r := newRemote(t)
+	r.write("a.go", "package a // one\n")
+	first := r.commit("first")
+	r.openPR(1, first)
+	store := storeFor(t, r)
+	pr := domain.PRRef{Repo: testRepo, Number: 1}
+	if _, err := store.FetchPR(ctx, pr, "main", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	dir, err := store.Worktree(ctx, pr, first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, filepath.Join(dir, "a.go")); got != "package a // one\n" {
+		t.Errorf("worktree a.go = %q", got)
+	}
+
+	r.write("a.go", "package a // two\n")
+	second := r.commit("second")
+	r.openPR(1, second)
+	if _, err := store.FetchPR(ctx, pr, "main", ""); err != nil {
+		t.Fatal(err)
+	}
+	again, err := store.Worktree(ctx, pr, second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again != dir || readFile(t, filepath.Join(dir, "a.go")) != "package a // two\n" {
+		t.Errorf("after head moved: dir %s (was %s), a.go %q", again, dir, readFile(t, filepath.Join(dir, "a.go")))
+	}
+
+	if err := store.RemoveWorktree(ctx, pr); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("worktree still exists: %v", err)
+	}
+	if err := store.RemoveWorktree(ctx, pr); err != nil {
+		t.Errorf("removing a missing worktree: %v", err)
+	}
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }

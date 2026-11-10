@@ -1,10 +1,11 @@
 ---
 # Scrutiny-lvpc
 title: Indexing spinner (top right)
-status: todo
+status: in-progress
 type: feature
+priority: normal
 created_at: 2026-11-10T17:46:57Z
-updated_at: 2026-11-10T17:46:57Z
+updated_at: 2026-11-10T21:56:06Z
 parent: Scrutiny-6gm4
 ---
 

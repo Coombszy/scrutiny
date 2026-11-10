@@ -71,7 +71,7 @@ func serve(portOverride int) error {
 	if err != nil {
 		return err
 	}
-	repos := gitcli.New(filepath.Join(dirs.State, "repos"), gitcli.HTTPSCloneURL, gitcli.GHCredentialConfig("github.com")...)
+	repos := gitcli.New(filepath.Join(dirs.State, "repos"), filepath.Join(dirs.State, "worktrees"), gitcli.HTTPSCloneURL, gitcli.GHCredentialConfig("github.com")...)
 	svc := review.NewService(review.Deps{
 		CodeHost:    host,
 		Repos:       repos,
