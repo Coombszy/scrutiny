@@ -46,23 +46,28 @@
     }
   });
 
-  // Next/previous comment. Files load lazily, so any file with threads that
-  // has not loaded yet is loaded first.
+  // Next/previous comment. Files load lazily (or, when large or generated,
+  // on demand), so files with threads that have not loaded are loaded first.
+  // Threads in Viewed (collapsed) files are skipped.
   async function loadThreadFiles(includeResolved) {
     const attr = includeResolved ? "threads" : "unresolved";
-    const pending = [...document.querySelectorAll(".file")]
+    const loads = [...document.querySelectorAll(".file:not(.viewed)")]
       .filter((f) => Number(f.dataset[attr] || 0) > 0)
-      .map((f) => f.querySelector(".lazy-diff"))
-      .filter(Boolean)
-      .map((el) => htmx.ajax("GET", el.getAttribute("hx-get"), { target: el, swap: "outerHTML" }));
-    await Promise.all(pending);
+      .map((f) => {
+        const lazy = f.querySelector(".lazy-diff");
+        if (lazy) return htmx.ajax("GET", lazy.getAttribute("hx-get"), { target: lazy, swap: "outerHTML" });
+        const load = f.querySelector(".file-body > .note button[hx-get]");
+        if (load) return htmx.ajax("GET", load.getAttribute("hx-get"), { target: f.querySelector(".file-body"), swap: "innerHTML" });
+      })
+      .filter(Boolean);
+    await Promise.all(loads);
   }
 
   async function navigate(direction) {
     const includeResolved = document.getElementById("nav-include-resolved")?.checked;
     await loadThreadFiles(includeResolved);
     const threads = [...document.querySelectorAll(".thread")].filter(
-      (t) => includeResolved || t.dataset.resolved === "false",
+      (t) => (includeResolved || t.dataset.resolved === "false") && t.getClientRects().length > 0,
     );
     if (threads.length === 0) return toast("No more comments.");
     const offset = 80; // below the sticky top bar

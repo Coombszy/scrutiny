@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/Coombszy/scrutiny/internal/cache"
 	"github.com/Coombszy/scrutiny/internal/codehost"
@@ -87,13 +88,16 @@ func (s *Service) saveSnapshot(ctx context.Context, ref domain.PRRef, snap snaps
 }
 
 // write runs a code host write against the current snapshot, then re-reads
-// the review state so the code host stays the source of truth.
+// the review state so the code host stays the source of truth. The state is
+// re-read even when the write fails, since part of it may have happened
+// (e.g. a Pending Review created before its first thread was refused).
 func (s *Service) write(ctx context.Context, ref domain.PRRef, fn func(snapshot) error) (snapshot, error) {
 	snap, err := s.snapshot(ctx, ref)
 	if err != nil {
 		return snapshot{}, err
 	}
 	if err := fn(snap); err != nil {
+		_, _ = s.readState(ctx, ref, snap.Head, snap.MergeBase)
 		return snapshot{}, err
 	}
 	return s.readState(ctx, ref, snap.Head, snap.MergeBase)
@@ -103,9 +107,21 @@ func (s *Service) write(ctx context.Context, ref domain.PRRef, fn func(snapshot)
 // the review at head if there is none. GitHub anchors a thread to its
 // review's commit and LEFT lines to the PR's merge base, so the thread is
 // refused when either would differ from the Comparison shown.
-// It returns every thread now anchored to the same line.
+// It returns the thread it added. Threads may only go on files in the
+// Comparison.
 func (s *Service) AddThread(ctx context.Context, ref domain.PRRef, base, head domain.SHA, t codehost.NewThread) ([]domain.ReviewThread, error) {
+	changes, err := s.Repos.Changes(ctx, ref.Repo, base, head)
+	if err != nil {
+		return nil, err
+	}
+	if !slices.ContainsFunc(changes, func(c domain.FileChange) bool { return c.Path == t.Path }) {
+		return nil, fmt.Errorf("%w: %s is not changed in this Comparison", ErrCannotComment, t.Path)
+	}
+	known := map[string]bool{}
 	snap, err := s.write(ctx, ref, func(snap snapshot) error {
+		for _, th := range snap.State.Threads {
+			known[th.ID] = true
+		}
 		if t.Side == domain.Left && base != snap.MergeBase {
 			return fmt.Errorf("%w: the left side of this Comparison is not the pull request's base", ErrCannotComment)
 		}
@@ -128,13 +144,13 @@ func (s *Service) AddThread(ctx context.Context, ref domain.PRRef, base, head do
 	if err != nil {
 		return nil, err
 	}
-	var threads []domain.ReviewThread
+	var added []domain.ReviewThread
 	for _, th := range snap.State.Threads {
-		if th.Path == t.Path && th.Side == t.Side && th.Line == t.Line {
-			threads = append(threads, th)
+		if !known[th.ID] && th.Path == t.Path {
+			added = append(added, th)
 		}
 	}
-	return threads, nil
+	return added, nil
 }
 
 // Anchors are the commits Review Threads are anchored to, as last read.
@@ -153,6 +169,9 @@ func (s *Service) Anchors(ctx context.Context, ref domain.PRRef) (Anchors, error
 // Review, starting one at the PR's head if needed.
 func (s *Service) Reply(ctx context.Context, ref domain.PRRef, threadID, body string) (domain.ReviewThread, error) {
 	snap, err := s.write(ctx, ref, func(snap snapshot) error {
+		if _, err := findThread(snap.State, threadID); err != nil {
+			return err
+		}
 		reviewID := ""
 		if p := snap.State.Pending; p != nil {
 			reviewID = p.ID
@@ -173,7 +192,10 @@ func (s *Service) Reply(ctx context.Context, ref domain.PRRef, threadID, body st
 
 // SetResolved resolves or unresolves a thread.
 func (s *Service) SetResolved(ctx context.Context, ref domain.PRRef, threadID string, resolved bool) (domain.ReviewThread, error) {
-	snap, err := s.write(ctx, ref, func(snapshot) error {
+	snap, err := s.write(ctx, ref, func(snap snapshot) error {
+		if _, err := findThread(snap.State, threadID); err != nil {
+			return err
+		}
 		return s.CodeHost.SetThreadResolved(ctx, threadID, resolved)
 	})
 	if err != nil {
@@ -188,7 +210,10 @@ func (s *Service) SetReaction(ctx context.Context, ref domain.PRRef, subjectID s
 	if !r.Valid() {
 		return nil, fmt.Errorf("%w: %q", ErrInvalidReaction, r)
 	}
-	snap, err := s.write(ctx, ref, func(snapshot) error {
+	snap, err := s.write(ctx, ref, func(snap snapshot) error {
+		if subjectID != snap.State.PRID && !slices.ContainsFunc(allComments(snap.State), func(c domain.Comment) bool { return c.ID == subjectID }) {
+			return fmt.Errorf("comment %s: %w", subjectID, ErrThreadNotFound)
+		}
 		return s.CodeHost.SetReaction(ctx, subjectID, r, on)
 	})
 	if err != nil {

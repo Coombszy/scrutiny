@@ -184,9 +184,11 @@ func (c *Client) ReviewState(ctx context.Context, ref domain.PRRef) (domain.Revi
 		if !threadsMore && !filesMore {
 			return state, nil
 		}
-		// A finished connection is re-requested from its end, returning nothing.
-		vars["threads"] = pr.ReviewThreads.PageInfo.EndCursor
-		vars["files"] = pr.Files.PageInfo.EndCursor
+		// A finished connection is re-requested from its end, returning
+		// nothing; an empty one has no cursor and is re-read from the start,
+		// which is also empty.
+		vars["threads"] = cursor(pr.ReviewThreads.PageInfo.EndCursor)
+		vars["files"] = cursor(pr.Files.PageInfo.EndCursor)
 	}
 }
 
@@ -240,4 +242,12 @@ func reactions(groups []gqlReactionGroup) []domain.ReactionGroup {
 		})
 	}
 	return out
+}
+
+// cursor maps GitHub's null endCursor (decoded as "") back to null.
+func cursor(c string) any {
+	if c == "" {
+		return nil
+	}
+	return c
 }

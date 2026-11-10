@@ -3,6 +3,7 @@ package codehost
 import (
 	"context"
 	"fmt"
+	"html"
 	"sync"
 
 	"github.com/Coombszy/scrutiny/internal/domain"
@@ -27,7 +28,9 @@ type Fake struct {
 	Submissions []Submission
 	ChecksOf    map[domain.PRRef]domain.Checks
 	Health      Status
-	nextID      int
+	// FailAddThread, when set, makes AddThread fail with it.
+	FailAddThread error
+	nextID        int
 }
 
 var _ CodeHost = (*Fake)(nil)
@@ -199,6 +202,9 @@ func (f *Fake) AddThread(_ context.Context, reviewID string, t NewThread) error 
 	if !f.Health.Online {
 		return ErrOffline
 	}
+	if f.FailAddThread != nil {
+		return f.FailAddThread
+	}
 	s, err := f.byReviewID(reviewID)
 	if err != nil {
 		return err
@@ -206,7 +212,7 @@ func (f *Fake) AddThread(_ context.Context, reviewID string, t NewThread) error 
 	s.Threads = append(s.Threads, domain.ReviewThread{
 		ID: f.id("PRRT"), Path: t.Path, Line: t.Line, StartLine: t.StartLine, Side: t.Side, StartSide: t.StartSide,
 		ViewerCanResolve: true,
-		Comments:         []domain.Comment{{ID: f.id("PRRC"), Author: s.Viewer, Body: t.Body, BodyHTML: t.Body, Pending: true, ViewerDidAuthor: true}},
+		Comments:         []domain.Comment{{ID: f.id("PRRC"), Author: s.Viewer, Body: t.Body, BodyHTML: renderBody(t.Body), Pending: true, ViewerDidAuthor: true}},
 	})
 	s.Pending.Comments++
 	return nil
@@ -225,7 +231,7 @@ func (f *Fake) Reply(_ context.Context, reviewID, threadID, body string) error {
 	for i := range s.Threads {
 		if s.Threads[i].ID == threadID {
 			s.Threads[i].Comments = append(s.Threads[i].Comments, domain.Comment{
-				ID: f.id("PRRC"), Author: s.Viewer, Body: body, BodyHTML: body, Pending: true, ViewerDidAuthor: true,
+				ID: f.id("PRRC"), Author: s.Viewer, Body: body, BodyHTML: renderBody(body), Pending: true, ViewerDidAuthor: true,
 			})
 			s.Pending.Comments++
 			return nil
@@ -262,7 +268,7 @@ func (f *Fake) AddConversationComment(_ context.Context, prID, body string) erro
 	if err != nil {
 		return err
 	}
-	s.Conversation = append(s.Conversation, domain.Comment{ID: f.id("IC"), Author: s.Viewer, Body: body, BodyHTML: body, ViewerDidAuthor: true})
+	s.Conversation = append(s.Conversation, domain.Comment{ID: f.id("IC"), Author: s.Viewer, Body: body, BodyHTML: renderBody(body), ViewerDidAuthor: true})
 	return nil
 }
 
@@ -358,3 +364,7 @@ func (f *Fake) SetViewed(_ context.Context, prID, path string, viewed bool) erro
 	}
 	return nil
 }
+
+// renderBody stands in for GitHub's Markdown rendering: escaped text in a
+// paragraph.
+func renderBody(body string) string { return "<p>" + html.EscapeString(body) + "</p>" }

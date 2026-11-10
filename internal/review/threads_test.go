@@ -237,3 +237,61 @@ func TestSubmittingAReview(t *testing.T) {
 		t.Errorf("unknown event: err = %v", err)
 	}
 }
+
+func TestAFailedWriteDoesNotLeaveAStaleSnapshot(t *testing.T) {
+	f := newFixture(t)
+	f.withDiff(mb, c3)
+	ctx := context.Background()
+	if _, err := f.svc.PRPage(ctx, ref, review.ComparisonRequest{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// The Pending Review is created, then adding the thread fails.
+	f.host.FailAddThread = errors.New("line could not be resolved")
+	if _, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"}); err == nil {
+		t.Fatal("AddThread succeeded, want the injected failure")
+	}
+	f.host.FailAddThread = nil
+
+	// The retry must reuse that Pending Review rather than start another.
+	if _, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"}); err != nil {
+		t.Fatalf("retry: %v", err)
+	}
+}
+
+func TestAddThreadReturnsOnlyTheNewThread(t *testing.T) {
+	f := newFixture(t)
+	f.withDiff(mb, c3)
+	f.host.State(ref).Threads = []domain.ReviewThread{{ID: "old", Path: "a.go", Line: 2, Side: domain.Right}}
+	ctx := context.Background()
+	if _, err := f.svc.PRPage(ctx, ref, review.ComparisonRequest{}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID == "old" {
+		t.Errorf("AddThread returned %v, want only the new thread", threadIDs(got))
+	}
+}
+
+func TestWritesAreRefusedForThingsNotOnThisPR(t *testing.T) {
+	f := newFixture(t)
+	f.withDiff(mb, c3)
+	ctx := context.Background()
+	if _, err := f.svc.PRPage(ctx, ref, review.ComparisonRequest{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "not-in-diff.go", Line: 1, Side: domain.Right, Body: "x"}); !errors.Is(err, review.ErrCannotComment) {
+		t.Errorf("file outside the diff: err = %v, want ErrCannotComment", err)
+	}
+	if _, err := f.svc.SetResolved(ctx, ref, "PRRT_elsewhere", true); !errors.Is(err, review.ErrThreadNotFound) {
+		t.Errorf("foreign thread: err = %v, want ErrThreadNotFound", err)
+	}
+	if _, err := f.svc.SetReaction(ctx, ref, "IC_elsewhere", domain.Heart, true); !errors.Is(err, review.ErrThreadNotFound) {
+		t.Errorf("foreign comment: err = %v, want ErrThreadNotFound", err)
+	}
+}

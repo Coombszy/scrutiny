@@ -8,6 +8,7 @@ import (
 
 	"github.com/Coombszy/scrutiny/internal/codehost"
 	"github.com/Coombszy/scrutiny/internal/domain"
+	"github.com/Coombszy/scrutiny/internal/repostore"
 )
 
 const prPath = "/github.com/o/r/pull/7"
@@ -84,6 +85,7 @@ func TestCreatingAThreadReturnsItWithTheNewPendingCount(t *testing.T) {
 
 func TestCommentingWhereItWouldBeMisplacedIsAConflict(t *testing.T) {
 	a := newApp(t)
+	a.repos.ChangeSets[repostore.Pair{From: c1, To: c2}] = []domain.FileChange{{Path: "parser.go", OldPath: "parser.go", Status: domain.Modified}}
 	a.do(t, http.MethodGet, prPath, nil)
 	rec := a.do(t, http.MethodPost, prPath+"/threads", url.Values{
 		"base": {string(c1)}, "head": {string(c2)}, "path": {"parser.go"}, "line": {"1"}, "side": {"LEFT"}, "body": {"x"},

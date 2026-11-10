@@ -48,7 +48,7 @@ templ commentView(pr domain.PRRef, c domain.Comment) {
 				<span class="badge pending">Pending</span>
 			}
 		</header>
-		<div class="markdown">
+		<div class="markdown" hx-disable>
 			@templ.Raw(c.BodyHTML)
 		</div>
 		@Reactions(pr, c.ID, c.Reactions)
