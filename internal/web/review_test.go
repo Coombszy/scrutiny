@@ -208,7 +208,7 @@ func TestNoFormControlCanBeRestoredOrAutocompleted(t *testing.T) {
 	q := url.Values{"base": {string(mb)}, "head": {string(c2)}, "path": {"parser.go"}, "line": {"3"}, "side": {"RIGHT"}}
 	for _, path := range []string{
 		"/", prPath, fileURL(), prPath + "/threads/new?" + q.Encode(), prPath + "/blob?path=lib/util.go",
-		"/settings/servers", "/settings/servers/list", "/dashboard/lists",
+		"/settings", "/settings/servers/list", "/dashboard/lists",
 	} {
 		doc, err := html.Parse(strings.NewReader(a.do(t, http.MethodGet, path, nil).Body.String()))
 		if err != nil {

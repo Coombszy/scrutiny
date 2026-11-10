@@ -4,10 +4,80 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/Coombszy/scrutiny/internal/settings"
 	"github.com/Coombszy/scrutiny/internal/theme"
+	"github.com/Coombszy/scrutiny/internal/web/views"
 )
+
+func hasTheme(themes []theme.Theme, id string) bool {
+	_, ok := theme.Find(themes, id)
+	return ok
+}
+
+// settingsPage shows every setting and the Language Servers.
+func (s *Server) settingsPage(w http.ResponseWriter, r *http.Request) {
+	cfg, err := s.settings.Load()
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	list, err := s.servers.List(r.Context(), "")
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.render(w, r, http.StatusOK, views.SettingsPage(views.SettingsForm{Settings: cfg.WithKeyDefaults()}, list))
+}
+
+// saveSettings saves the Settings form. Invalid input is shown in the form
+// rather than as an error, so it stays editable; a new Theme reloads the
+// page to apply it.
+func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
+	cfg, err := s.settings.Load()
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	cfg = cfg.WithKeyDefaults()
+	oldTheme := cfg.Theme
+	form := views.SettingsForm{Settings: cfg}
+	if err := s.applySettingsForm(r, &form.Settings); err != nil {
+		form.Err = err.Error()
+	} else if err := s.settings.Save(form.Settings); err != nil {
+		form.Err = err.Error()
+	} else {
+		form.Saved = true
+		if form.Settings.Theme != oldTheme {
+			w.Header().Set("HX-Refresh", "true")
+		}
+	}
+	s.render(w, r, http.StatusOK, views.SettingsFormView(form))
+}
+
+// applySettingsForm copies the posted fields onto cfg and validates it.
+func (s *Server) applySettingsForm(r *http.Request, cfg *settings.Settings) error {
+	cfg.Theme = r.PostFormValue("theme")
+	if themes, _ := theme.Load(s.themesDir); !hasTheme(themes, cfg.Theme) {
+		return fmt.Errorf("no theme %q", cfg.Theme)
+	}
+	cfg.ViewMode = settings.ViewMode(r.PostFormValue("view_mode"))
+	for name, dst := range map[string]*int{"collapse_threshold": &cfg.Diff.CollapseThreshold, "port": &cfg.Port} {
+		n, err := strconv.Atoi(strings.TrimSpace(r.PostFormValue(name)))
+		if err != nil {
+			return fmt.Errorf("%s must be a whole number", name)
+		}
+		*dst = n
+	}
+	for action := range cfg.Keys {
+		if v, ok := r.PostForm["key."+action]; ok {
+			cfg.Keys[action] = strings.Join(strings.Fields(v[0]), " ")
+		}
+	}
+	return cfg.Validate()
+}
 
 // themeCSS serves the configured Theme, falling back to the default when it
 // is unknown (e.g. its file was removed).

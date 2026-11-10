@@ -108,9 +108,9 @@ func TestKeyboardHelpIsOfferedOnThePRPageAndDashboard(t *testing.T) {
 			t.Error("the top bar still advertises ctrl+k")
 		}
 	}
-	servers := a.do(t, http.MethodGet, "/settings/servers", nil).Body.String()
-	if strings.Contains(servers, `id="help-hint"`) {
-		t.Error("the Language Servers page offers keyboard help")
+	settingsPage := a.do(t, http.MethodGet, "/settings", nil).Body.String()
+	if strings.Contains(settingsPage, `id="help-hint"`) {
+		t.Error("the Settings page offers keyboard help")
 	}
 
 	// The hint follows a rebinding.
@@ -120,7 +120,7 @@ func TestKeyboardHelpIsOfferedOnThePRPageAndDashboard(t *testing.T) {
 
 func TestEveryPageHasAnActivitySpinner(t *testing.T) {
 	a := newApp(t)
-	for _, path := range []string{"/", prPath, "/settings/servers"} {
+	for _, path := range []string{"/", prPath, "/settings"} {
 		mustContain(t, a.do(t, http.MethodGet, path, nil).Body.String(), `id="activity"`)
 	}
 }

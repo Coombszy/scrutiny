@@ -17,13 +17,9 @@ func (s *Server) routeServers() {
 	s.mux.HandleFunc("POST /settings/servers/{name}/remove", s.removeServer)
 }
 
+// serversPage moved into the Settings page.
 func (s *Server) serversPage(w http.ResponseWriter, r *http.Request) {
-	list, err := s.servers.List(r.Context(), "")
-	if err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	s.render(w, r, http.StatusOK, views.ServersPage(list))
+	http.Redirect(w, r, "/settings#language-servers", http.StatusSeeOther)
 }
 
 func (s *Server) serverList(w http.ResponseWriter, r *http.Request) {

@@ -1,0 +1,95 @@
+package views
+
+import (
+	"github.com/Coombszy/scrutiny/internal/servers"
+	"github.com/Coombszy/scrutiny/internal/settings"
+)
+
+// SettingsForm is the editable settings, with the outcome of the last save.
+type SettingsForm struct {
+	Settings settings.Settings
+	Saved    bool
+	Err      string
+}
+
+// keyLabels names each rebindable action, in the order they are listed.
+var keyLabels = []struct{ Action, Label string }{
+	{"symbol_search", "Search files and symbols"},
+	{"command_palette", "Command palette"},
+	{"next_comment", "Next comment"},
+	{"prev_comment", "Previous comment"},
+	{"toggle_view_mode", "Toggle split/unified diff"},
+	{"refresh", "Refresh"},
+	{"help", "Show keyboard shortcuts"},
+}
+
+templ SettingsPage(form SettingsForm, list []servers.Status) {
+	@Layout("Settings") {
+		<header class="pr-header">
+			<h1>Settings</h1>
+			<p class="muted">Changes save as you make them, to Scrutiny's config file.</p>
+		</header>
+		@SettingsFormView(form)
+		<section id="language-servers" class="settings-section">
+			<h2>Language Servers</h2>
+			<p class="muted">
+				Code navigation runs a Language Server per language. These come from the
+				<a href="https://github.com/mason-org/mason-registry">Mason registry</a>
+				and install into Scrutiny's data directory; Scrutiny never installs runtimes such as node or go.
+			</p>
+			<div class="toolbar">
+				<input type="search" name="q" autocomplete="off" placeholder="Filter by name or language" hx-get="/settings/servers/list" hx-trigger="input changed delay:200ms, search" hx-target="#server-list"/>
+				<button hx-post="/settings/servers/refresh" hx-target="#server-list">Update registry</button>
+			</div>
+			@ServerList(list)
+		</section>
+	}
+}
+
+templ SettingsFormView(form SettingsForm) {
+	<form id="settings-form" class="settings-form" autocomplete="off" hx-post="/settings" hx-trigger="change" hx-swap="outerHTML">
+		<section class="settings-section">
+			<h2>General</h2>
+			<label>
+				<span>Theme</span>
+				<select name="theme">
+					for _, t := range pageFrom(ctx).Themes {
+						<option value={ t.ID } selected?={ t.ID == form.Settings.Theme }>{ t.Name }</option>
+					}
+				</select>
+			</label>
+			<label>
+				<span>View Mode</span>
+				<select name="view_mode">
+					<option value={ string(settings.Split) } selected?={ form.Settings.ViewMode == settings.Split }>Split</option>
+					<option value={ string(settings.Unified) } selected?={ form.Settings.ViewMode == settings.Unified }>Unified</option>
+				</select>
+			</label>
+			<label>
+				<span>Collapse diffs over</span>
+				<span><input type="number" name="collapse_threshold" min="1" value={ itoa(form.Settings.Diff.CollapseThreshold) }/> changed lines</span>
+			</label>
+			<label>
+				<span>Port</span>
+				<span><input type="number" name="port" min="1" max="65535" value={ itoa(form.Settings.Port) }/> <span class="muted">applies when <code>scrutiny serve</code> restarts</span></span>
+			</label>
+		</section>
+		<section class="settings-section">
+			<h2>Keyboard shortcuts</h2>
+			<p class="muted">Keys separated by spaces, with optional modifiers, e.g. <code>ctrl+k</code> or <code>] c</code>. Single keys only work outside text boxes.</p>
+			for _, k := range keyLabels {
+				<label>
+					<span>{ k.Label }</span>
+					<input type="text" name={ "key." + k.Action } value={ form.Settings.Keys[k.Action] } autocomplete="off" spellcheck="false"/>
+				</label>
+			}
+		</section>
+		<p class="settings-status" aria-live="polite">
+			if form.Err != "" {
+				<span class="settings-error">Not saved: { form.Err }</span>
+			} else if form.Saved {
+				<span class="settings-saved">Saved</span>
+			}
+		</p>
+	</form>
+}

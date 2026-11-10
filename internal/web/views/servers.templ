@@ -6,24 +6,6 @@ import (
 	"github.com/Coombszy/scrutiny/internal/servers"
 )
 
-templ ServersPage(list []servers.Status) {
-	@Layout("Language Servers") {
-		<header class="pr-header">
-			<h1>Language Servers</h1>
-			<p class="muted">
-				Code navigation runs a Language Server per language. These come from the
-				<a href="https://github.com/mason-org/mason-registry">Mason registry</a>
-				and install into Scrutiny's data directory; Scrutiny never installs runtimes such as node or go.
-			</p>
-		</header>
-		<div class="toolbar">
-			<input type="search" name="q" autocomplete="off" placeholder="Filter by name or language" hx-get="/settings/servers/list" hx-trigger="input changed delay:200ms, search" hx-target="#server-list"/>
-			<button hx-post="/settings/servers/refresh" hx-target="#server-list">Update registry</button>
-		</div>
-		@ServerList(list)
-	}
-}
-
 templ ServerList(list []servers.Status) {
 	<div id="server-list" class="server-list">
 		if len(list) == 0 {

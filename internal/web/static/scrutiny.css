@@ -231,8 +231,22 @@ h1.path { font-family: var(--mono); font-size: var(--fs-lg); overflow-wrap: anyw
 .result.marker-removed .name { text-decoration: line-through; color: var(--fg-dim); }
 tr:target td { background: rgba(250, 189, 47, .18); }
 
-/* Language Servers */
-.topbar-link { color: var(--fg-dim); font-size: var(--fs-sm); text-decoration: none; }
+/* Settings and Language Servers */
+.topbar-link { color: var(--fg-dim); font-size: var(--fs-sm); text-decoration: none; display: inline-flex; }
+.topbar-link:hover { color: var(--fg); }
+.settings-section { max-width: 60rem; margin: 0 0 1.5rem; }
+.settings-section h2 { margin: 0 0 .5rem; padding-bottom: .3rem; border-bottom: 1px solid var(--bg2); }
+.settings-form label { display: flex; gap: 1rem; align-items: center; padding: .35rem 0; }
+.settings-form label > span:first-child { flex: 0 0 14rem; }
+.settings-form input[type="number"] { width: 7rem; }
+.settings-form input[type="text"] { width: 12rem; font-family: var(--mono); }
+.settings-status { min-height: 1.5em; }
+.settings-saved { color: var(--green); }
+.settings-error { color: var(--red); }
+@media (max-width: 700px) {
+  .settings-form label { flex-wrap: wrap; gap: .3rem; }
+  .settings-form label > span:first-child { flex-basis: 100%; }
+}
 .indexing:not([hidden]) + .topbar-link { margin-left: 1rem; }
 .indexing[hidden] + .topbar-link { margin-left: auto; }
 .server-list { display: flex; flex-direction: column; max-width: 60rem; }

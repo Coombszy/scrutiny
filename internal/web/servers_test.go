@@ -14,7 +14,7 @@ func TestServersPageShowsEachPackagesState(t *testing.T) {
 	a.inst.Have["gopls"] = installer.Installed{Name: "gopls", Version: "v0.23.0", Languages: []string{"Go"}}
 	a.inst.Absent["node"] = true
 
-	body := a.do(t, http.MethodGet, "/settings/servers", nil).Body.String()
+	body := a.do(t, http.MethodGet, "/settings", nil).Body.String()
 	mustContain(t, body,
 		"Language Servers", `id="server-gopls"`, "Installed v0.23.0", `hx-post="/settings/servers/gopls/remove"`,
 		`id="server-pyright"`, "Requires node",

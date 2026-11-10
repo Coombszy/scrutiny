@@ -661,7 +661,8 @@ window.Scrutiny = { actions: {} };
       { label: "Change theme…", run: () => show(themes.map((t) => ({ label: t.name, run: () => setTheme(t.id) }))) },
       { label: "Rebind a hotkey…", run: () => show(rebindItems()) },
       { label: "Go to the Dashboard", run: () => (location.href = "/") },
-      { label: "Manage Language Servers", run: () => (location.href = "/settings/servers") },
+      { label: "Open settings", run: () => (location.href = "/settings") },
+      { label: "Manage Language Servers", run: () => (location.href = "/settings#language-servers") },
     ];
   }
 
