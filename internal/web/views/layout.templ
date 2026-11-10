@@ -1,0 +1,28 @@
+package views
+
+templ Layout(title string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ title } · Scrutiny</title>
+			<link rel="stylesheet" href="/static/scrutiny.css"/>
+			<script src="/static/htmx.min.js" defer></script>
+		</head>
+		<body>
+			<header class="topbar">
+				<a class="brand" href="/">Scrutiny</a>
+			</header>
+			<main>
+				{ children... }
+			</main>
+		</body>
+	</html>
+}
+
+templ Home() {
+	@Layout("Home") {
+		<p>Scrutiny is running.</p>
+	}
+}

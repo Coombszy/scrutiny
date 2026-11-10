@@ -1,0 +1,12 @@
+:root {
+  --bg: #282828;
+  --bg1: #3c3836;
+  --fg: #ebdbb2;
+  --muted: #a89984;
+  --accent: #fabd2f;
+}
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; }
+a { color: var(--accent); }
+.topbar { display: flex; gap: 1rem; align-items: center; padding: .5rem 1rem; background: var(--bg1); }
+.brand { font-weight: 700; text-decoration: none; }
+main { padding: 1rem; }
