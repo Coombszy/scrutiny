@@ -5,12 +5,14 @@ package github
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	ghapi "github.com/cli/go-gh/v2/pkg/api"
@@ -75,16 +77,20 @@ func (c *Client) Commits(ctx context.Context, ref domain.PRRef) ([]domain.Commit
 	return commits, nil
 }
 
+// Dashboard runs its two searches at once: GitHub's search API takes
+// seconds per query and sends no ETag to revalidate with.
 func (c *Client) Dashboard(ctx context.Context) (codehost.Dashboard, error) {
 	var (
-		d   codehost.Dashboard
-		err error
+		d                  codehost.Dashboard
+		authored           []domain.PRSummary
+		authErr, reviewErr error
+		wg                 sync.WaitGroup
 	)
-	if d.ReviewRequested, err = c.searchPRs(ctx, "review-requested:@me"); err != nil {
-		return d, err
-	}
-	d.Authored, err = c.searchPRs(ctx, "author:@me")
-	return d, err
+	wg.Go(func() { authored, authErr = c.searchPRs(ctx, "author:@me") })
+	d.ReviewRequested, reviewErr = c.searchPRs(ctx, "review-requested:@me")
+	wg.Wait()
+	d.Authored = authored
+	return d, errors.Join(reviewErr, authErr)
 }
 
 func (c *Client) searchPRs(ctx context.Context, qualifier string) ([]domain.PRSummary, error) {

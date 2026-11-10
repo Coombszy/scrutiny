@@ -53,6 +53,7 @@ func NewServer(d Deps) *Server {
 	s.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
 	s.mux.HandleFunc("GET /{$}", s.dashboard)
 	s.mux.HandleFunc("GET /open", s.open)
+	s.mux.HandleFunc("GET /dashboard/lists", s.dashboardLists)
 	s.mux.HandleFunc("GET /github.com/{owner}/{repo}/pull/{number}", s.pullRequest)
 	s.mux.HandleFunc("GET /github.com/{owner}/{repo}/pull/{number}/file", s.file)
 	s.mux.HandleFunc("POST /settings/view-mode", s.setViewMode)

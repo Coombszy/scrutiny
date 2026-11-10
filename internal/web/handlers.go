@@ -39,12 +39,22 @@ func gitHubPR(owner, repo, number string) (domain.PRRef, bool) {
 }
 
 func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
+	d, cached, err := s.review.CachedDashboard(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.render(w, r, http.StatusOK, views.Dashboard(d, cached))
+}
+
+// dashboardLists fetches the Dashboard's GitHub lists for the page to swap in.
+func (s *Server) dashboardLists(w http.ResponseWriter, r *http.Request) {
 	d, err := s.review.Dashboard(r.Context())
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	s.render(w, r, http.StatusOK, views.Dashboard(d))
+	s.render(w, r, http.StatusOK, views.DashboardLists(d))
 }
 
 // open redirects a pasted GitHub PR URL to the same PR in Scrutiny.

@@ -168,3 +168,34 @@ func TestDashboardSearchesReviewRequestsAndAuthored(t *testing.T) {
 		t.Errorf("Dashboard = %+v", got)
 	}
 }
+
+func TestDashboardSearchesRunInParallel(t *testing.T) {
+	body, err := os.ReadFile("testdata/search.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var inFlight, peak atomic.Int32
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if n := inFlight.Add(1); n > peak.Load() {
+			peak.Store(n)
+		}
+		if inFlight.Load() == 2 {
+			close(release)
+		}
+		select {
+		case <-release:
+		case <-time.After(2 * time.Second):
+		}
+		inFlight.Add(-1)
+		w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+
+	if _, err := newClient(srv, cache.NewMemory()).Dashboard(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if peak.Load() != 2 {
+		t.Errorf("at most %d search in flight, want both at once", peak.Load())
+	}
+}

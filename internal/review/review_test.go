@@ -261,3 +261,21 @@ func TestSinceLastReviewStartsAfterTheReviewedCommit(t *testing.T) {
 		})
 	}
 }
+
+func TestTheLastDashboardIsKeptForTheNextVisit(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	if got, ok, err := f.svc.CachedDashboard(ctx); err != nil || ok || len(got.Recent) != 0 {
+		t.Fatalf("before any fetch: %+v, %v, %v", got, ok, err)
+	}
+	f.host.Dash = codehost.Dashboard{Authored: []domain.PRSummary{{Ref: ref, Title: "Mine"}}}
+	if _, err := f.svc.Dashboard(ctx); err != nil {
+		t.Fatal(err)
+	}
+	f.cache.RecordVisit(ctx, cache.Visit{PR: ref, Title: "Mine", VisitedAt: f.now})
+
+	got, ok, err := f.svc.CachedDashboard(ctx)
+	if err != nil || !ok || len(got.Authored) != 1 || len(got.Recent) != 1 {
+		t.Errorf("CachedDashboard = %+v, %v, %v", got, ok, err)
+	}
+}

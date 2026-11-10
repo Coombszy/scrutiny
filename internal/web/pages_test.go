@@ -181,7 +181,7 @@ func TestToggleViewModeWritesSettings(t *testing.T) {
 	}
 }
 
-func TestDashboardListsPRs(t *testing.T) {
+func TestDashboardRendersAtOnceAndLoadsGitHubListsAfter(t *testing.T) {
 	a := newApp(t)
 	a.host.Dash = codehost.Dashboard{
 		ReviewRequested: []domain.PRSummary{{Ref: domain.PRRef{Repo: repo, Number: 9}, Title: "Needs eyes", Author: "pat"}},
@@ -189,12 +189,18 @@ func TestDashboardListsPRs(t *testing.T) {
 	}
 	a.do(t, http.MethodGet, "/github.com/o/r/pull/7", nil) // a visit
 
-	rec := a.do(t, http.MethodGet, "/", nil)
-	mustContain(t, rec.Body.String(),
-		"Review requested", "Needs eyes", `href="/github.com/o/r/pull/9"`,
-		"Authored", "My work",
-		"Recently opened", "Teach the parser",
-	)
+	// First visit: nothing cached, so the GitHub lists load after the page.
+	body := a.do(t, http.MethodGet, "/", nil).Body.String()
+	mustContain(t, body, "Recently opened", "Teach the parser", `hx-get="/dashboard/lists"`, `hx-trigger="load"`)
+	if strings.Contains(body, "Needs eyes") {
+		t.Error("first page load waited for GitHub")
+	}
+	lists := a.do(t, http.MethodGet, "/dashboard/lists", nil).Body.String()
+	mustContain(t, lists, "Review requested", "Needs eyes", `href="/github.com/o/r/pull/9"`, "Authored", "My work")
+
+	// Later visits show the last lists straight away, then refresh them.
+	body = a.do(t, http.MethodGet, "/", nil).Body.String()
+	mustContain(t, body, "Needs eyes", `hx-get="/dashboard/lists"`)
 }
 
 func TestOpenRedirectsGitHubURLs(t *testing.T) {

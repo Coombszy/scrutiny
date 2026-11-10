@@ -5,14 +5,22 @@ import (
 	"github.com/Coombszy/scrutiny/internal/review"
 )
 
-templ Dashboard(d review.DashboardPage) {
+// Dashboard renders at once from what is cached; the GitHub lists then
+// refresh themselves, since GitHub's search takes seconds.
+templ Dashboard(d review.DashboardPage, cached bool) {
 	@Layout("Dashboard") {
 		<form class="open-pr" action="/open" method="get">
 			<input type="url" name="url" placeholder="Paste a GitHub pull request URL" required/>
 			<button type="submit">Open</button>
 		</form>
-		@prList("Review requested", d.ReviewRequested)
-		@prList("Authored", d.Authored)
+		<div id="dashboard-lists" hx-get="/dashboard/lists" hx-trigger="load" hx-swap="outerHTML">
+			if cached {
+				@prList("Review requested", d.ReviewRequested)
+				@prList("Authored", d.Authored)
+			} else {
+				<p class="muted"><span class="spinner"></span> Loading your pull requests from GitHub…</p>
+			}
+		</div>
 		<section class="pr-list">
 			<h2>Recently opened</h2>
 			if len(d.Recent) == 0 {
@@ -28,6 +36,14 @@ templ Dashboard(d review.DashboardPage) {
 			</ul>
 		</section>
 	}
+}
+
+// DashboardLists are the freshly fetched GitHub lists.
+templ DashboardLists(d review.DashboardPage) {
+	<div id="dashboard-lists">
+		@prList("Review requested", d.ReviewRequested)
+		@prList("Authored", d.Authored)
+	</div>
 }
 
 templ prList(title string, prs []domain.PRSummary) {
