@@ -44,7 +44,7 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	s.render(w, r, http.StatusOK, views.Dashboard(d, cached))
+	s.renderPage(w, r, http.StatusOK, views.Page{KeyHelp: true}, views.Dashboard(d, cached))
 }
 
 // dashboardLists fetches the Dashboard's GitHub lists for the page to swap in.
@@ -94,7 +94,7 @@ func (s *Server) pullRequest(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	s.renderPage(w, r, http.StatusOK, views.Page{Indexing: s.review.Indexing(ref), KeyHelp: true}, views.PR(page, cfg.ViewMode))
+	s.renderPage(w, r, http.StatusOK, views.Page{Indexing: s.review.Indexing(ref), KeyHelp: true, CodeHelp: true}, views.PR(page, cfg.ViewMode))
 }
 
 // file renders one file's diff as an htmx fragment.

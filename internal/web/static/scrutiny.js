@@ -104,14 +104,22 @@ window.Scrutiny = { actions: {} };
     await Promise.all(loads);
   }
 
-  Scrutiny.actions.next_comment = () => navigate(1);
-  Scrutiny.actions.prev_comment = () => navigate(-1);
-  Scrutiny.actions.refresh = () => location.reload();
-  Scrutiny.actions.toggle_view_mode = () =>
-    htmx.ajax("POST", "/settings/view-mode", {
-      values: { mode: document.body.dataset.viewMode === "split" ? "unified" : "split" },
-      swap: "none",
-    });
+  // Only the PR page has comments to step through and a View Mode.
+  if (document.querySelector(".comment-nav")) {
+    Scrutiny.actions.next_comment = () => navigate(1);
+    Scrutiny.actions.prev_comment = () => navigate(-1);
+    Scrutiny.actions.toggle_view_mode = () =>
+      htmx.ajax("POST", "/settings/view-mode", {
+        values: { mode: document.body.dataset.viewMode === "split" ? "unified" : "split" },
+        swap: "none",
+      });
+  }
+  // On the Dashboard, refresh means fetching its lists from GitHub again.
+  Scrutiny.actions.refresh = () => {
+    const button = document.querySelector("#dashboard-status button");
+    if (!button) return location.reload();
+    if (!button.disabled) button.click();
+  };
 
   async function navigate(direction) {
     const includeResolved = document.getElementById("nav-include-resolved")?.checked;
@@ -342,6 +350,94 @@ window.Scrutiny = { actions: {} };
   };
 })();
 
+// Dashboard search (ctrl+k): the PRs listed on the page, or one named by
+// URL or owner/repo#123.
+(() => {
+  "use strict";
+  const dialog = document.getElementById("pr-search");
+  if (!dialog) return;
+  const input = dialog.querySelector("input");
+  const list = dialog.querySelector("ul");
+  let shown = [];
+  let selected = 0;
+
+  // named turns a pasted GitHub PR URL or owner/repo#123 into its path here.
+  function named(q) {
+    const m =
+      q.match(/^https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/) || q.match(/^([\w.-]+)\/([\w.-]+)#(\d+)$/);
+    return m && { title: `Open ${m[1]}/${m[2]}#${m[3]}`, ref: "", href: `/github.com/${m[1]}/${m[2]}/pull/${m[3]}` };
+  }
+
+  // The PRs on the page, once each, in page order.
+  function prs() {
+    const seen = new Set();
+    return [...document.querySelectorAll(".pr-list li")]
+      .map((li) => {
+        const a = li.querySelector("a");
+        return { title: a.textContent.trim(), ref: li.querySelector(".muted")?.textContent.trim() ?? "", href: a.getAttribute("href") };
+      })
+      .filter((p) => !seen.has(p.href) && seen.add(p.href));
+  }
+
+  function fuzzy(q, text) {
+    const t = text.toLowerCase();
+    let score = 0, ti = 0, prev = -2;
+    for (const ch of q) {
+      ti = t.indexOf(ch, ti);
+      if (ti < 0) return -1;
+      score += 1 + (ti === prev + 1 ? 5 : 0) + (ti === 0 || " /#-_".includes(t[ti - 1]) ? 10 : 0);
+      prev = ti++;
+    }
+    return score;
+  }
+
+  function render() {
+    const q = input.value.trim();
+    const target = named(q);
+    const needle = q.toLowerCase().replace(/\s+/g, "");
+    shown = [
+      ...(target ? [target] : []),
+      ...prs()
+        .map((p) => ({ p, score: Math.max(fuzzy(needle, p.title), fuzzy(needle, p.ref)) }))
+        .filter((x) => x.score >= 0)
+        .sort((a, b) => b.score - a.score)
+        .map((x) => x.p),
+    ];
+    selected = 0;
+    list.replaceChildren(
+      ...shown.map((p, i) => {
+        const a = Object.assign(document.createElement("a"), { className: "result" + (i ? "" : " selected"), href: p.href });
+        a.append(Object.assign(document.createElement("span"), { className: "name", textContent: p.title }));
+        if (p.ref) a.append(Object.assign(document.createElement("span"), { className: "where muted", textContent: p.ref }));
+        const li = document.createElement("li");
+        li.append(a);
+        return li;
+      }),
+    );
+    if (shown.length === 0) list.replaceChildren(Object.assign(document.createElement("li"), { className: "muted", textContent: "No matching pull requests." }));
+  }
+
+  input.addEventListener("input", render);
+  input.addEventListener("keydown", (e) => {
+    const links = list.querySelectorAll("a.result");
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      selected = (selected + (e.key === "ArrowDown" ? 1 : -1) + links.length) % Math.max(links.length, 1);
+      links.forEach((a, i) => a.classList.toggle("selected", i === selected));
+      links[selected]?.scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter" && shown[selected]) {
+      e.preventDefault();
+      location.href = shown[selected].href;
+    }
+  });
+
+  Scrutiny.actions.symbol_search = () => {
+    if (!dialog.open) dialog.showModal();
+    input.select();
+    render();
+  };
+})();
+
 // Hotkeys and the Command Palette.
 (() => {
   "use strict";
@@ -356,6 +452,10 @@ window.Scrutiny = { actions: {} };
     refresh: "Refresh",
     help: "Show keyboard shortcuts",
   };
+  if (document.getElementById("pr-search")) {
+    labels.symbol_search = "Search pull requests";
+    labels.refresh = "Refresh pull requests from GitHub";
+  }
 
   function toast(message) {
     const el = document.createElement("div");

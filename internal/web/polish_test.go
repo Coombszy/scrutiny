@@ -94,18 +94,23 @@ func TestSettingsKeysRoundTripThroughTheConfig(t *testing.T) {
 	}
 }
 
-func TestKeyboardHelpIsOfferedOnlyOnThePRPage(t *testing.T) {
+func TestKeyboardHelpIsOfferedOnThePRPageAndDashboard(t *testing.T) {
 	a := newApp(t)
 	pr := a.do(t, http.MethodGet, prPath, nil).Body.String()
-	mustContain(t, pr, `id="help-hint"`, "<kbd>?</kbd>", `id="help"`, `data-close-dialog`)
+	mustContain(t, pr, `id="help-hint"`, "<kbd>?</kbd>", `id="help"`, `data-close-dialog`, "Mouse and editing")
 	dash := a.do(t, http.MethodGet, "/", nil).Body.String()
+	mustContain(t, dash, `id="help-hint"`, `id="help"`, `id="pr-search"`)
+	if strings.Contains(dash, "Mouse and editing") {
+		t.Error("the Dashboard lists code navigation shortcuts")
+	}
 	for _, page := range []string{pr, dash} {
 		if strings.Contains(page, "ctrl+k search") {
 			t.Error("the top bar still advertises ctrl+k")
 		}
 	}
-	if strings.Contains(dash, `id="help-hint"`) || strings.Contains(dash, `id="help"`) {
-		t.Error("the Dashboard offers keyboard help")
+	servers := a.do(t, http.MethodGet, "/settings/servers", nil).Body.String()
+	if strings.Contains(servers, `id="help-hint"`) {
+		t.Error("the Language Servers page offers keyboard help")
 	}
 
 	// The hint follows a rebinding.

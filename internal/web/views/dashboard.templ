@@ -29,6 +29,10 @@ templ Dashboard(d review.DashboardPage, cached bool) {
 		} else {
 			@dashboardLists(d)
 		}
+		<dialog id="pr-search" class="palette">
+			<input type="search" placeholder="Search pull requests, or paste a PR URL or owner/repo#123" autocomplete="off" spellcheck="false"/>
+			<div class="palette-results"><ul class="results"></ul></div>
+		</dialog>
 		<section class="pr-list">
 			<h2>Recently opened</h2>
 			if len(d.Recent) == 0 {

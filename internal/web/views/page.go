@@ -15,8 +15,9 @@ type Page struct {
 	Keys      map[string]string // action -> key sequence
 	ViewMode  string
 	// KeyHelp offers the keyboard shortcuts in the top bar; only pages with
-	// hotkeys to show (the PR page) set it.
-	KeyHelp bool
+	// hotkeys to show (the PR page and Dashboard) set it. CodeHelp adds the
+	// mouse and editing shortcuts of pages showing code.
+	KeyHelp, CodeHelp bool
 }
 
 // ThemeOption is a Theme the Command Palette can switch to.

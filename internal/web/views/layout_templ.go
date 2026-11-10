@@ -171,12 +171,22 @@ func Layout(title string) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if pageFrom(ctx).KeyHelp {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<dialog id=\"help\" class=\"help\"><header><h2>Keyboard shortcuts</h2><button class=\"close\" data-close-dialog title=\"Close (Esc)\" aria-label=\"Close\">×</button></header><table class=\"keys\"><tbody></tbody></table><h3>Mouse and editing</h3><table class=\"keys\"><tbody><tr><td><kbd>ctrl</kbd>/<kbd>cmd</kbd> + click</td><td>Go to definition</td></tr><tr><td>Right-click code</td><td>Go to definition or find usages</td></tr><tr><td><kbd>ctrl</kbd>/<kbd>cmd</kbd> + <kbd>enter</kbd></td><td>Send a comment or reply</td></tr><tr><td><kbd>esc</kbd></td><td>Close dialogs, menus and panels</td></tr></tbody></table><p class=\"muted\">Rebind hotkeys from the Command Palette; single keys only work outside text boxes.</p></dialog> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<dialog id=\"help\" class=\"help\"><header><h2>Keyboard shortcuts</h2><button class=\"close\" data-close-dialog title=\"Close (Esc)\" aria-label=\"Close\">×</button></header><table class=\"keys\"><tbody></tbody></table>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if pageFrom(ctx).CodeHelp {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<h3>Mouse and editing</h3><table class=\"keys\"><tbody><tr><td><kbd>ctrl</kbd>/<kbd>cmd</kbd> + click</td><td>Go to definition</td></tr><tr><td>Right-click code</td><td>Go to definition or find usages</td></tr><tr><td><kbd>ctrl</kbd>/<kbd>cmd</kbd> + <kbd>enter</kbd></td><td>Send a comment or reply</td></tr><tr><td><kbd>esc</kbd></td><td>Close dialogs, menus and panels</td></tr></tbody></table>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<p class=\"muted\">Rebind hotkeys from the Command Palette; single keys only work outside text boxes.</p></dialog> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<dialog id=\"commands\" class=\"palette\"><input type=\"search\" placeholder=\"Type a command\" autocomplete=\"off\" spellcheck=\"false\"><div class=\"palette-results\"><ul class=\"results\"></ul></div></dialog></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<dialog id=\"commands\" class=\"palette\"><input type=\"search\" placeholder=\"Type a command\" autocomplete=\"off\" spellcheck=\"false\"><div class=\"palette-results\"><ul class=\"results\"></ul></div></dialog></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
