@@ -107,10 +107,11 @@ func (s *Service) PRPage(ctx context.Context, ref domain.PRRef, req ComparisonRe
 
 // mergeBase returns the merge base of the PR's head with its base branch,
 // fetching only when the head is not yet available locally. Merge bases are
-// cached per head commit, since moving the base branch forward cannot
-// change them.
+// cached per base branch and head commit, since moving the base branch
+// forward cannot change them (a force-pushed base branch can, until the
+// head moves).
 func (s *Service) mergeBase(ctx context.Context, pr domain.PullRequest) (domain.SHA, error) {
-	key := fmt.Sprintf("mergebase:%s@%s", pr.Ref, pr.HeadSHA)
+	key := fmt.Sprintf("mergebase:%s:%s@%s", pr.Ref, pr.BaseBranch, pr.HeadSHA)
 	have, err := s.Repos.HasCommit(ctx, pr.Ref.Repo, pr.HeadSHA)
 	if err != nil {
 		return "", err

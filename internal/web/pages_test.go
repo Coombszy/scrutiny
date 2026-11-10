@@ -190,3 +190,21 @@ func TestOpenRedirectsGitHubURLs(t *testing.T) {
 		t.Errorf("non-PR URL: status %d, want 400", rec.Code)
 	}
 }
+
+func TestPRPathsWithTraversalOrInvalidNamesAre404(t *testing.T) {
+	a := newApp(t)
+	// Were the names not validated, this PR would be found and served.
+	evil := domain.PRRef{Repo: domain.Repo{Host: "github.com", Owner: "../../x", Name: "y"}, Number: 7}
+	a.host.PRs[evil] = a.host.PRs[ref]
+	for _, path := range []string{
+		"/github.com/..%2F..%2Fx/y/pull/7",
+		"/github.com/o/..%2Fr/pull/7",
+		"/github.com/../r/pull/7/file",
+		"/github.com/o/.../pull/7",
+		"/github.com/o%20o/r/pull/7",
+	} {
+		if rec := a.do(t, http.MethodGet, path, nil); rec.Code != http.StatusNotFound && rec.Code != http.StatusTemporaryRedirect {
+			t.Errorf("%s: status %d, want 404", path, rec.Code)
+		}
+	}
+}

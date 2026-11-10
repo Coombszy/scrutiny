@@ -17,7 +17,26 @@ import (
 
 var errBadRequest = errors.New("bad request")
 
-var shaPattern = regexp.MustCompile(`^[0-9a-f]{40}([0-9a-f]{24})?$`)
+var (
+	shaPattern = regexp.MustCompile(`^[0-9a-f]{40}([0-9a-f]{24})?$`)
+	// namePattern is GitHub's charset for owner and repository names.
+	namePattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
+)
+
+// gitHubPR builds a github.com PRRef, rejecting names that are not valid on
+// GitHub (including "." and "..", which would escape the clone directory).
+func gitHubPR(owner, repo, number string) (domain.PRRef, bool) {
+	n, err := strconv.Atoi(number)
+	if err != nil || n < 1 {
+		return domain.PRRef{}, false
+	}
+	for _, name := range []string{owner, repo} {
+		if !namePattern.MatchString(name) || strings.Trim(name, ".") == "" {
+			return domain.PRRef{}, false
+		}
+	}
+	return domain.PRRef{Repo: domain.Repo{Host: "github.com", Owner: owner, Name: repo}, Number: n}, true
+}
 
 func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 	d, err := s.review.Dashboard(r.Context())
@@ -31,21 +50,19 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 // open redirects a pasted GitHub PR URL to the same PR in Scrutiny.
 func (s *Server) open(w http.ResponseWriter, r *http.Request) {
 	u, err := url.Parse(strings.TrimSpace(r.URL.Query().Get("url")))
-	if err != nil || u.Host != "github.com" {
-		s.fail(w, r, fmt.Errorf("%w: not a github.com pull request URL", errBadRequest))
-		return
+	var parts []string
+	if err == nil && u.Host == "github.com" {
+		parts = strings.Split(strings.Trim(u.Path, "/"), "/")
 	}
-	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(parts) < 4 || parts[2] != "pull" {
 		s.fail(w, r, fmt.Errorf("%w: not a github.com pull request URL", errBadRequest))
 		return
 	}
-	n, err := strconv.Atoi(parts[3])
-	if err != nil || n < 1 {
+	ref, ok := gitHubPR(parts[0], parts[1], parts[3])
+	if !ok {
 		s.fail(w, r, fmt.Errorf("%w: not a github.com pull request URL", errBadRequest))
 		return
 	}
-	ref := domain.PRRef{Repo: domain.Repo{Host: "github.com", Owner: parts[0], Name: parts[1]}, Number: n}
 	http.Redirect(w, r, ref.Path(), http.StatusSeeOther)
 }
 
@@ -118,12 +135,5 @@ func (s *Server) setViewMode(w http.ResponseWriter, r *http.Request) {
 }
 
 func prRef(r *http.Request) (domain.PRRef, bool) {
-	n, err := strconv.Atoi(r.PathValue("number"))
-	if err != nil || n < 1 {
-		return domain.PRRef{}, false
-	}
-	return domain.PRRef{
-		Repo:   domain.Repo{Host: "github.com", Owner: r.PathValue("owner"), Name: r.PathValue("repo")},
-		Number: n,
-	}, true
+	return gitHubPR(r.PathValue("owner"), r.PathValue("repo"), r.PathValue("number"))
 }

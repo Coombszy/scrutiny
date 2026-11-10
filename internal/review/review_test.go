@@ -211,3 +211,26 @@ func TestDashboardCombinesCodeHostListsWithRecentVisits(t *testing.T) {
 		t.Errorf("Dashboard = %+v", got)
 	}
 }
+
+func TestRetargetingAPRRecomputesTheMergeBase(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	f.repos.ChangeSets[repostore.Pair{From: mb, To: c3}] = nil
+	if _, err := f.svc.PRPage(ctx, ref, review.ComparisonRequest{}); err != nil {
+		t.Fatal(err)
+	}
+
+	const otherTip, otherMB domain.SHA = "ot00000000000000000000000000000000000000", "om00000000000000000000000000000000000000"
+	f.host.PRs[ref] = domain.PullRequest{Ref: ref, BaseBranch: "release", HeadSHA: c3}
+	f.repos.Remotes[ref] = repostore.FakeRemote{BaseTip: otherTip, Commits: []domain.SHA{c1, c2, c3}}
+	f.repos.MergeBases[repostore.Pair{From: otherTip, To: c3}] = otherMB
+	f.repos.ChangeSets[repostore.Pair{From: otherMB, To: c3}] = nil
+
+	page, err := f.svc.PRPage(ctx, ref, review.ComparisonRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Comparison.Base != otherMB {
+		t.Errorf("Base = %s, want the merge base with the new base branch", page.Comparison.Base.Short())
+	}
+}
