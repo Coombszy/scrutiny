@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -66,22 +67,54 @@ func (s *Store) lock(r domain.Repo) func() {
 	return l.Unlock
 }
 
-func (s *Store) FetchPR(ctx context.Context, pr domain.PRRef, baseBranch string) error {
+func (s *Store) FetchPR(ctx context.Context, pr domain.PRRef, baseBranch string) (domain.SHA, error) {
 	defer s.lock(pr.Repo)()
 	dir := s.dir(pr.Repo)
 	if _, err := os.Stat(filepath.Join(dir, "HEAD")); errors.Is(err, os.ErrNotExist) {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return err
+			return "", err
 		}
 		if _, err := s.git(ctx, pr.Repo, "init", "-q", "--bare"); err != nil {
-			return err
+			return "", err
 		}
 	}
 	n := strconv.Itoa(pr.Number)
-	_, err := s.git(ctx, pr.Repo, "fetch", "-q", "--no-tags", "--force", s.cloneURL(pr.Repo),
-		"+refs/heads/"+baseBranch+":refs/heads/"+baseBranch,
-		"+refs/pull/"+n+"/head:refs/pull/"+n+"/head")
-	return err
+	baseRef := "refs/heads/" + baseBranch
+	if _, err := s.git(ctx, pr.Repo, "fetch", "-q", "--no-tags", "--force", s.cloneURL(pr.Repo),
+		"+"+baseRef+":"+baseRef,
+		"+refs/pull/"+n+"/head:refs/pull/"+n+"/head"); err != nil {
+		return "", err
+	}
+	out, err := s.git(ctx, pr.Repo, "rev-parse", "--verify", baseRef+"^{commit}")
+	if err != nil {
+		return "", err
+	}
+	return domain.SHA(strings.TrimSpace(string(out))), nil
+}
+
+func (s *Store) HasCommit(ctx context.Context, repo domain.Repo, sha domain.SHA) (bool, error) {
+	if _, err := os.Stat(filepath.Join(s.dir(repo), "HEAD")); errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	_, err := s.git(ctx, repo, "cat-file", "-e", string(sha)+"^{commit}")
+	return err == nil, nil
+}
+
+func (s *Store) Attribute(ctx context.Context, repo domain.Repo, sha domain.SHA, attr string, paths []string) (map[string]string, error) {
+	values := make(map[string]string, len(paths))
+	if len(paths) == 0 {
+		return values, nil
+	}
+	stdin := strings.NewReader(strings.Join(paths, "\x00") + "\x00")
+	out, err := s.gitWithInput(ctx, repo, stdin, "check-attr", "-z", "--stdin", "--source="+string(sha), attr)
+	if err != nil {
+		return nil, err
+	}
+	tok := splitNUL(out)
+	for i := 0; i+2 < len(tok); i += 3 {
+		values[tok[i]] = tok[i+2]
+	}
+	return values, nil
 }
 
 func (s *Store) MergeBase(ctx context.Context, repo domain.Repo, a, b domain.SHA) (domain.SHA, error) {
@@ -186,12 +219,17 @@ func (s *Store) FileDiff(ctx context.Context, repo domain.Repo, from, to domain.
 // git runs git inside repo's bare clone, ignoring the system config and
 // never prompting for credentials.
 func (s *Store) git(ctx context.Context, repo domain.Repo, args ...string) ([]byte, error) {
+	return s.gitWithInput(ctx, repo, nil, args...)
+}
+
+func (s *Store) gitWithInput(ctx context.Context, repo domain.Repo, stdin io.Reader, args ...string) ([]byte, error) {
 	full := []string{"-c", "core.quotePath=false"}
 	for _, kv := range s.gitConfig {
 		full = append(full, "-c", kv)
 	}
 	cmd := exec.CommandContext(ctx, "git", append(full, args...)...)
 	cmd.Dir = s.dir(repo)
+	cmd.Stdin = stdin
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_NOSYSTEM=1")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

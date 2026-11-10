@@ -19,7 +19,7 @@ func TestFetchPRMakesHeadAndBaseAvailable(t *testing.T) {
 	r.openPR(1, head)
 
 	store := storeFor(t, r)
-	if err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
+	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -40,14 +40,14 @@ func TestFetchPRAgainPicksUpNewHead(t *testing.T) {
 	r.openPR(1, first)
 	store := storeFor(t, r)
 	pr := domain.PRRef{Repo: testRepo, Number: 1}
-	if err := store.FetchPR(ctx, pr, "main"); err != nil {
+	if _, err := store.FetchPR(ctx, pr, "main"); err != nil {
 		t.Fatal(err)
 	}
 
 	r.write("a.txt", "two\n")
 	second := r.commit("second")
 	r.openPR(1, second)
-	if err := store.FetchPR(ctx, pr, "main"); err != nil {
+	if _, err := store.FetchPR(ctx, pr, "main"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -76,7 +76,7 @@ func TestChangesSummarisesEachFile(t *testing.T) {
 	head := r.commit("head")
 	r.openPR(1, head)
 	store := storeFor(t, r)
-	if err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
+	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -111,7 +111,7 @@ func TestFileDiffNumbersEachLine(t *testing.T) {
 	head := r.commit("head")
 	r.openPR(1, head)
 	store := storeFor(t, r)
-	if err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
+	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
 		t.Fatal(err)
 	}
 	change := domain.FileChange{Path: "new.txt", OldPath: "old.txt", Status: domain.Renamed}
@@ -152,7 +152,7 @@ func TestListFilesAtSHA(t *testing.T) {
 	head := r.commit("head")
 	r.openPR(1, head)
 	store := storeFor(t, r)
-	if err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
+	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -162,5 +162,57 @@ func TestListFilesAtSHA(t *testing.T) {
 	}
 	if len(got) != 2 || got[0] != "a.go" || got[1] != "dir/b.go" {
 		t.Errorf("ListFiles = %q, want [a.go dir/b.go]", got)
+	}
+}
+
+func TestFetchPRReturnsBaseTipAndHasCommit(t *testing.T) {
+	ctx := context.Background()
+	r := newRemote(t)
+	r.write("a.txt", "one\n")
+	baseTip := r.commit("base")
+	r.openPR(1, baseTip)
+	store := storeFor(t, r)
+
+	if ok, _ := store.HasCommit(ctx, testRepo, baseTip); ok {
+		t.Error("HasCommit before any fetch = true")
+	}
+	got, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != baseTip {
+		t.Errorf("FetchPR base tip = %s, want %s", got, baseTip)
+	}
+	if ok, err := store.HasCommit(ctx, testRepo, baseTip); !ok || err != nil {
+		t.Errorf("HasCommit after fetch = %v, %v", ok, err)
+	}
+	if ok, _ := store.HasCommit(ctx, testRepo, "0123456789012345678901234567890123456789"); ok {
+		t.Error("HasCommit(unknown) = true")
+	}
+}
+
+func TestGitAttributeAtSHA(t *testing.T) {
+	ctx := context.Background()
+	r := newRemote(t)
+	r.write(".gitattributes", "gen/** linguist-generated\nvendor.js linguist-generated=false\n")
+	r.write("gen/x.go", "package gen\n")
+	r.write("vendor.js", "x\n")
+	r.write("main.go", "package main\n")
+	head := r.commit("head")
+	r.openPR(1, head)
+	store := storeFor(t, r)
+	if _, err := store.FetchPR(ctx, domain.PRRef{Repo: testRepo, Number: 1}, "main"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := store.Attribute(ctx, testRepo, head, "linguist-generated", []string{"gen/x.go", "vendor.js", "main.go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"gen/x.go": "set", "vendor.js": "false", "main.go": "unspecified"}
+	for p, v := range want {
+		if got[p] != v {
+			t.Errorf("%s = %q, want %q", p, got[p], v)
+		}
 	}
 }

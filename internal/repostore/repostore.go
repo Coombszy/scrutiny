@@ -13,8 +13,11 @@ var ErrNotFound = errors.New("not found")
 
 // Store gives access to repository contents at specific commits.
 type Store interface {
-	// FetchPR makes the PR's head and its base branch available locally.
-	FetchPR(ctx context.Context, pr domain.PRRef, baseBranch string) error
+	// FetchPR makes the PR's head and its base branch available locally,
+	// returning the base branch's tip.
+	FetchPR(ctx context.Context, pr domain.PRRef, baseBranch string) (baseTip domain.SHA, err error)
+	// HasCommit reports whether sha is available locally.
+	HasCommit(ctx context.Context, repo domain.Repo, sha domain.SHA) (bool, error)
 	// MergeBase returns the best common ancestor of a and b.
 	MergeBase(ctx context.Context, repo domain.Repo, a, b domain.SHA) (domain.SHA, error)
 	// Changes lists the files that differ between from and to.
@@ -25,4 +28,7 @@ type Store interface {
 	Blob(ctx context.Context, repo domain.Repo, sha domain.SHA, path string) ([]byte, error)
 	// ListFiles returns every file path at sha.
 	ListFiles(ctx context.Context, repo domain.Repo, sha domain.SHA) ([]string, error)
+	// Attribute returns the gitattributes value of attr for each path, read
+	// from .gitattributes at sha: "set", "unset", "unspecified" or the value.
+	Attribute(ctx context.Context, repo domain.Repo, sha domain.SHA, attr string, paths []string) (map[string]string, error)
 }
