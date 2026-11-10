@@ -3,7 +3,9 @@ package views
 import (
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -352,13 +354,28 @@ func excerpt(body string) string {
 	return s
 }
 
-// contextURL loads a gap's unchanged lines, revealing them in dir.
-func contextURL(c DiffContext, g review.Gap, dir review.Direction) string {
+// hunkID identifies a hunk's header row on the page: by file, since a page
+// shows many files, and by position within it.
+func hunkID(path string, i int) string {
+	h := fnv.New32a()
+	h.Write([]byte(path))
+	return fmt.Sprintf("hunk-%08x-%d", h.Sum32(), i)
+}
+
+// HunkIDPattern matches hunkID's output.
+var HunkIDPattern = regexp.MustCompile(`^hunk-[0-9a-f]{8}-\d+$`)
+
+// contextURL loads a gap's unchanged lines, revealing them in dir; hunk is
+// the header row below the gap, removed once the gap is fully open.
+func contextURL(c DiffContext, g review.Gap, dir review.Direction, hunk string) string {
 	q := url.Values{
 		"base": {string(c.Base)}, "head": {string(c.Head)},
 		"path": {c.File.Path}, "old": {c.File.OldPath}, "status": {string(c.File.Status)},
 		"start": {strconv.Itoa(g.Start)}, "end": {strconv.Itoa(g.End)}, "offset": {strconv.Itoa(g.Offset)},
 		"first": {strconv.FormatBool(g.First)}, "last": {strconv.FormatBool(g.Last)}, "dir": {string(dir)},
+	}
+	if hunk != "" {
+		q.Set("hunk", hunk)
 	}
 	return c.PR.Path() + "/context?" + q.Encode()
 }

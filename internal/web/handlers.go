@@ -155,8 +155,10 @@ func (s *Server) expandGap(w http.ResponseWriter, r *http.Request) {
 	end, err2 := strconv.Atoi(q.Get("end"))
 	offset, err3 := strconv.Atoi(q.Get("offset"))
 	dir := review.Direction(q.Get("dir"))
+	hunk := q.Get("hunk")
 	if !shaPattern.MatchString(base) || !shaPattern.MatchString(head) || change.Path == "" ||
-		err1 != nil || err2 != nil || err3 != nil || (dir != review.Up && dir != review.Down && dir != review.All) {
+		err1 != nil || err2 != nil || err3 != nil || (dir != review.Up && dir != review.Down && dir != review.All) ||
+		(hunk != "" && !views.HunkIDPattern.MatchString(hunk)) {
 		s.fail(w, r, fmt.Errorf("%w: base, head, path, start, end, offset and dir are required", errBadRequest))
 		return
 	}
@@ -172,7 +174,7 @@ func (s *Server) expandGap(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	s.render(w, r, http.StatusOK, views.ExpandedRows(dc, lines, rest, restBefore))
+	s.render(w, r, http.StatusOK, views.ExpandedRows(dc, lines, rest, restBefore, hunk))
 }
 
 // setViewMode saves the View Mode to the config file and reloads the page.

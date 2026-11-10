@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -77,5 +78,36 @@ func TestFullFileShowsEveryLine(t *testing.T) {
 	mustContain(t, body, `data-line="1"`, `data-line="50"`, `data-line="200"`)
 	if strings.Contains(body, `class="expander"`) {
 		t.Error("full file still has gaps")
+	}
+}
+
+func TestOpeningAGapFullyRemovesTheHunkHeaderBelowIt(t *testing.T) {
+	a := newApp(t)
+	a.withLongParser()
+	a.do(t, http.MethodGet, prPath, nil)
+	body := a.do(t, http.MethodGet, fileURL(), nil).Body.String()
+
+	// The second hunk's header, and the gap above it that names it.
+	header := regexp.MustCompile(`<tr class="hunk" id="(hunk-[0-9a-f]+-1)">`).FindStringSubmatch(body)
+	if header == nil {
+		t.Fatalf("no id on the second hunk header:\n%s", body)
+	}
+	mustContain(t, body, "hunk="+header[1])
+
+	q := url.Values{"base": {string(mb)}, "head": {string(c2)}, "path": {"parser.go"}, "old": {"parser.go"}, "status": {"modified"},
+		"start": {"12"}, "end": {"99"}, "offset": {"-1"}, "hunk": {header[1]}}
+	q.Set("dir", "down")
+	partial := a.do(t, http.MethodGet, prPath+"/context?"+q.Encode(), nil).Body.String()
+	if strings.Contains(partial, `hx-swap-oob="delete"`) {
+		t.Error("removed the header while lines are still hidden")
+	}
+	mustContain(t, partial, "hunk="+header[1]) // the remaining gap still names it
+	q.Set("dir", "all")
+	whole := a.do(t, http.MethodGet, prPath+"/context?"+q.Encode(), nil).Body.String()
+	mustContain(t, whole, `<tr id="`+header[1]+`" hx-swap-oob="delete"></tr>`)
+
+	q.Set("hunk", "nope; drop table")
+	if rec := a.do(t, http.MethodGet, prPath+"/context?"+q.Encode(), nil); rec.Code != http.StatusBadRequest {
+		t.Errorf("bad hunk id: status %d, want 400", rec.Code)
 	}
 }
