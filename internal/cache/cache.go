@@ -28,9 +28,15 @@ type Cache interface {
 	// Get returns the entry for key; ok is false when there is none.
 	Get(ctx context.Context, key string) (e Entry, ok bool, err error)
 	Put(ctx context.Context, key string, e Entry) error
+	// Delete removes the entry for key, if any.
+	Delete(ctx context.Context, key string) error
+	// DeletePrefix removes every entry whose key starts with prefix.
+	DeletePrefix(ctx context.Context, prefix string) error
 
 	// RecordVisit notes that pr was opened, replacing any earlier visit.
 	RecordVisit(ctx context.Context, v Visit) error
 	// RecentVisits returns up to limit visits, most recent first.
 	RecentVisits(ctx context.Context, limit int) ([]Visit, error)
+	// DeleteVisit removes pr from the recent visits, if it is there.
+	DeleteVisit(ctx context.Context, pr domain.PRRef) error
 }

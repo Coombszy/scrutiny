@@ -43,6 +43,14 @@ templ Dashboard(d review.DashboardPage, cached bool) {
 					<li>
 						<a href={ templ.SafeURL(v.PR.Path()) }>{ v.Title }</a>
 						<span class="muted">{ v.PR.String() }</span>
+						<button
+							class="forget"
+							hx-post={ v.PR.Path() + "/forget" }
+							hx-target="closest li"
+							hx-swap="outerHTML"
+							title="Remove from Recently opened and clear its cached data"
+							aria-label={ "Remove " + v.PR.String() + " from Recently opened" }
+						>×</button>
 					</li>
 				}
 			</ul>

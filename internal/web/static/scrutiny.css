@@ -41,6 +41,8 @@ main { padding: 1rem; max-width: 100%; }
 .open-pr { display: flex; gap: .5rem; margin-bottom: 1rem; }
 .open-pr input { flex: 1; max-width: 40rem; }
 .pr-list ul { list-style: none; padding: 0; }
+.pr-list .forget { margin-left: auto; background: none; border: none; color: var(--gray); padding: 0 .4rem; line-height: 1; }
+.pr-list .forget:hover { color: var(--red); background: none; }
 .pr-list li { padding: .3rem 0; border-bottom: 1px solid var(--bg1); display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
 
 /* PR page */

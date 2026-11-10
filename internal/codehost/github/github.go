@@ -123,6 +123,21 @@ func nextLink(header string) string {
 	return ""
 }
 
+// Forget drops the cached REST responses for the PR: the PR itself and
+// everything under it, such as its commits.
+func (c *Client) Forget(ctx context.Context, ref domain.PRRef) error {
+	key := "github:" + pullPath(ref)
+	if err := c.cache.Delete(ctx, key); err != nil {
+		return err
+	}
+	for _, prefix := range []string{key + "/", key + "?"} {
+		if err := c.cache.DeletePrefix(ctx, prefix); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func pullPath(ref domain.PRRef) string {
 	return "/repos/" + ref.Owner + "/" + ref.Name + "/pulls/" + strconv.Itoa(ref.Number)
 }

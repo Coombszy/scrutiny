@@ -13,6 +13,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/Coombszy/scrutiny/internal/cache"
+	"github.com/Coombszy/scrutiny/internal/domain"
 )
 
 const schema = `
@@ -82,6 +83,18 @@ func (c *Cache) Put(ctx context.Context, key string, e cache.Entry) error {
 	return err
 }
 
+func (c *Cache) Delete(ctx context.Context, key string) error {
+	_, err := c.db.ExecContext(ctx, `DELETE FROM entries WHERE key = ?`, key)
+	return err
+}
+
+// DeletePrefix compares with substr rather than LIKE, so keys holding % or
+// _ match literally.
+func (c *Cache) DeletePrefix(ctx context.Context, prefix string) error {
+	_, err := c.db.ExecContext(ctx, `DELETE FROM entries WHERE substr(key, 1, length(?1)) = ?1`, prefix)
+	return err
+}
+
 func (c *Cache) RecordVisit(ctx context.Context, v cache.Visit) error {
 	_, err := c.db.ExecContext(ctx,
 		`INSERT INTO visits (host, owner, repo, number, title, visited_at) VALUES (?, ?, ?, ?, ?, ?)
@@ -110,4 +123,11 @@ func (c *Cache) RecentVisits(ctx context.Context, limit int) ([]cache.Visit, err
 		visits = append(visits, v)
 	}
 	return visits, rows.Err()
+}
+
+func (c *Cache) DeleteVisit(ctx context.Context, pr domain.PRRef) error {
+	_, err := c.db.ExecContext(ctx,
+		`DELETE FROM visits WHERE host = ? AND owner = ? AND repo = ? AND number = ?`,
+		pr.Host, pr.Owner, pr.Name, pr.Number)
+	return err
 }

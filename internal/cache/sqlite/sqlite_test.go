@@ -77,3 +77,38 @@ func TestRecentVisitsAreDedupedAndNewestFirst(t *testing.T) {
 		t.Errorf("RecentVisits[0] = %+v", got[0])
 	}
 }
+
+func TestDeletingEntriesAndVisits(t *testing.T) {
+	ctx := context.Background()
+	c := open(t, filepath.Join(t.TempDir(), "cache.db"))
+	for _, key := range []string{"a:1", "a:1/x", "a:10", "a%_", "b"} {
+		if err := c.Put(ctx, key, cache.Entry{Value: []byte("v")}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := c.Delete(ctx, "b"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.DeletePrefix(ctx, "a:1/"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.DeletePrefix(ctx, "a%"); err != nil { // % is literal, not a wildcard
+		t.Fatal(err)
+	}
+	for key, want := range map[string]bool{"a:1": true, "a:1/x": false, "a:10": true, "a%_": false, "b": false} {
+		if _, ok, _ := c.Get(ctx, key); ok != want {
+			t.Errorf("%q present = %v, want %v", key, ok, want)
+		}
+	}
+
+	repo := domain.Repo{Host: "github.com", Owner: "o", Name: "r"}
+	one, two := domain.PRRef{Repo: repo, Number: 1}, domain.PRRef{Repo: repo, Number: 2}
+	c.RecordVisit(ctx, cache.Visit{PR: one, Title: "one"})
+	c.RecordVisit(ctx, cache.Visit{PR: two, Title: "two"})
+	if err := c.DeleteVisit(ctx, one); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := c.RecentVisits(ctx, 10); len(got) != 1 || got[0].PR != two {
+		t.Errorf("RecentVisits = %+v, want only #2", got)
+	}
+}

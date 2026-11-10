@@ -2,7 +2,9 @@ package cache
 
 import (
 	"context"
+	"maps"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/Coombszy/scrutiny/internal/domain"
@@ -35,6 +37,31 @@ func (m *Memory) Put(_ context.Context, key string, e Entry) error {
 	return nil
 }
 
+func (m *Memory) Delete(_ context.Context, key string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.entries, key)
+	return nil
+}
+
+func (m *Memory) DeletePrefix(_ context.Context, prefix string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for key := range m.entries {
+		if strings.HasPrefix(key, prefix) {
+			delete(m.entries, key)
+		}
+	}
+	return nil
+}
+
+// Keys returns the keys of every entry, for tests.
+func (m *Memory) Keys() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Sorted(maps.Keys(m.entries))
+}
+
 func (m *Memory) RecordVisit(_ context.Context, v Visit) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -54,4 +81,11 @@ func (m *Memory) RecentVisits(_ context.Context, limit int) ([]Visit, error) {
 		vs = vs[:limit]
 	}
 	return vs, nil
+}
+
+func (m *Memory) DeleteVisit(_ context.Context, pr domain.PRRef) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.visits, pr)
+	return nil
 }

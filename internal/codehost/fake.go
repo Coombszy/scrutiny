@@ -28,6 +28,8 @@ type Fake struct {
 	Submissions []Submission
 	ChecksOf    map[domain.PRRef]domain.Checks
 	Health      Status
+	// Forgotten lists the PRs Forget was called for.
+	Forgotten []domain.PRRef
 	// FailAddThread, when set, makes AddThread fail with it.
 	FailAddThread error
 	nextID        int
@@ -371,3 +373,10 @@ func (f *Fake) SetViewed(_ context.Context, prID, path string, viewed bool) erro
 // renderBody stands in for GitHub's Markdown rendering: escaped text in a
 // paragraph.
 func renderBody(body string) string { return "<p>" + html.EscapeString(body) + "</p>" }
+
+func (f *Fake) Forget(_ context.Context, ref domain.PRRef) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Forgotten = append(f.Forgotten, ref)
+	return nil
+}

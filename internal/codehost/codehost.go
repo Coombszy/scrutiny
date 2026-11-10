@@ -70,6 +70,9 @@ type CodeHost interface {
 	// ReviewState reads the PR's Review Threads, Conversation Comments,
 	// Reactions, the viewer's Pending Review and Viewed files.
 	ReviewState(ctx context.Context, ref domain.PRRef) (domain.ReviewState, error)
+	// Forget drops whatever the code host adapter has cached locally for
+	// the PR. Nothing on the code host itself changes.
+	Forget(ctx context.Context, ref domain.PRRef) error
 	// StartReview creates a Pending Review anchored to commit.
 	StartReview(ctx context.Context, prID string, commit domain.SHA) (reviewID string, err error)
 	// AddThread adds a Review Thread to a Pending Review.

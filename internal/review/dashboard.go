@@ -7,6 +7,7 @@ import (
 
 	"github.com/Coombszy/scrutiny/internal/cache"
 	"github.com/Coombszy/scrutiny/internal/codehost"
+	"github.com/Coombszy/scrutiny/internal/domain"
 )
 
 // recentLimit is how many recently opened PRs the Dashboard lists.
@@ -60,4 +61,24 @@ func (s *Service) CachedDashboard(ctx context.Context) (page DashboardPage, ok b
 	page.FetchedAt = e.FetchedAt
 	page.Stale = s.Now().Sub(e.FetchedAt) > dashboardMaxAge
 	return page, json.Unmarshal(e.Value, &page.Dashboard) == nil, nil
+}
+
+// ForgetPR removes the PR from the recently opened list and drops what is
+// cached locally for it: its review snapshot, merge bases, the code host's
+// cached responses, and its worktree and Language Servers. Nothing on the
+// code host changes, and opening the PR again fetches everything afresh.
+func (s *Service) ForgetPR(ctx context.Context, ref domain.PRRef) error {
+	if err := s.closeWorkspaces(ctx, ref); err != nil {
+		return err
+	}
+	if err := s.Cache.Delete(ctx, snapshotKey(ref)); err != nil {
+		return err
+	}
+	if err := s.Cache.DeletePrefix(ctx, "mergebase:"+ref.String()+":"); err != nil {
+		return err
+	}
+	if err := s.CodeHost.Forget(ctx, ref); err != nil {
+		return err
+	}
+	return s.Cache.DeleteVisit(ctx, ref)
 }
