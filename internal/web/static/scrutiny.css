@@ -230,3 +230,4 @@ tr:target td { background: rgba(250, 189, 47, .18); }
 .server-state { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 .requires { color: var(--yellow); }
 .install-error { flex-basis: 100%; white-space: pre-wrap; color: var(--red); font-size: .8rem; max-height: 12rem; overflow: auto; background: var(--bg1); padding: .4rem; }
+#refresh-banner:has(#refresh-commits:empty):has(#refresh-comments:empty) { display: none; }

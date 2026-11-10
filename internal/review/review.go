@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/Coombszy/scrutiny/internal/cache"
@@ -106,7 +107,7 @@ func (s *Service) PRPage(ctx context.Context, ref domain.PRRef, req ComparisonRe
 	}
 	if pr.State == domain.Closed || pr.State == domain.Merged {
 		if err := s.closeWorkspaces(ctx, ref); err != nil {
-			return PRPage{}, err
+			slog.Warn("removing worktree", "pr", ref, "err", err)
 		}
 	}
 	mergeBase, err := s.mergeBase(ctx, pr)

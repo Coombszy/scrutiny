@@ -7,9 +7,9 @@ import (
 
 templ PR(p review.PRPage, mode settings.ViewMode) {
 	@Layout(p.PR.Title) {
-		<div data-live={ p.PR.Ref.Path() + "/events" } hidden></div>
+		<div data-live={ p.PR.Ref.Path() + "/events?head=" + string(p.PR.HeadSHA) } hidden></div>
 		@OfflineBanner(p.Offline, false)
-		@EmptyRefreshBanner()
+		@RefreshBanner()
 		<header class="pr-header">
 			<div class="pr-title">
 				<h1>{ p.PR.Title } <span class="muted">#{ itoa(p.PR.Ref.Number) }</span></h1>

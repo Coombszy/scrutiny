@@ -16,7 +16,7 @@ func TestDefinitionReturnsTargetsWithTheirURLs(t *testing.T) {
 		{Path: "lib/util.go", Line: 40, Col: 5},
 	}
 
-	rec := a.do(t, http.MethodGet, prPath+"/definition?path=parser.go&line=2&col=6", nil)
+	rec := a.do(t, http.MethodGet, prPath+"/definition?path=parser.go&line=2&col=6&head="+string(c2), nil)
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "application/json" {
 		t.Fatalf("status %d, type %q: %s", rec.Code, rec.Header().Get("Content-Type"), rec.Body)
 	}
@@ -37,7 +37,7 @@ func TestDefinitionReturnsTargetsWithTheirURLs(t *testing.T) {
 func TestNavigatingWithoutALanguageServerSaysSo(t *testing.T) {
 	a := newApp(t)
 	a.do(t, http.MethodGet, prPath, nil)
-	rec := a.do(t, http.MethodGet, prPath+"/definition?path=notes.txt&line=1&col=0", nil)
+	rec := a.do(t, http.MethodGet, prPath+"/definition?path=notes.txt&line=1&col=0&head="+string(c2), nil)
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("status %d, want 404", rec.Code)
 	}
@@ -52,7 +52,7 @@ func TestReferencesPanelListsUsagesWithText(t *testing.T) {
 		{Path: "parser.go", Line: 2, Col: 4}, {Path: "use.go", Line: 3, Col: 8},
 	}
 
-	body := a.do(t, http.MethodGet, prPath+"/references?path=parser.go&line=2&col=4", nil).Body.String()
+	body := a.do(t, http.MethodGet, prPath+"/references?path=parser.go&line=2&col=4&head="+string(c2), nil).Body.String()
 	mustContain(t, body, "2 usages", "use.go", "var x = renewed", `data-nav-path="use.go"`, `data-nav-line="3"`, `href="/github.com/o/r/pull/7/blob?path=use.go#L3"`)
 }
 
@@ -82,7 +82,19 @@ func TestDiffCellsCarryNavigationAnchors(t *testing.T) {
 	a := newApp(t)
 	a.do(t, http.MethodGet, prPath, nil)
 	body := a.do(t, http.MethodGet, fileURL(), nil).Body.String()
-	mustContain(t, body, `data-path="parser.go"`, `data-line="2"`)
+	mustContain(t, body, `data-path="parser.go"`, `data-line="2"`, `data-head="`+string(c2)+`"`)
 	page := a.do(t, http.MethodGet, prPath, nil).Body.String()
 	mustContain(t, page, `id="indexing"`, `id="palette"`, `data-path="parser.go"`)
+}
+
+func TestNavigatingFromAStaleViewIsAConflict(t *testing.T) {
+	a := newApp(t)
+	a.do(t, http.MethodGet, prPath, nil)
+	rec := a.do(t, http.MethodGet, prPath+"/definition?path=parser.go&line=2&col=6&head="+string(c1), nil)
+	if rec.Code != http.StatusConflict {
+		t.Errorf("status %d, want 409", rec.Code)
+	}
+	if rec := a.do(t, http.MethodGet, prPath+"/definition?path=../x.go&line=2&col=6&head="+string(c2), nil); rec.Code != http.StatusBadRequest {
+		t.Errorf("bad path: status %d, want 400", rec.Code)
+	}
 }

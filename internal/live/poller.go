@@ -3,6 +3,7 @@ package live
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/Coombszy/scrutiny/internal/codehost"
@@ -54,7 +55,13 @@ func (p *Poller) PollDue(ctx context.Context) {
 		interval *= backoff
 	}
 	now := p.Now()
-	for _, ref := range p.Hub.Watched() {
+	watched := p.Hub.Watched()
+	for ref, last := range p.last {
+		if now.Sub(last) > interval && !slices.Contains(watched, ref) {
+			delete(p.last, ref) // forget PRs nobody is looking at any more
+		}
+	}
+	for _, ref := range watched {
 		if last, ok := p.last[ref]; ok && now.Sub(last) < interval {
 			continue
 		}

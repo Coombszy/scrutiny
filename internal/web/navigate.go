@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/navigator"
 	"github.com/Coombszy/scrutiny/internal/web/views"
 )
@@ -18,15 +19,16 @@ func (s *Server) routeNavigation() {
 	s.mux.HandleFunc("GET "+pr+"/blob", s.blob)
 }
 
-// navPosition reads path, line and col (a UTF-16 offset) from the query.
-func navPosition(r *http.Request) (string, navigator.Position, error) {
+// navPosition reads head (the commit the page shows), path, line and col
+// (a UTF-16 offset) from the query.
+func navPosition(r *http.Request) (domain.SHA, string, navigator.Position, error) {
 	q := r.URL.Query()
 	line, err1 := strconv.Atoi(q.Get("line"))
 	col, err2 := strconv.Atoi(q.Get("col"))
-	if q.Get("path") == "" || err1 != nil || err2 != nil || line < 1 || col < 0 {
-		return "", navigator.Position{}, fmt.Errorf("%w: path, line and col are required", errBadRequest)
+	if q.Get("path") == "" || err1 != nil || err2 != nil || line < 1 || col < 0 || !shaPattern.MatchString(q.Get("head")) {
+		return "", "", navigator.Position{}, fmt.Errorf("%w: head, path, line and col are required", errBadRequest)
 	}
-	return q.Get("path"), navigator.Position{Line: line, Col: col}, nil
+	return domain.SHA(q.Get("head")), q.Get("path"), navigator.Position{Line: line, Col: col}, nil
 }
 
 type targetJSON struct {
@@ -46,12 +48,12 @@ func (s *Server) definition(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	path, pos, err := navPosition(r)
+	head, path, pos, err := navPosition(r)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	targets, err := s.review.Definition(r.Context(), ref, path, pos)
+	targets, err := s.review.Definition(r.Context(), ref, head, path, pos)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -73,12 +75,12 @@ func (s *Server) references(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	path, pos, err := navPosition(r)
+	head, path, pos, err := navPosition(r)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	refs, err := s.review.References(r.Context(), ref, path, pos)
+	refs, err := s.review.References(r.Context(), ref, head, path, pos)
 	if err != nil {
 		s.fail(w, r, err)
 		return

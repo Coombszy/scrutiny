@@ -169,3 +169,44 @@ func TestUnknownLanguageHasNoServer(t *testing.T) {
 		t.Errorf("err = %v, want ErrNoServer", err)
 	}
 }
+
+func TestACrashedServerIsReplaced(t *testing.T) {
+	m, ws := newManager(t, time.Minute), module(t)
+	if _, err := m.Definition(ctx(t), ws, "main.go", navigator.Position{Line: 6, Col: 14}); err != nil {
+		t.Fatal(err)
+	}
+	pid := m.PID(ws)
+	proc, _ := os.FindProcess(pid)
+	proc.Kill()
+	deadline := time.Now().Add(5 * time.Second)
+	for m.Running(ws) && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if m.Running(ws) {
+		t.Fatal("dead server still registered")
+	}
+
+	if _, err := m.Definition(ctx(t), ws, "main.go", navigator.Position{Line: 6, Col: 14}); err != nil {
+		t.Errorf("after crash: %v", err)
+	}
+	if m.PID(ws) == pid {
+		t.Error("reused the dead server")
+	}
+}
+
+func TestResetLetsInFlightRequestsFinish(t *testing.T) {
+	m, ws := newManager(t, time.Minute), module(t)
+	if _, err := m.Definition(ctx(t), ws, "main.go", navigator.Position{Line: 6, Col: 14}); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := m.References(ctx(t), ws, "greet.go", navigator.Position{Line: 4, Col: 6})
+		done <- err
+	}()
+	time.Sleep(time.Millisecond)
+	m.Reset(ws)
+	if err := <-done; err != nil {
+		t.Errorf("request racing a Reset failed: %v", err)
+	}
+}

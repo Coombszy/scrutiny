@@ -92,6 +92,8 @@ templ ReferencesPanel(pr domain.PRRef, refs []review.Reference) {
 // FileViewPage shows a whole file at the PR's head.
 templ FileViewPage(pr domain.PRRef, f review.FileView) {
 	@Layout(f.Path) {
+		<div data-live={ pr.Path() + "/events?head=" + string(f.Head) } hidden></div>
+		@RefreshBanner()
 		<header class="pr-header">
 			<p><a href={ templ.SafeURL(pr.Path()) }>← { pr.String() }</a></p>
 			<h1 class="path">{ f.Path }</h1>
@@ -103,7 +105,7 @@ templ FileViewPage(pr domain.PRRef, f review.FileView) {
 			</p>
 		</header>
 		<section class="file" data-path={ f.Path }>
-			<table class="diff file-view" data-path={ f.Path }>
+			<table class="diff file-view" data-path={ f.Path } data-head={ string(f.Head) }>
 				<colgroup><col class="ln"/><col/></colgroup>
 				for i, line := range f.Lines {
 					<tr id={ "L" + itoa(i+1) }>

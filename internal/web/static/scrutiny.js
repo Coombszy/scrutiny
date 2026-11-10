@@ -60,6 +60,10 @@
     }
     const focused = document.activeElement;
     if (focused?.id && target.contains(focused)) e.detail.refocus = focused.id;
+    // Keep expanded panels and threads as the reader left them.
+    const fresh = fragment.matches?.("details") ? fragment : fragment.querySelector?.("details");
+    const old = target.matches("details") ? target : target.querySelector("details");
+    if (fresh && old) fresh.open = old.open;
   });
   document.addEventListener("htmx:oobAfterSwap", (e) => {
     if (e.detail.refocus) document.getElementById(e.detail.refocus)?.focus();
@@ -138,11 +142,14 @@
     return res;
   }
 
-  // position returns the file, line and UTF-16 column under a mouse event.
+  // position returns the commit, file, line and UTF-16 column under a mouse
+  // event.
   function position(e) {
     const cell = e.target.closest("td.code[data-line]");
     if (!cell) return null;
-    const path = cell.closest("[data-path]")?.dataset.path;
+    const table = cell.closest("[data-path]");
+    const path = table?.dataset.path;
+    const head = table?.dataset.head;
     let node, offset;
     if (document.caretPositionFromPoint) {
       const p = document.caretPositionFromPoint(e.clientX, e.clientY);
@@ -157,11 +164,11 @@
     let col = 0;
     const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
     for (let t = walker.nextNode(); t && t !== node; t = walker.nextNode()) col += t.data.length;
-    return { path, line: Number(cell.dataset.line), col: col + offset };
+    return { head, path, line: Number(cell.dataset.line), col: col + offset };
   }
 
   function query(pos) {
-    return new URLSearchParams({ path: pos.path, line: pos.line, col: pos.col }).toString();
+    return new URLSearchParams({ head: pos.head, path: pos.path, line: pos.line, col: pos.col }).toString();
   }
 
   // reveal scrolls to a line of a file shown on this page, loading the file's

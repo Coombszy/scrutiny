@@ -87,10 +87,10 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		status = http.StatusServiceUnavailable
 	case errors.Is(err, review.ErrThreadNotFound):
 		status = http.StatusNotFound
-	case errors.Is(err, review.ErrCannotComment):
+	case errors.Is(err, review.ErrCannotComment), errors.Is(err, review.ErrNotAtHead):
 		status = http.StatusConflict
 	case errors.Is(err, review.ErrInvalidComparison), errors.Is(err, review.ErrInvalidReaction),
-		errors.Is(err, review.ErrInvalidEvent), errors.Is(err, errBadRequest):
+		errors.Is(err, review.ErrInvalidEvent), errors.Is(err, review.ErrBadPath), errors.Is(err, errBadRequest):
 		status = http.StatusBadRequest
 	default:
 		slog.Error("request failed", "path", r.URL.Path, "err", err)

@@ -66,6 +66,9 @@ func (c *conn) call(ctx context.Context, method string, params, result any) erro
 
 	raw := json.RawMessage(strconv.Itoa(id))
 	if err := c.send(message{ID: &raw, Method: method, Params: mustJSON(params)}); err != nil {
+		c.mu.Lock()
+		delete(c.pending, id)
+		c.mu.Unlock()
 		return err
 	}
 	select {

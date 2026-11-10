@@ -3,6 +3,7 @@ package review
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"path"
@@ -23,6 +24,14 @@ var languages = map[string]string{
 	".h": "c", ".cc": "cpp", ".cpp": "cpp", ".hpp": "cpp", ".cs": "csharp", ".lua": "lua", ".sh": "bash",
 	".bash": "bash", ".yaml": "yaml", ".yml": "yaml", ".json": "json", ".tf": "terraform", ".zig": "zig",
 }
+
+var (
+	// ErrNotAtHead is returned for navigation from a view of another commit
+	// than the PR's head: the Language Server only sees the head.
+	ErrNotAtHead = errors.New("navigation only works on the pull request's head")
+	// ErrBadPath is returned for a path that is not inside the repository.
+	ErrBadPath = errors.New("path is not inside the repository")
+)
 
 // Language returns the language of a file, or "" if none is known.
 func Language(file string) string { return languages[strings.ToLower(path.Ext(file))] }
@@ -58,7 +67,10 @@ func (w *workspaces) init() {
 // workspace returns the Workspace for file in the PR's worktree at the
 // head last read, moving the worktree and restarting servers when the head
 // has moved since they started.
-func (s *Service) workspace(ctx context.Context, ref domain.PRRef, file string) (navigator.Workspace, snapshot, error) {
+func (s *Service) workspace(ctx context.Context, ref domain.PRRef, head domain.SHA, file string) (navigator.Workspace, snapshot, error) {
+	if !validPath(file) {
+		return navigator.Workspace{}, snapshot{}, fmt.Errorf("%w: %q", ErrBadPath, file)
+	}
 	lang := Language(file)
 	if lang == "" || s.Navigator == nil {
 		return navigator.Workspace{}, snapshot{}, fmt.Errorf("%w for %s", navigator.ErrNoServer, path.Base(file))
@@ -67,17 +79,27 @@ func (s *Service) workspace(ctx context.Context, ref domain.PRRef, file string) 
 	if err != nil {
 		return navigator.Workspace{}, snapshot{}, err
 	}
+	if head != snap.Head {
+		return navigator.Workspace{}, snapshot{}, fmt.Errorf("%w (now %s); refresh, or view a Comparison ending there", ErrNotAtHead, snap.Head.Short())
+	}
 	return s.workspaceFor(ctx, ref, snap, lang)
 }
 
+// validPath reports whether p is a clean relative path inside a repository.
+func validPath(p string) bool {
+	return p != "" && !path.IsAbs(p) && path.Clean(p) == p && p != ".." && !strings.HasPrefix(p, "../")
+}
+
 func (s *Service) workspaceFor(ctx context.Context, ref domain.PRRef, snap snapshot, lang string) (navigator.Workspace, snapshot, error) {
+	// Held across the worktree move so concurrent requests cannot move it
+	// back and forth.
+	s.ws.mu.Lock()
+	defer s.ws.mu.Unlock()
 	dir, err := s.Repos.Worktree(ctx, ref, snap.Head)
 	if err != nil {
 		return navigator.Workspace{}, snapshot{}, err
 	}
 	ws := navigator.Workspace{Root: dir, Language: lang}
-	s.ws.mu.Lock()
-	defer s.ws.mu.Unlock()
 	s.ws.init()
 	if head, ok := s.ws.heads[ref]; ok && head != snap.Head {
 		for open := range s.ws.open[ref] {
@@ -119,6 +141,9 @@ func (s *Service) Indexing(ref domain.PRRef) bool {
 
 // closeWorkspaces stops the PR's servers and removes its worktree.
 func (s *Service) closeWorkspaces(ctx context.Context, ref domain.PRRef) error {
+	if s.Navigator == nil {
+		return s.Repos.RemoveWorktree(ctx, ref)
+	}
 	s.ws.mu.Lock()
 	s.ws.init()
 	for ws := range s.ws.open[ref] {
@@ -132,8 +157,9 @@ func (s *Service) closeWorkspaces(ctx context.Context, ref domain.PRRef) error {
 
 // Definition finds where the symbol at pos in file (at the PR's head) is
 // defined.
-func (s *Service) Definition(ctx context.Context, ref domain.PRRef, file string, pos navigator.Position) ([]Target, error) {
-	ws, snap, err := s.workspace(ctx, ref, file)
+// head is the commit the position was taken from, which must be the PR's.
+func (s *Service) Definition(ctx context.Context, ref domain.PRRef, head domain.SHA, file string, pos navigator.Position) ([]Target, error) {
+	ws, snap, err := s.workspace(ctx, ref, head, file)
 	if err != nil {
 		return nil, err
 	}
@@ -145,8 +171,8 @@ func (s *Service) Definition(ctx context.Context, ref domain.PRRef, file string,
 }
 
 // References finds the usages of the symbol at pos in file.
-func (s *Service) References(ctx context.Context, ref domain.PRRef, file string, pos navigator.Position) ([]Reference, error) {
-	ws, snap, err := s.workspace(ctx, ref, file)
+func (s *Service) References(ctx context.Context, ref domain.PRRef, head domain.SHA, file string, pos navigator.Position) ([]Reference, error) {
+	ws, snap, err := s.workspace(ctx, ref, head, file)
 	if err != nil {
 		return nil, err
 	}
@@ -252,8 +278,8 @@ type SearchResult struct {
 const searchLimit = 50
 
 // SymbolSearch fuzzy-matches query against the repo's files and symbols at
-// the PR's head, putting what the PR changed first (PR Weighting) and
-// marking what it added or removed.
+// the PR's head, putting what the PR added or removed first (PR Weighting)
+// and marking it. Among the rest, anything else the PR changed wins ties.
 func (s *Service) SymbolSearch(ctx context.Context, ref domain.PRRef, query string) ([]SearchResult, error) {
 	snap, err := s.snapshot(ctx, ref)
 	if err != nil {
@@ -297,8 +323,9 @@ func (s *Service) SymbolSearch(ctx context.Context, ref domain.PRRef, query stri
 
 	slices.SortFunc(results, func(a, b SearchResult) int {
 		return cmp.Or(
-			compareBool(a.InPR, b.InPR),
+			compareBool(a.Marker != MarkerNone, b.Marker != MarkerNone),
 			cmp.Compare(b.score, a.score),
+			compareBool(a.InPR, b.InPR),
 			compareBool(a.Kind != "file", b.Kind != "file"),
 			cmp.Compare(a.Name, b.Name),
 		)

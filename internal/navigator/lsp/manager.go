@@ -154,7 +154,9 @@ func (m *Manager) server(ctx context.Context, ws navigator.Workspace) (*server, 
 			m.mu.Unlock()
 			return nil, fmt.Errorf("%w for %s", navigator.ErrNoServer, ws.Language)
 		}
-		s = newServer(ws, argv, func(indexing bool) { m.notify(ws, indexing) })
+		s = newServer(ws, argv)
+		s.setIndex = func(indexing bool) { m.notify(s, indexing) }
+		s.onExit = func() { m.forget(s) }
 		m.servers[ws] = s
 		go s.start()
 	}
@@ -179,13 +181,27 @@ func (m *Manager) server(ctx context.Context, ws navigator.Workspace) (*server, 
 	return s, nil
 }
 
-func (m *Manager) notify(ws navigator.Workspace, indexing bool) {
+// notify reports s's Indexing, unless s has been replaced: a stopping
+// server must not hide the spinner for its successor.
+func (m *Manager) notify(s *server, indexing bool) {
 	m.mu.Lock()
 	fn := m.onIndexing
+	current, ok := m.servers[s.ws]
 	m.mu.Unlock()
-	if fn != nil {
-		fn(ws, indexing)
+	if fn != nil && (!ok || current == s) {
+		fn(s.ws, indexing)
 	}
+}
+
+// forget drops s once its process has exited, so the next query starts a
+// fresh server.
+func (m *Manager) forget(s *server) {
+	m.mu.Lock()
+	if m.servers[s.ws] == s {
+		delete(m.servers, s.ws)
+	}
+	m.mu.Unlock()
+	s.setIndexing(false)
 }
 
 // reap stops servers that have been idle for longer than m.idle.
@@ -218,6 +234,10 @@ type server struct {
 	ws       navigator.Workspace
 	argv     []string
 	setIndex func(bool)
+	onExit   func()
+
+	exited   chan struct{} // closed once the process has been waited for
+	waitOnce sync.Once
 
 	ready chan struct{} // closed once initialised (or failed: see err)
 	err   error
@@ -232,9 +252,17 @@ type server struct {
 	indexing bool
 }
 
-func newServer(ws navigator.Workspace, argv []string, setIndex func(bool)) *server {
-	return &server{ws: ws, argv: argv, setIndex: setIndex, ready: make(chan struct{}),
+func newServer(ws navigator.Workspace, argv []string) *server {
+	return &server{ws: ws, argv: argv, ready: make(chan struct{}), exited: make(chan struct{}),
 		lastUsed: time.Now(), opened: map[string]bool{}, progress: map[string]bool{}}
+}
+
+// wait reaps the process once, however many callers ask.
+func (s *server) wait() {
+	s.waitOnce.Do(func() {
+		_ = s.cmd.Wait()
+		close(s.exited)
+	})
 }
 
 func (s *server) start() {
@@ -266,7 +294,13 @@ func (s *server) launch() error {
 	s.conn = newConn(stdin)
 	s.conn.onNotify = s.handleNotification
 	s.conn.onRequest = s.handleRequest
-	go s.conn.read(stdout)
+	go func() {
+		s.conn.read(stdout) // until the process exits or is stopped
+		s.wait()
+		if s.onExit != nil {
+			s.onExit()
+		}
+	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -284,10 +318,12 @@ func (s *server) launch() error {
 	}
 	if err := s.conn.call(ctx, "initialize", init, nil); err != nil {
 		s.kill()
+		<-s.exited
 		return err
 	}
 	if err := s.conn.notify("initialized", struct{}{}); err != nil {
 		s.kill()
+		<-s.exited
 		return err
 	}
 	return nil
@@ -395,24 +431,34 @@ func (s *server) open(path string) error {
 	}})
 }
 
-// stop asks the server to shut down, killing it if it does not exit.
+// drainTimeout bounds how long stop waits for in-flight queries.
+const drainTimeout = 30 * time.Second
+
+// stop lets in-flight queries finish, asks the server to shut down, and
+// kills it if it does not exit.
 func (s *server) stop() {
 	<-s.ready
+	for deadline := time.Now().Add(drainTimeout); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		s.mu.Lock()
+		busy := s.inUse > 0
+		s.mu.Unlock()
+		if !busy {
+			break
+		}
+	}
 	if s.err == nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		if err := s.conn.call(ctx, "shutdown", nil, nil); err == nil {
 			_ = s.conn.notify("exit", nil)
 		}
 		cancel()
-		exited := make(chan struct{})
-		go func() { _ = s.cmd.Wait(); close(exited) }()
 		select {
-		case <-exited:
+		case <-s.exited:
 		case <-time.After(2 * time.Second):
 			s.kill()
+			<-s.exited
 		}
 	}
-	s.setIndexing(false)
 	slog.Debug("language server stopped", "root", s.ws.Root, "language", s.ws.Language)
 }
 

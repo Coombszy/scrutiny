@@ -22,7 +22,7 @@ func TestDefinitionRunsInAWorktreeAtTheHead(t *testing.T) {
 		{Path: "/usr/lib/go/src/fmt/print.go", Line: 270, OutsideProject: true},
 	}
 
-	got, err := f.svc.Definition(context.Background(), ref, "a.go", navigator.Position{Line: 2, Col: 4})
+	got, err := f.svc.Definition(context.Background(), ref, c3, "a.go", navigator.Position{Line: 2, Col: 4})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestNavigatingAfterTheHeadMovesResetsTheServer(t *testing.T) {
 	f := newFixture(t)
 	f.openPage(t)
 	ctx := context.Background()
-	if _, err := f.svc.Definition(ctx, ref, "a.go", navigator.Position{Line: 1}); err != nil {
+	if _, err := f.svc.Definition(ctx, ref, c3, "a.go", navigator.Position{Line: 1}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -50,7 +50,7 @@ func TestNavigatingAfterTheHeadMovesResetsTheServer(t *testing.T) {
 	if _, err := f.svc.Poll(ctx, ref); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.svc.Definition(ctx, ref, "a.go", navigator.Position{Line: 1}); err != nil {
+	if _, err := f.svc.Definition(ctx, ref, c4, "a.go", navigator.Position{Line: 1}); err != nil {
 		t.Fatal(err)
 	}
 	if f.repos.Worktrees[ref] != c4 || len(f.nav.Resets) != 1 {
@@ -61,7 +61,7 @@ func TestNavigatingAfterTheHeadMovesResetsTheServer(t *testing.T) {
 func TestUnsupportedLanguagesHaveNoServer(t *testing.T) {
 	f := newFixture(t)
 	f.openPage(t)
-	_, err := f.svc.Definition(context.Background(), ref, "notes.txt", navigator.Position{Line: 1})
+	_, err := f.svc.Definition(context.Background(), ref, c3, "notes.txt", navigator.Position{Line: 1})
 	if !errors.Is(err, navigator.ErrNoServer) {
 		t.Errorf("err = %v, want ErrNoServer", err)
 	}
@@ -75,7 +75,7 @@ func TestReferencesCarryTheirLineText(t *testing.T) {
 		{Path: "a.go", Line: 2, Col: 4}, {Path: "b.go", Line: 3, Col: 8},
 	}
 
-	got, err := f.svc.References(context.Background(), ref, "a.go", navigator.Position{Line: 2, Col: 4})
+	got, err := f.svc.References(context.Background(), ref, c3, "a.go", navigator.Position{Line: 2, Col: 4})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestFileViewHighlightsTheFileAtHead(t *testing.T) {
 func TestClosingAPRRemovesItsWorktree(t *testing.T) {
 	f := newFixture(t)
 	f.openPage(t)
-	if _, err := f.svc.Definition(context.Background(), ref, "a.go", navigator.Position{Line: 1}); err != nil {
+	if _, err := f.svc.Definition(context.Background(), ref, c3, "a.go", navigator.Position{Line: 1}); err != nil {
 		t.Fatal(err)
 	}
 	f.host.PRs[ref] = domain.PullRequest{Ref: ref, BaseBranch: "main", HeadSHA: c3, State: domain.Merged}
@@ -162,5 +162,48 @@ func TestClosingAPRRemovesItsWorktree(t *testing.T) {
 	}
 	if _, ok := f.repos.Worktrees[ref]; ok || len(f.nav.Resets) != 1 {
 		t.Errorf("worktree kept (%v) or server not reset (%v) after merge", ok, f.nav.Resets)
+	}
+}
+
+func TestNavigatingFromAViewNotAtTheHeadIsRefused(t *testing.T) {
+	f := newFixture(t)
+	f.openPage(t)
+	// e.g. a Comparison ending at c2, or a page from before a push.
+	_, err := f.svc.Definition(context.Background(), ref, c2, "a.go", navigator.Position{Line: 1})
+	if !errors.Is(err, review.ErrNotAtHead) {
+		t.Errorf("err = %v, want ErrNotAtHead", err)
+	}
+	if len(f.nav.Calls) != 0 {
+		t.Error("asked the Language Server anyway")
+	}
+}
+
+func TestNavigationPathsMustStayInTheRepository(t *testing.T) {
+	f := newFixture(t)
+	f.openPage(t)
+	for _, p := range []string{"../../etc/passwd.go", "/etc/x.go", "a/../../b.go"} {
+		if _, err := f.svc.Definition(context.Background(), ref, c3, p, navigator.Position{Line: 1}); !errors.Is(err, review.ErrBadPath) {
+			t.Errorf("%s: err = %v, want ErrBadPath", p, err)
+		}
+	}
+}
+
+func TestSymbolSearchRanksAnExactMatchAboveAnUnchangedSymbolInAModifiedFile(t *testing.T) {
+	f := newFixture(t)
+	f.withDiff(mb, c3) // a.go is modified, adding line 2 only
+	f.repos.Blobs[c3] = map[string]string{"a.go": ""}
+	f.nav.AllSymbols = []navigator.Symbol{
+		{Name: "Loader", Kind: "struct", Location: navigator.Location{Path: "lib/load.go", Line: 3}},
+		{Name: "LoadOrder", Kind: "function", Location: navigator.Location{Path: "a.go", Line: 1}},
+	}
+	if _, err := f.svc.PRPage(context.Background(), ref, review.ComparisonRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := f.svc.SymbolSearch(context.Background(), ref, "loader")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].Name != "Loader" {
+		t.Errorf("results = %+v, want the exact match first", got)
 	}
 }

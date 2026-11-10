@@ -28,7 +28,7 @@ templ Diff(c DiffContext, d review.DiffFile) {
 		if len(d.Hunks) == 0 {
 			<p class="note">No content changes.</p>
 		} else if c.Mode == settings.Unified {
-			<table class="diff unified" data-path={ d.Path } data-new-thread={ newThreadURL(c.PR, c.Base, c.Head, d.Path, 3) }>
+			<table class="diff unified" data-path={ d.Path } data-head={ string(c.Head) } data-new-thread={ newThreadURL(c.PR, c.Base, c.Head, d.Path, 3) }>
 				<colgroup><col class="ln"/><col class="ln"/><col/></colgroup>
 				for _, h := range d.Hunks {
 					<tr class="hunk"><td colspan="3">{ h.Header }</td></tr>
@@ -51,7 +51,7 @@ templ Diff(c DiffContext, d review.DiffFile) {
 				}
 			</table>
 		} else {
-			<table class="diff split" data-path={ d.Path } data-new-thread={ newThreadURL(c.PR, c.Base, c.Head, d.Path, 4) }>
+			<table class="diff split" data-path={ d.Path } data-head={ string(c.Head) } data-new-thread={ newThreadURL(c.PR, c.Base, c.Head, d.Path, 4) }>
 				<colgroup><col class="ln"/><col/><col class="ln"/><col/></colgroup>
 				for _, h := range d.Hunks {
 					<tr class="hunk"><td colspan="4">{ h.Header }</td></tr>

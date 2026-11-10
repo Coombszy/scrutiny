@@ -7,9 +7,7 @@ import (
 
 // LiveUpdate renders an Update as out-of-band swaps for the PR page.
 templ LiveUpdate(pr domain.PRRef, u review.Update) {
-	if u.Head != "" || u.NewThreads > 0 {
-		@refreshBanner(u, true)
-	}
+	@refreshUpdate(u)
 	if u.OfflineChanged {
 		@OfflineBanner(u.Offline, true)
 	}
@@ -31,26 +29,24 @@ templ LiveUpdate(pr domain.PRRef, u review.Update) {
 	}
 }
 
-templ refreshBanner(u review.Update, oob bool) {
-	<div
-		id="refresh-banner"
-		if oob {
-			hx-swap-oob="true"
-		}
-		class="notice live"
-	>
-		if u.Head != "" {
-			New commits were pushed (head is now <code>{ u.Head.Short() }</code>).
-		} else {
-			New comments were added.
-		}
-		<button data-reload>Refresh</button>
-	</div>
+// refreshUpdate fills in the Refresh banner's messages; each is swapped on
+// its own so a later update does not overwrite an earlier one.
+templ refreshUpdate(u review.Update) {
+	if u.Head != "" {
+		<span id="refresh-commits" hx-swap-oob="true">New commits were pushed (head is now <code>{ u.Head.Short() }</code>).</span>
+	}
+	if u.NewThreads > 0 {
+		<span id="refresh-comments" hx-swap-oob="true">New comments were added.</span>
+	}
 }
 
-// EmptyRefreshBanner is the placeholder the Refresh button arrives in.
-templ EmptyRefreshBanner() {
-	<div id="refresh-banner"></div>
+// RefreshBanner is shown, by CSS, once either message has arrived.
+templ RefreshBanner() {
+	<div id="refresh-banner" class="notice live">
+		<span id="refresh-commits"></span>
+		<span id="refresh-comments"></span>
+		<button data-reload>Refresh</button>
+	</div>
 }
 
 // OfflineBanner says GitHub is unreachable; while it carries data-offline,

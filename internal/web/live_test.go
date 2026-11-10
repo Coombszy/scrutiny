@@ -25,7 +25,7 @@ func TestPRPageShowsChecksAndConnectsForLiveUpdates(t *testing.T) {
 	body := a.do(t, http.MethodGet, prPath, nil).Body.String()
 	mustContain(t, body,
 		`id="checks"`, "Blocked", `class="check-count failure"`, `href="https://ci.example/run/1"`, "Required",
-		`data-live="/github.com/o/r/pull/7/events"`, `id="refresh-banner"`, `id="offline-banner"`,
+		`data-live="/github.com/o/r/pull/7/events?head=`+string(c2)+`"`, `id="refresh-banner"`, `id="offline-banner"`,
 	)
 }
 
@@ -77,8 +77,33 @@ func TestEventsStreamRendersUpdatesAsOutOfBandSwaps(t *testing.T) {
 	got := strings.Join(event, "\n")
 	mustContain(t, got,
 		"event: update",
-		`data: <div id="refresh-banner" hx-swap-oob="true"`, "New commits",
+		`id="refresh-commits" hx-swap-oob="true"`, "New commits",
 		`id="thread-T9"`, "<p>edited</p>",
 		`id="pending-count" hx-swap-oob="true"`, ">3<",
 	)
+}
+
+func TestEventsCatchUpAPageFromBeforeAPush(t *testing.T) {
+	a := newApp(t)
+	a.do(t, http.MethodGet, prPath, nil)
+	srv := httptest.NewServer(a.handler)
+	t.Cleanup(srv.Close)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+prPath+"/events?head="+string(c1), nil)
+	req.Host = "127.0.0.1:7878"
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	lines := bufio.NewScanner(resp.Body)
+	var got []string
+	for lines.Scan() && !strings.Contains(lines.Text(), "New commits") {
+		got = append(got, lines.Text())
+		if len(got) > 50 {
+			t.Fatalf("no catch-up update: %q", got)
+		}
+	}
 }
