@@ -207,6 +207,9 @@ func TestDashboardFetchesFromGitHubOnlyWhenStaleOrAsked(t *testing.T) {
 	if strings.Contains(body, `hx-trigger="load"`) {
 		t.Error("fetched from GitHub again within ten minutes")
 	}
+	if n := strings.Count(body, `id="dashboard-status"`); n != 1 {
+		t.Errorf("page has %d status bars, want 1", n)
+	}
 }
 
 func TestOpenRedirectsGitHubURLs(t *testing.T) {

@@ -222,5 +222,7 @@ tr:target td { background: rgba(250, 189, 47, .18); }
 .palette .hint { margin-left: auto; font-family: var(--mono); font-size: .75rem; color: var(--gray); }
 .palette .capture { padding: .8rem; text-align: center; color: var(--fg-dim); }
 .palette .capture kbd { font-family: var(--mono); background: var(--bg2); padding: .1rem .4rem; border-radius: 4px; margin: 0 .15rem; }
-.dashboard-status { display: flex; gap: .6rem; align-items: center; font-size: .85rem; margin: .2rem 0 .4rem; }
-.dashboard-status button.htmx-request { opacity: .5; pointer-events: none; }
+.dashboard-top { display: flex; gap: 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 1rem; }
+.dashboard-top .open-pr { flex: 1 1 24rem; margin-bottom: 0; }
+.dashboard-status { display: flex; gap: .6rem; align-items: center; font-size: .85rem; margin-left: auto; }
+.dashboard-status.htmx-request button { opacity: .5; pointer-events: none; }
