@@ -396,3 +396,12 @@ func (s *Service) changeComment(ctx context.Context, ref domain.PRRef, commentID
 	}
 	return out, nil
 }
+
+// RenderMarkdown renders a comment body as it will appear once posted; a
+// blank one renders as nothing without asking the code host.
+func (s *Service) RenderMarkdown(ctx context.Context, ref domain.PRRef, body string) (string, error) {
+	if strings.TrimSpace(body) == "" {
+		return "", nil
+	}
+	return s.CodeHost.RenderMarkdown(ctx, ref.Repo, body)
+}

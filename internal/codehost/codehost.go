@@ -102,4 +102,7 @@ type CodeHost interface {
 	// creates and submits a review at commit in one step.
 	SubmitReview(ctx context.Context, prID, reviewID string, commit domain.SHA, event domain.ReviewEvent, body string) error
 	SetViewed(ctx context.Context, prID, path string, viewed bool) error
+	// RenderMarkdown renders a comment body as the code host would show it,
+	// sanitised, with references resolved against the PR's repo.
+	RenderMarkdown(ctx context.Context, repo domain.Repo, body string) (string, error)
 }

@@ -169,6 +169,27 @@ button.primary:hover { filter: brightness(1.1); background: var(--green); }
 textarea { font: inherit; color: var(--fg); background: var(--bg1); border: 1px solid var(--bg2); border-radius: 4px; padding: .4rem; width: 100%; resize: vertical; }
 .actions { display: flex; gap: .5rem; }
 
+/* Comment boxes: Write/Preview tabs and the formatting toolbar */
+.md-editor { border: 1px solid var(--bg2); border-radius: 6px; background: var(--bg-soft); min-width: 0; }
+.md-header { display: flex; align-items: flex-end; flex-wrap: wrap; gap: .3rem; border-bottom: 1px solid var(--bg2); padding: .3rem .4rem 0; }
+.md-tabs { display: flex; margin-bottom: -1px; }
+.md-tabs button { background: none; border: 1px solid transparent; border-radius: 6px 6px 0 0; padding: .3rem .8rem; color: var(--fg-dim); }
+.md-tabs button:hover { background: none; color: var(--fg); }
+.md-tabs button[aria-selected="true"] { background: var(--bg0); border-color: var(--bg2); border-bottom-color: var(--bg0); color: var(--fg); }
+.md-toolbar { margin-left: auto; display: flex; align-items: center; flex-wrap: wrap; gap: .1rem; padding-bottom: .3rem; }
+.md-toolbar button { background: none; border: 0; color: var(--fg-dim); width: 1.8rem; height: 1.7rem; padding: 0; display: inline-grid; place-items: center; font-family: var(--sans); }
+.md-toolbar button:hover { background: var(--bg1); color: var(--fg); }
+.md-toolbar svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+.md-toolbar svg circle { fill: currentColor; }
+.md-sep { width: 1px; height: 1.1rem; background: var(--bg2); margin: 0 .3rem; }
+.md-editor.previewing .md-toolbar { visibility: hidden; }
+.md-editor textarea { display: block; border: 0; border-radius: 0 0 6px 6px; background: var(--bg0); }
+.md-editor textarea[hidden] { display: none; }
+.md-editor textarea:focus { outline: 2px solid var(--blue); outline-offset: -2px; }
+.md-preview { padding: .4rem .6rem; background: var(--bg0); border-radius: 0 0 6px 6px; }
+.md-preview > :first-child { margin-top: 0; }
+.md-preview > :last-child { margin-bottom: 0; }
+
 .reactions { display: flex; gap: .3rem; align-items: center; flex-wrap: wrap; margin-top: .3rem; }
 .reaction { padding: 0 .45rem; border-radius: 999px; font-size: var(--fs-sm); }
 .reaction.reacted { border-color: var(--blue); background: rgba(131, 165, 152, .2); }

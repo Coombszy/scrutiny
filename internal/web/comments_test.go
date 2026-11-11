@@ -73,3 +73,26 @@ func TestChangingSomeoneElsesCommentIsRefused(t *testing.T) {
 		t.Errorf("status %d, want 409", rec.Code)
 	}
 }
+
+func TestCommentBoxesOfferPreviewAndFormatting(t *testing.T) {
+	a := newApp(t)
+	a.withThread()
+	page := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	mustContain(t, page, `data-preview="/github.com/o/r/pull/7/markdown"`, `data-md-tab="preview"`, `data-md="bold"`)
+	if strings.Contains(page, `data-md="suggestion"`) {
+		t.Error("a Conversation Comment offers a suggested change")
+	}
+	// A thread on the head side can suggest a change to its line.
+	body := a.do(t, http.MethodGet, fileURL(), nil).Body.String()
+	mustContain(t, body, `data-md="suggestion" data-start="2" data-end="2"`)
+}
+
+func TestPreviewRendersMarkdown(t *testing.T) {
+	a := newApp(t)
+	rec := a.do(t, http.MethodPost, prPath+"/markdown", url.Values{"body": {"<b>hi</b>"}})
+	if rec.Code != http.StatusOK || rec.Body.String() != "<p>&lt;b&gt;hi&lt;/b&gt;</p>" {
+		t.Errorf("preview = %d %q", rec.Code, rec.Body.String())
+	}
+	rec = a.do(t, http.MethodPost, prPath+"/markdown", url.Values{"body": {"  "}})
+	mustContain(t, rec.Body.String(), "Nothing to preview")
+}

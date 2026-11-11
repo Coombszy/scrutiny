@@ -1411,3 +1411,240 @@ window.Scrutiny = { actions: {} };
   });
   document.addEventListener("click", (e) => pickers.forEach((p) => !p.contains(e.target) && close(p)));
 })();
+
+// Comment boxes: Write and Preview tabs and a Markdown formatting toolbar,
+// as on GitHub. Edits go through the browser's insertText so ctrl+z undoes
+// them; the preview is rendered by GitHub, so it matches the posted comment.
+(() => {
+  "use strict";
+
+  // replace swaps box's text from start to end for text, then selects
+  // selStart..selEnd (offsets into the whole new value).
+  function replace(box, start, end, text, selStart, selEnd) {
+    box.focus();
+    box.setSelectionRange(start, end);
+    if (!document.execCommand("insertText", false, text)) box.setRangeText(text, start, end, "end");
+    box.setSelectionRange(selStart, selEnd ?? selStart);
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  // wrap surrounds the selection with before and after, or removes them
+  // when it is already wrapped; with nothing selected the cursor lands
+  // between them, ready to type.
+  function wrap(box, before, after) {
+    const { value, selectionStart: s, selectionEnd: e } = box;
+    const sel = value.slice(s, e);
+    if (value.slice(s - before.length, s) === before && value.slice(e, e + after.length) === after) {
+      return replace(box, s - before.length, e + after.length, sel, s - before.length, e - before.length);
+    }
+    if (sel.startsWith(before) && sel.endsWith(after) && sel.length >= before.length + after.length) {
+      const inner = sel.slice(before.length, sel.length - after.length);
+      return replace(box, s, e, inner, s, s + inner.length);
+    }
+    replace(box, s, e, before + sel + after, s + before.length, s + before.length + sel.length);
+  }
+
+  // lines extends the selection to whole lines, returning its bounds.
+  function lines(box) {
+    const { value, selectionStart: s, selectionEnd: e } = box;
+    const start = value.lastIndexOf("\n", s - 1) + 1;
+    let end = value.indexOf("\n", e > s && value[e - 1] === "\n" ? e - 1 : e);
+    if (end < 0) end = value.length;
+    return { start, end, text: value.slice(start, end).split("\n") };
+  }
+
+  // prefix starts each selected line with make(i), or strips it from all
+  // of them when every one already has it (matching pattern). A list
+  // marker already there is swapped for the new one when list is set.
+  function prefix(box, pattern, make, list = false) {
+    const { start, end, text } = lines(box);
+    const all = text.every((l) => pattern.test(l));
+    const out = text
+      .map((l, i) => {
+        if (!list) return all ? l.replace(pattern, "") : make(i) + l;
+        const [, indent, rest] = l.match(listItem);
+        return indent + (all ? "" : make(i)) + rest;
+      })
+      .join("\n");
+    if (text.length === 1 && box.selectionStart === box.selectionEnd) {
+      const caret = box.selectionStart + out.length - text[0].length;
+      return replace(box, start, end, out, Math.max(start, caret));
+    }
+    replace(box, start, end, out, start, start + out.length);
+  }
+  // listItem splits a line into its indent and its text after any marker.
+  const listItem = /^(\s*)(?:[-*+]\s\[[ xX]\]\s|[-*+]\s|\d+[.)]\s)?(.*)$/;
+
+  function link(box) {
+    const { value, selectionStart: s, selectionEnd: e } = box;
+    const sel = value.slice(s, e);
+    if (/^https?:\/\/\S+$/.test(sel)) return replace(box, s, e, `[](${sel})`, s + 1);
+    const text = `[${sel}](url)`;
+    const url = s + sel.length + 3;
+    replace(box, s, e, text, url, url + 3);
+  }
+
+  // suggest adds a suggested change holding the lines it replaces, read
+  // from the diff; lines not on the page leave the block empty.
+  function suggest(box, button) {
+    const start = Number(button.dataset.start);
+    const end = Number(button.dataset.end);
+    const table = box.closest("table.diff");
+    const code = [];
+    for (let n = start; n <= end && table; n++) {
+      const cell = table.querySelector(`td.code[data-line="${n}"]`);
+      if (!cell) {
+        code.length = 0;
+        break;
+      }
+      code.push(cell.textContent.replace(/\n$/, ""));
+    }
+    const { value, selectionStart: s, selectionEnd: e } = box;
+    const lead = s === 0 || value[s - 1] === "\n" ? "" : "\n";
+    const body = code.join("\n");
+    const text = `${lead}\`\`\`suggestion\n${body}\n\`\`\`\n`;
+    const caret = s + lead.length + "```suggestion\n".length;
+    replace(box, s, e, text, caret, caret + body.length);
+  }
+
+  const actions = {
+    heading: (box) => prefix(box, /^#{1,6}\s/, () => "### "),
+    bold: (box) => wrap(box, "**", "**"),
+    italic: (box) => wrap(box, "_", "_"),
+    underline: (box) => wrap(box, "<ins>", "</ins>"),
+    strike: (box) => wrap(box, "~~", "~~"),
+    quote: (box) => prefix(box, /^>\s?/, () => "> "),
+    code: (box) => {
+      const { value, selectionStart: s, selectionEnd: e } = box;
+      if (value.slice(s, e).includes("\n")) wrap(box, "```\n", "\n```");
+      else wrap(box, "`", "`");
+    },
+    link,
+    ordered: (box) => prefix(box, /^\s*\d+[.)]\s/, (i) => `${i + 1}. `, true),
+    unordered: (box) => prefix(box, /^\s*[-*+]\s(?!\[[ xX]\]\s)/, () => "- ", true),
+    task: (box) => prefix(box, /^\s*[-*+]\s\[[ xX]\]\s/, () => "- [ ] ", true),
+  };
+
+  const editorOf = (el) => el.closest(".md-editor");
+  const boxOf = (editor) => editor.querySelector("textarea");
+
+  async function show(editor, tab) {
+    const box = boxOf(editor);
+    const pane = editor.querySelector(".md-preview");
+    const previewing = tab === "preview";
+    for (const t of editor.querySelectorAll("[data-md-tab]")) t.setAttribute("aria-selected", String(t.dataset.mdTab === tab));
+    editor.classList.toggle("previewing", previewing);
+    if (!previewing) {
+      pane.hidden = true;
+      box.hidden = false;
+      box.focus();
+      return;
+    }
+    pane.style.minHeight = box.offsetHeight + "px";
+    box.hidden = true;
+    pane.hidden = false;
+    pane.innerHTML = '<p class="muted">Loading preview…</p>';
+    const body = box.value;
+    try {
+      const res = await Scrutiny.busy(
+        fetch(editor.dataset.preview, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "HX-Request": "true",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content,
+          },
+          body: new URLSearchParams({ body }),
+        }),
+      );
+      const text = await res.text();
+      if (box.value !== body || !editor.classList.contains("previewing")) return; // superseded
+      if (res.status === 401) Scrutiny.authFailed();
+      if (res.ok) pane.innerHTML = text;
+      else pane.replaceChildren(Object.assign(document.createElement("p"), { className: "muted", textContent: `Preview failed: ${text.trim() || res.statusText}` }));
+    } catch {
+      pane.innerHTML = '<p class="muted">Preview failed: Scrutiny is not reachable.</p>';
+    }
+  }
+
+  // Toolbar buttons keep the textarea's focus and selection.
+  document.addEventListener("mousedown", (e) => {
+    if (e.target.closest(".md-toolbar button")) e.preventDefault();
+  });
+  document.addEventListener("click", (e) => {
+    const tab = e.target.closest("[data-md-tab]");
+    if (tab) return show(editorOf(tab), tab.dataset.mdTab);
+    const button = e.target.closest(".md-toolbar [data-md]");
+    if (!button) return;
+    const editor = editorOf(button);
+    if (editor.classList.contains("previewing")) show(editor, "write");
+    const box = boxOf(editor);
+    if (button.dataset.md === "suggestion") suggest(box, button);
+    else actions[button.dataset.md]?.(box);
+  });
+
+  // Back to Write when the form resets (Cancel) or the browser needs to
+  // show the textarea to say it is required.
+  document.addEventListener("reset", (e) => {
+    for (const editor of e.target.querySelectorAll(".md-editor.previewing")) show(editor, "write");
+  });
+  document.addEventListener(
+    "invalid",
+    (e) => {
+      const editor = e.target.closest?.(".md-editor.previewing");
+      if (editor) show(editor, "write");
+    },
+    true,
+  );
+
+  const shortcuts = { b: "bold", i: "italic", e: "code" };
+  // Captured ahead of the hotkeys, which are not meant for comment text.
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      const box = e.target;
+      if (!box.matches?.(".md-editor textarea")) return;
+      const mod = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey;
+      if (mod && shortcuts[e.key.toLowerCase()]) {
+        e.preventDefault();
+        e.stopPropagation();
+        actions[shortcuts[e.key.toLowerCase()]](box);
+        return;
+      }
+      if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && !e.isComposing) continueList(e, box);
+    },
+    true,
+  );
+
+  // Enter in a list item starts the next one; on an empty item it ends
+  // the list instead.
+  function continueList(e, box) {
+    const { value, selectionStart: s, selectionEnd: end } = box;
+    if (s !== end) return;
+    const start = value.lastIndexOf("\n", s - 1) + 1;
+    const line = value.slice(start, s);
+    const m = line.match(/^(\s*)([-*+]\s\[[ xX]\]\s|[-*+]\s|(\d+)([.)])\s)/);
+    if (!m) return;
+    e.preventDefault();
+    if (line === m[0]) return replace(box, start, s, "", start);
+    let marker = m[2];
+    if (m[3]) marker = `${Number(m[3]) + 1}${m[4]} `;
+    else if (/\[[ xX]\]/.test(marker)) marker = marker.replace(/\[[xX]\]/, "[ ]");
+    const text = "\n" + m[1] + marker;
+    replace(box, s, s, text, s + text.length);
+  }
+
+  // Pasting a URL over selected text links it.
+  document.addEventListener("paste", (e) => {
+    const box = e.target;
+    if (!box.matches?.(".md-editor textarea") || box.selectionStart === box.selectionEnd) return;
+    const url = e.clipboardData?.getData("text/plain").trim();
+    if (!url || !/^https?:\/\/\S+$/.test(url)) return;
+    const { value, selectionStart: s, selectionEnd: end } = box;
+    const sel = value.slice(s, end);
+    if (/^https?:\/\//.test(sel) || sel.includes("\n")) return;
+    e.preventDefault();
+    const text = `[${sel}](${url})`;
+    replace(box, s, end, text, s + text.length);
+  });
+})();

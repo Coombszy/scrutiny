@@ -25,6 +25,7 @@ func (s *Server) routeReview() {
 	s.mux.HandleFunc("POST "+pr+"/comments/{comment}/delete", s.deleteComment)
 	s.mux.HandleFunc("POST "+pr+"/viewed", s.viewed)
 	s.mux.HandleFunc("POST "+pr+"/review", s.submit)
+	s.mux.HandleFunc("POST "+pr+"/markdown", s.previewMarkdown)
 }
 
 // threadAnchor reads a new thread's anchor from the query or form.
@@ -223,6 +224,21 @@ func (s *Server) submit(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("HX-Refresh", "true")
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// previewMarkdown renders a comment body for a comment box's Preview tab.
+func (s *Server) previewMarkdown(w http.ResponseWriter, r *http.Request) {
+	ref, ok := prRef(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	html, err := s.review.RenderMarkdown(r.Context(), ref, r.FormValue("body"))
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.render(w, r, http.StatusOK, views.MarkdownPreview(html))
 }
 
 // renderWithPending renders c followed by out-of-band updates of the

@@ -384,6 +384,15 @@ func (f *Fake) SetViewed(_ context.Context, prID, path string, viewed bool) erro
 // paragraph.
 func renderBody(body string) string { return "<p>" + html.EscapeString(body) + "</p>" }
 
+func (f *Fake) RenderMarkdown(_ context.Context, _ domain.Repo, body string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.Health.Online {
+		return "", ErrOffline
+	}
+	return renderBody(body), nil
+}
+
 func (f *Fake) Forget(_ context.Context, ref domain.PRRef) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

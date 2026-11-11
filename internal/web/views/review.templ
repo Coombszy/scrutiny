@@ -37,10 +37,12 @@ templ threadView(pr domain.PRRef, t domain.ReviewThread, oob bool) {
 				<span class="muted">{ commentCount(len(t.Comments)) }</span>
 			</summary>
 			for _, c := range t.Comments {
-				@commentView(pr, c, "closest .thread")
+				@commentView(pr, c, "closest .thread", threadSuggestion(t))
 			}
 			<form class="reply" autocomplete="off" hx-post={ pr.Path() + "/threads/" + t.ID + "/replies" } hx-target="closest .thread" hx-swap="outerHTML">
-				<textarea autocomplete="off" id={ "reply-" + t.ID } name="body" rows="2" placeholder="Reply…" required></textarea>
+				@markdownEditor(pr, threadSuggestion(t)) {
+					<textarea autocomplete="off" id={ "reply-" + t.ID } name="body" rows="2" placeholder="Reply…" required></textarea>
+				}
 				<div class="actions">
 					<button type="submit">Reply</button>
 					if t.Resolved && t.ViewerCanUnresolve {
@@ -55,8 +57,8 @@ templ threadView(pr domain.PRRef, t domain.ReviewThread, oob bool) {
 }
 
 // commentView renders a comment; edits and deletes swap target, the thread
-// or Conversation it is in.
-templ commentView(pr domain.PRRef, c domain.Comment, target string) {
+// or Conversation it is in. An edit can add a suggested change to s.
+templ commentView(pr domain.PRRef, c domain.Comment, target string, s suggestion) {
 	<article class="comment" id={ "comment-" + c.ID }>
 		<header>
 			<strong>{ c.Author }</strong>
@@ -91,7 +93,9 @@ templ commentView(pr domain.PRRef, c domain.Comment, target string) {
 		</div>
 		if c.ViewerCanUpdate {
 			<form class="edit-comment" autocomplete="off" hidden hx-post={ pr.Path() + "/comments/" + c.ID + "/edit" } hx-target={ target } hx-swap="outerHTML">
-				<textarea autocomplete="off" name="body" rows="3" required>{ c.Body }</textarea>
+				@markdownEditor(pr, s) {
+					<textarea autocomplete="off" name="body" rows="3" required>{ c.Body }</textarea>
+				}
 				<div class="actions">
 					<button type="submit">Save</button>
 					<button type="button" data-cancel-edit>Cancel</button>
@@ -157,7 +161,9 @@ templ NewThreadForm(pr domain.PRRef, a ThreadAnchor, cols int) {
 						<input type="hidden" name="start_side" value={ a.StartSide }/>
 					}
 					<input type="hidden" name="cols" value={ itoa(cols) }/>
-					<textarea autocomplete="off" name="body" rows="3" placeholder="Leave a comment" required autofocus></textarea>
+					@markdownEditor(pr, a.suggestion()) {
+						<textarea autocomplete="off" name="body" rows="3" placeholder="Leave a comment" required autofocus></textarea>
+					}
 					<div class="actions">
 						<button type="submit">Add to review</button>
 						<button type="button" data-remove-row>Cancel</button>
@@ -233,11 +239,13 @@ templ conversationView(pr domain.PRRef, comments []domain.Comment, reviews []dom
 			if e.Review != nil {
 				@reviewEvent(*e.Review)
 			} else {
-				@commentView(pr, *e.Comment, "#conversation")
+				@commentView(pr, *e.Comment, "#conversation", suggestion{})
 			}
 		}
 		<form class="reply" autocomplete="off" hx-post={ pr.Path() + "/comments" } hx-target="#conversation" hx-swap="outerHTML">
-			<textarea autocomplete="off" id="conversation-new" name="body" rows="3" placeholder="Add a comment" required></textarea>
+			@markdownEditor(pr, suggestion{}) {
+				<textarea autocomplete="off" id="conversation-new" name="body" rows="3" placeholder="Add a comment" required></textarea>
+			}
 			<div class="actions"><button type="submit">Comment</button></div>
 		</form>
 	</section>
@@ -249,7 +257,9 @@ templ submitDialog(pr domain.PRRef, head domain.SHA, pending []review.PendingCom
 			<h2>Finish your review</h2>
 			@PendingList(pending, false)
 			<input type="hidden" name="head" value={ string(head) }/>
-			<textarea autocomplete="off" name="body" rows="5" placeholder="Leave a comment"></textarea>
+			@markdownEditor(pr, suggestion{}) {
+				<textarea autocomplete="off" name="body" rows="5" placeholder="Leave a comment"></textarea>
+			}
 			<fieldset>
 				<label><input type="radio" name="event" value="COMMENT" checked/> Comment</label>
 				<label><input type="radio" name="event" value="APPROVE"/> Approve</label>
@@ -281,4 +291,70 @@ templ reviewEvent(r domain.SubmittedReview) {
 			</div>
 		}
 	</article>
+}
+
+// markdownEditor wraps a comment's textarea with Write and Preview tabs and
+// a formatting toolbar, as GitHub's comment box has; the toolbar offers a
+// suggested change when s names lines to replace.
+templ markdownEditor(pr domain.PRRef, s suggestion) {
+	<div class="md-editor" data-preview={ pr.Path() + "/markdown" }>
+		<div class="md-header">
+			<div class="md-tabs" role="tablist">
+				<button type="button" role="tab" data-md-tab="write" aria-selected="true">Write</button>
+				<button type="button" role="tab" data-md-tab="preview" aria-selected="false">Preview</button>
+			</div>
+			<div class="md-toolbar" role="toolbar" aria-label="Formatting">
+				if s.Start != 0 {
+					<button
+						type="button"
+						data-md="suggestion"
+						data-start={ itoa(s.Start) }
+						data-end={ itoa(s.End) }
+						title="Add a suggestion"
+						aria-label="Add a suggestion"
+					>
+						<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 1.5h6l3 3v10h-9z"></path><path d="M8 5.5v4M6 7.5h4M6 12h4"></path></svg>
+					</button>
+					<span class="md-sep"></span>
+				}
+				<button type="button" data-md="heading" title="Heading" aria-label="Heading"><b>H</b></button>
+				<button type="button" data-md="bold" title="Bold (ctrl+b)" aria-label="Bold"><b>B</b></button>
+				<button type="button" data-md="italic" title="Italic (ctrl+i)" aria-label="Italic"><i>I</i></button>
+				<button type="button" data-md="underline" title="Underline" aria-label="Underline"><u>U</u></button>
+				<button type="button" data-md="strike" title="Strikethrough" aria-label="Strikethrough"><s>S</s></button>
+				<span class="md-sep"></span>
+				<button type="button" data-md="quote" title="Quote" aria-label="Quote">
+					<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5v11M6 4h8M6 8h8M6 12h5"></path></svg>
+				</button>
+				<button type="button" data-md="code" title="Code (ctrl+e)" aria-label="Code">
+					<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 4 1.5 8 5 12M11 4l3.5 4-3.5 4"></path></svg>
+				</button>
+				<button type="button" data-md="link" title="Link" aria-label="Link">
+					<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 9.5l3-3M7 4.5l1-1a2.8 2.8 0 0 1 4 4l-1 1M9 11.5l-1 1a2.8 2.8 0 0 1-4-4l1-1"></path></svg>
+				</button>
+				<span class="md-sep"></span>
+				<button type="button" data-md="ordered" title="Numbered list" aria-label="Numbered list">
+					<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5h8.5M6 8h8.5M6 12.5h8.5M2 2.5h1v3M1.5 7h2l-2 2.5h2"></path></svg>
+				</button>
+				<button type="button" data-md="unordered" title="Bulleted list" aria-label="Bulleted list">
+					<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5h8.5M6 8h8.5M6 12.5h8.5"></path><circle cx="2.5" cy="3.5" r=".6"></circle><circle cx="2.5" cy="8" r=".6"></circle><circle cx="2.5" cy="12.5" r=".6"></circle></svg>
+				</button>
+				<button type="button" data-md="task" title="Task list" aria-label="Task list">
+					<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.5 4h7M7.5 11h7M1.5 4l1.3 1.3L5 2.8"></path><rect x="1.5" y="9" width="3.5" height="3.5" rx=".5"></rect></svg>
+				</button>
+			</div>
+		</div>
+		{ children... }
+		<div class="markdown md-preview" hx-disable hidden></div>
+	</div>
+}
+
+// MarkdownPreview is a comment body as rendered by the code host, for a
+// comment box's Preview tab.
+templ MarkdownPreview(html string) {
+	if html == "" {
+		<p class="muted">Nothing to preview</p>
+	} else {
+		@templ.Raw(html)
+	}
 }

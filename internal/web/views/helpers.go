@@ -73,6 +73,29 @@ type ThreadAnchor struct {
 	StartSide string
 }
 
+// suggestion is the run of head lines, Start to End, that a suggested
+// change on a thread replaces; zero when the thread cannot take one (it is
+// on the base side, or outdated).
+type suggestion struct{ Start, End int }
+
+func suggestionFor(side, startSide domain.DiffSide, startLine, line int) suggestion {
+	if side != domain.Right || line == 0 {
+		return suggestion{}
+	}
+	if startSide == domain.Right && startLine != 0 {
+		return suggestion{startLine, line}
+	}
+	return suggestion{line, line}
+}
+
+func (a ThreadAnchor) suggestion() suggestion {
+	return suggestionFor(domain.DiffSide(a.Side), domain.DiffSide(a.StartSide), a.StartLine, a.Line)
+}
+
+func threadSuggestion(t domain.ReviewThread) suggestion {
+	return suggestionFor(t.Side, t.StartSide, t.StartLine, t.Line)
+}
+
 // Location names the anchor's file and lines as a thread's header does,
 // e.g. "parser.go:7" or "parser.go:3-7"; a range across sides marks each
 // end with - or +, e.g. "parser.go:-3 to +7".
