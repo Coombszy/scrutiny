@@ -34,10 +34,13 @@ type ThemeOption struct {
 
 // taglines are typed out, one after another, after the brand in the top bar.
 var taglines = []string{
-	"GitHub is down... again",
-	"F**k GitHub",
-	"Stupid Buggy GitHub Diff page",
-	"Why is GitHub S**t",
+	"GitHub is down... again.",
+	"F**k GitHub.",
+	"Stupid Buggy GitHub Diff page.",
+	"Why is GitHub S**t.",
+	"UI/UX is Dead.",
+	"Do GitHub even test their own product.",
+	"Who wins, This clanked tool or a multi-million dollar company?",
 }
 
 type pageKey struct{}
