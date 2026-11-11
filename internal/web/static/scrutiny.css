@@ -160,6 +160,10 @@ button.primary:hover { filter: brightness(1.1); background: var(--green); }
 .comment-actions button { background: none; border: none; padding: 0 .3rem; color: var(--gray); font-size: var(--fs-sm); }
 .comment-actions button:hover { color: var(--fg); background: none; }
 .comment-actions .danger:hover { color: var(--red); }
+/* A comment's ID, at the header's right; clicking copies it */
+.comment-id { margin-left: auto; background: none; border: none; padding: 0 .3rem; color: var(--gray); font-family: var(--mono); font-size: var(--fs-sm); }
+.comment-actions + .comment-id { margin-left: 0; }
+.comment-id:hover { color: var(--fg); background: none; }
 /* A thread row left empty by deleting its last comment; not the new-thread form's */
 .thread-row:not(.new-thread):not(:has(.thread)) { display: none; }
 .badge.pending { background: var(--yellow); color: var(--bg0); }

@@ -296,6 +296,29 @@ window.Scrutiny = { actions: {} };
     }
   });
 
+  // A [data-copy] button copies its value, e.g. a comment's ID, and says so.
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-copy]");
+    if (!btn) return;
+    e.preventDefault(); // inside a thread's summary, do not also toggle it
+    try {
+      await navigator.clipboard.writeText(btn.dataset.copy);
+    } catch {
+      toast("Could not copy to the clipboard.");
+      return;
+    }
+    if (btn.dataset.copied) return;
+    btn.dataset.copied = "true";
+    const label = btn.textContent;
+    btn.style.minWidth = btn.offsetWidth + "px";
+    btn.textContent = "Copied";
+    setTimeout(() => {
+      btn.textContent = label;
+      btn.style.minWidth = "";
+      delete btn.dataset.copied;
+    }, 1200);
+  });
+
   // Ctrl/Cmd+Enter submits the form a textarea is in.
   document.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && e.target.matches("textarea")) {

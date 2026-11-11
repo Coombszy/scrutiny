@@ -38,6 +38,14 @@ func TestOwnCommentsOfferEditAndDelete(t *testing.T) {
 	}
 }
 
+func TestEveryCommentOffersToCopyItsID(t *testing.T) {
+	a := newApp(t)
+	a.withOwnComment()
+	mustContain(t, a.do(t, http.MethodGet, prPath, nil).Body.String(), `data-copy="IC1"`)
+	// Someone else's comment too, not only the viewer's own.
+	mustContain(t, a.do(t, http.MethodGet, fileURL(), nil).Body.String(), `data-copy="C1"`, `data-copy="C2"`)
+}
+
 func TestEditingACommentReturnsItsThread(t *testing.T) {
 	a := newApp(t)
 	a.withOwnComment()

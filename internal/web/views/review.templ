@@ -35,9 +35,12 @@ templ threadView(pr domain.PRRef, t domain.ReviewThread, oob bool) {
 					<span class="badge">Outdated</span>
 				}
 				<span class="muted">{ commentCount(len(t.Comments)) }</span>
+				if len(t.Comments) > 0 {
+					@commentID(t.Comments[0].ID)
+				}
 			</summary>
-			for _, c := range t.Comments {
-				@commentView(pr, c, "closest .thread", threadSuggestion(t))
+			for i, c := range t.Comments {
+				@commentView(pr, c, "closest .thread", threadSuggestion(t), i > 0)
 			}
 			<form class="reply" autocomplete="off" hx-post={ pr.Path() + "/threads/" + t.ID + "/replies" } hx-target="closest .thread" hx-swap="outerHTML">
 				@markdownEditor(pr, threadSuggestion(t)) {
@@ -57,8 +60,10 @@ templ threadView(pr domain.PRRef, t domain.ReviewThread, oob bool) {
 }
 
 // commentView renders a comment; edits and deletes swap target, the thread
-// or Conversation it is in. An edit can add a suggested change to s.
-templ commentView(pr domain.PRRef, c domain.Comment, target string, s suggestion) {
+// or Conversation it is in. An edit can add a suggested change to s. showID
+// puts the comment's ID in its header; a thread's first comment has its ID
+// beside the file name instead.
+templ commentView(pr domain.PRRef, c domain.Comment, target string, s suggestion, showID bool) {
 	<article class="comment" id={ "comment-" + c.ID }>
 		<header>
 			<strong>{ c.Author }</strong>
@@ -87,6 +92,9 @@ templ commentView(pr domain.PRRef, c domain.Comment, target string, s suggestion
 					}
 				</span>
 			}
+			if showID {
+				@commentID(c.ID)
+			}
 		</header>
 		<div class="markdown" hx-disable>
 			@templ.Raw(c.BodyHTML)
@@ -104,6 +112,12 @@ templ commentView(pr domain.PRRef, c domain.Comment, target string, s suggestion
 		}
 		@Reactions(pr, c.ID, c.Reactions)
 	</article>
+}
+
+// commentID shows a comment's ID; clicking it copies the ID, e.g. to hand
+// the comment to another tool.
+templ commentID(id string) {
+	<button type="button" class="comment-id" data-copy={ id } title="Comment ID, click to copy">{ id }</button>
 }
 
 // Reactions renders the Reactions on a comment or PR, with a picker.
@@ -239,7 +253,7 @@ templ conversationView(pr domain.PRRef, comments []domain.Comment, reviews []dom
 			if e.Review != nil {
 				@reviewEvent(*e.Review)
 			} else {
-				@commentView(pr, *e.Comment, "#conversation", suggestion{})
+				@commentView(pr, *e.Comment, "#conversation", suggestion{}, true)
 			}
 		}
 		<form class="reply" autocomplete="off" hx-post={ pr.Path() + "/comments" } hx-target="#conversation" hx-swap="outerHTML">
