@@ -127,7 +127,7 @@ func TestPRPageListsFilesForLazyLoading(t *testing.T) {
 	}
 	body := rec.Body.String()
 	mustContain(t, body,
-		"Teach the parser &lt;generics&gt;",
+		"<title>Teach the parser &lt;generics&gt; #7</title>",
 		`hx-trigger="intersect once"`,
 		"/github.com/o/r/pull/7/file?",
 		"Load diff",   // go.sum is generated
@@ -198,7 +198,7 @@ func TestDashboardFetchesFromGitHubOnlyWhenStaleOrAsked(t *testing.T) {
 
 	// First visit: nothing cached, so the GitHub lists load after the page.
 	body := a.do(t, http.MethodGet, "/", nil).Body.String()
-	mustContain(t, body, "Recently opened", "Teach the parser", `hx-get="/dashboard/lists"`, `hx-trigger="load"`)
+	mustContain(t, body, "<title>Dashboard · Scrutiny</title>", "Recently opened", "Teach the parser", `hx-get="/dashboard/lists"`, `hx-trigger="load"`)
 	if strings.Contains(body, "Needs eyes") {
 		t.Error("first page load waited for GitHub")
 	}

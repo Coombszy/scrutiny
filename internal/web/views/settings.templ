@@ -26,7 +26,7 @@ var keyLabels = []struct{ Action, Label string }{
 }
 
 templ SettingsPage(form SettingsForm, list []servers.Status, activity Activity) {
-	@Layout("Settings") {
+	@Layout("Settings · Scrutiny") {
 		<header class="pr-header">
 			<h1>Settings</h1>
 			<p class="muted">Changes save as you make them, to Scrutiny's config file.</p>

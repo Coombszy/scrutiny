@@ -208,7 +208,7 @@ templ tokens(ts []highlight.Token) {
 }
 
 templ Error(status int, message string) {
-	@Layout("Error") {
+	@Layout("Error · Scrutiny") {
 		<h1>{ itoa(status) }</h1>
 		<p>{ message }</p>
 	}

@@ -99,7 +99,7 @@ templ ReferencesPanel(pr domain.PRRef, refs []review.Reference) {
 
 // FileViewPage shows a whole file at the PR's head.
 templ FileViewPage(pr domain.PRRef, f review.FileView) {
-	@Layout(f.Path) {
+	@Layout(f.Path + " · Scrutiny") {
 		<div data-live={ pr.Path() + "/events?head=" + string(f.Head) } hidden></div>
 		@RefreshBanner()
 		<header class="pr-header">

@@ -517,7 +517,7 @@ func PR(p review.PRPage, mode settings.ViewMode) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = Layout(p.PR.Title).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Layout(p.PR.Title+" #"+itoa(p.PR.Ref.Number)).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

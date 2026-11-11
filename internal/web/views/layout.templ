@@ -1,5 +1,7 @@
 package views
 
+// Layout is the page shell; title is the whole <title>, e.g. "Settings ·
+// Scrutiny".
 templ Layout(title string) {
 	<!DOCTYPE html>
 	<html lang="en">
@@ -7,7 +9,7 @@ templ Layout(title string) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<meta name="csrf-token" content={ pageFrom(ctx).CSRFToken }/>
-			<title>{ title } · Scrutiny</title>
+			<title>{ title }</title>
 			<link rel="stylesheet" href="/static/scrutiny.css"/>
 			<link rel="stylesheet" href={ "/theme.css?v=" + pageFrom(ctx).Theme }/>
 			<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"/>
