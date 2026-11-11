@@ -60,6 +60,7 @@ func NewServer(d Deps) *Server {
 	s.mux.HandleFunc("GET /{$}", s.dashboard)
 	s.mux.HandleFunc("GET /open", s.open)
 	s.mux.HandleFunc("GET /dashboard/lists", s.dashboardLists)
+	s.mux.HandleFunc("GET /prs", s.prs)
 	s.mux.HandleFunc("GET /github.com/{owner}/{repo}/pull/{number}", s.pullRequest)
 	s.mux.HandleFunc("POST /github.com/{owner}/{repo}/pull/{number}/forget", s.forgetPR)
 	s.mux.HandleFunc("GET /github.com/{owner}/{repo}/pull/{number}/file", s.file)

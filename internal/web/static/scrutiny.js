@@ -745,33 +745,30 @@ window.Scrutiny = { actions: {} };
   };
 })();
 
-// Dashboard search (ctrl+k): the PRs listed on the page, or one named by
-// URL or owner/repo#123.
+// PR search (ctrl+p, and ctrl+k on the Dashboard): jump to a PR from the
+// Dashboard's lists or those recently opened, or one named by URL,
+// owner/repo#123, or #123 in the repo of the PR being viewed.
 (() => {
   "use strict";
   const dialog = document.getElementById("pr-search");
   if (!dialog) return;
   const input = dialog.querySelector("input");
   const list = dialog.querySelector("ul");
+  const status = dialog.querySelector(".palette-status");
+  const here = location.pathname.match(/^\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/);
+  let prs = [];
   let shown = [];
   let selected = 0;
 
-  // named turns a pasted GitHub PR URL or owner/repo#123 into its path here.
+  // named turns a pasted GitHub PR URL, owner/repo#123, or #123 (on a PR's
+  // pages) into its path here.
   function named(q) {
-    const m =
+    let m =
       q.match(/^https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/) || q.match(/^([\w.-]+)\/([\w.-]+)#(\d+)$/);
-    return m && { title: `Open ${m[1]}/${m[2]}#${m[3]}`, ref: "", href: `/github.com/${m[1]}/${m[2]}/pull/${m[3]}` };
-  }
-
-  // The PRs on the page, once each, in page order.
-  function prs() {
-    const seen = new Set();
-    return [...document.querySelectorAll(".pr-list li")]
-      .map((li) => {
-        const a = li.querySelector("a");
-        return { title: a.textContent.trim(), ref: li.querySelector(".muted")?.textContent.trim() ?? "", href: a.getAttribute("href") };
-      })
-      .filter((p) => !seen.has(p.href) && seen.add(p.href));
+    if (!m && here && (m = q.match(/^#?(\d+)$/))) m = [q, here[1], here[2], m[1]];
+    if (!m) return null;
+    const ref = `${m[1]}/${m[2]}#${m[3]}`;
+    return { title: `Open ${ref}`, ref: "", href: `/github.com/${m[1]}/${m[2]}/pull/${m[3]}`, key: `github.com/${ref}` };
   }
 
   function fuzzy(q, text) {
@@ -788,28 +785,57 @@ window.Scrutiny = { actions: {} };
 
   function render() {
     const q = input.value.trim();
-    const target = named(q);
     const needle = q.toLowerCase().replace(/\s+/g, "");
-    shown = [
-      ...(target ? [target] : []),
-      ...prs()
-        .map((p) => ({ p, score: Math.max(fuzzy(needle, p.title), fuzzy(needle, p.ref)) }))
-        .filter((x) => x.score >= 0)
-        .sort((a, b) => b.score - a.score)
-        .map((x) => x.p),
-    ];
+    const matches = prs
+      .map((p) => ({ p, score: Math.max(fuzzy(needle, p.title), fuzzy(needle, p.ref)) }))
+      .filter((x) => x.score >= 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.p);
+    // A named PR already listed shows as itself, first.
+    const target = named(q);
+    const listed = target && matches.findIndex((p) => p.ref === target.key);
+    if (listed >= 0) matches.unshift(...matches.splice(listed, 1));
+    shown = [...(target && listed < 0 ? [target] : []), ...matches];
     selected = 0;
     list.replaceChildren(
       ...shown.map((p, i) => {
         const a = Object.assign(document.createElement("a"), { className: "result" + (i ? "" : " selected"), href: p.href });
         a.append(Object.assign(document.createElement("span"), { className: "name", textContent: p.title }));
-        if (p.ref) a.append(Object.assign(document.createElement("span"), { className: "where muted", textContent: p.ref }));
+        if (p.draft) a.append(Object.assign(document.createElement("span"), { className: "badge", textContent: "Draft" }));
+        const where = p.author ? `${p.ref} by ${p.author}` : p.ref;
+        if (where) a.append(Object.assign(document.createElement("span"), { className: "where muted", textContent: where }));
         const li = document.createElement("li");
         li.append(a);
         return li;
       }),
     );
     if (shown.length === 0) list.replaceChildren(Object.assign(document.createElement("li"), { className: "muted", textContent: "No matching pull requests." }));
+  }
+
+  async function get(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error((await res.text()).trim() || res.statusText);
+    return res.json();
+  }
+
+  // load shows the cached PRs at once, then, when they are over ten minutes
+  // old (as on the Dashboard), fetches them from GitHub and shows those.
+  let refreshing = null;
+  async function load() {
+    try {
+      const cached = await get(dialog.dataset.src);
+      prs = cached.prs;
+      if (dialog.open) render();
+      if (!cached.stale) return;
+      status.hidden = false;
+      refreshing ??= get(`${dialog.dataset.src}?refresh=1`).finally(() => (refreshing = null));
+      prs = (await refreshing).prs;
+      if (dialog.open) render();
+    } catch (err) {
+      list.replaceChildren(Object.assign(document.createElement("li"), { className: "muted", textContent: err.message }));
+    } finally {
+      status.hidden = true;
+    }
   }
 
   input.addEventListener("input", render);
@@ -826,11 +852,14 @@ window.Scrutiny = { actions: {} };
     }
   });
 
-  Scrutiny.actions.symbol_search = () => {
+  Scrutiny.actions.pr_search = () => {
     if (!dialog.open) dialog.showModal();
     input.select();
     render();
+    load();
   };
+  // The Dashboard has no code to search, so ctrl+k searches PRs there too.
+  if (document.getElementById("dashboard-lists")) Scrutiny.actions.symbol_search = Scrutiny.actions.pr_search;
 })();
 
 // Hotkeys and the Command Palette.
@@ -840,6 +869,7 @@ window.Scrutiny = { actions: {} };
   let bindings = JSON.parse(body.dataset.keys || "{}");
   const labels = {
     symbol_search: "Search files and symbols",
+    pr_search: "Jump to a pull request",
     command_palette: "Command palette",
     next_comment: "Next comment",
     prev_comment: "Previous comment",
@@ -849,8 +879,10 @@ window.Scrutiny = { actions: {} };
     help: "Show keyboard shortcuts",
     back_to_pr: "Back to the pull request",
   };
-  if (document.getElementById("pr-search")) {
-    labels.symbol_search = "Search pull requests";
+  // An action that only stands in for another (ctrl+k searching PRs on the
+  // Dashboard) is not listed twice.
+  const alias = (a) => a !== "pr_search" && Scrutiny.actions[a] === Scrutiny.actions.pr_search;
+  if (document.getElementById("dashboard-lists")) {
     labels.refresh = "Refresh pull requests from GitHub";
   }
 
@@ -947,7 +979,7 @@ window.Scrutiny = { actions: {} };
       const kbd = (key) => Object.assign(document.createElement("kbd"), { textContent: key });
       help.querySelector("tbody").replaceChildren(
         ...Object.keys(labels)
-          .filter((a) => bindings[a] && Scrutiny.actions[a])
+          .filter((a) => bindings[a] && Scrutiny.actions[a] && !alias(a))
           .map((a) => {
             const keys = document.createElement("td");
             keys.append(...bindings[a].split(/\s+/).flatMap((k, i) => (i ? [" then ", kbd(k)] : [kbd(k)])));
@@ -980,7 +1012,7 @@ window.Scrutiny = { actions: {} };
     const themes = JSON.parse(body.dataset.themes || "[]");
     return [
       ...Object.keys(labels)
-        .filter((a) => a !== "command_palette" && Scrutiny.actions[a])
+        .filter((a) => a !== "command_palette" && Scrutiny.actions[a] && !alias(a))
         .map((a) => ({ label: labels[a], hint: bindings[a], run: Scrutiny.actions[a] })),
       ...link("since-last-review", "Show changes since your last review"),
       ...link("stack-parent", "Go to the parent PR in the Stack"),

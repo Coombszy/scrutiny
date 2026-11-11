@@ -203,7 +203,7 @@ func Layout(title string) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<dialog id=\"commands\" class=\"palette\"><input type=\"search\" placeholder=\"Type a command\" autocomplete=\"off\" spellcheck=\"false\"><div class=\"palette-results\"><ul class=\"results\"></ul></div></dialog>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<dialog id=\"pr-search\" class=\"palette\" data-src=\"/prs\"><input type=\"search\" placeholder=\"Jump to a pull request by title, number, owner/repo#123 or URL\" autocomplete=\"off\" spellcheck=\"false\"><p class=\"palette-status muted\" hidden><span class=\"spinner\"></span> Refreshing pull requests from GitHub…</p><div class=\"palette-results\"><ul class=\"results\"></ul></div></dialog> <dialog id=\"commands\" class=\"palette\"><input type=\"search\" placeholder=\"Type a command\" autocomplete=\"off\" spellcheck=\"false\"><div class=\"palette-results\"><ul class=\"results\"></ul></div></dialog>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

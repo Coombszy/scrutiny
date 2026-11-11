@@ -20,6 +20,7 @@ collapse_threshold = 1000     # changed lines before a file starts collapsed
 
 [keys]                        # space-separated sequences; single keys only work outside inputs
 symbol_search = "ctrl+k"
+pr_search = "ctrl+p"
 command_palette = "ctrl+j"
 next_comment = "] c"
 prev_comment = "[ c"

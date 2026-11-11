@@ -33,6 +33,7 @@ type Settings struct {
 func DefaultKeys() map[string]string {
 	return map[string]string{
 		"symbol_search":    "ctrl+k",
+		"pr_search":        "ctrl+p",
 		"command_palette":  "ctrl+j",
 		"next_comment":     "] c",
 		"prev_comment":     "[ c",
