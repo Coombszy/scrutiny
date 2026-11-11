@@ -178,6 +178,11 @@ window.Scrutiny = { actions: {} };
     const open = e.target.closest("[data-open-dialog]");
     if (open) document.getElementById(open.dataset.openDialog)?.showModal();
     if (e.target.closest("[data-close-dialog]")) e.target.closest("dialog")?.close();
+    // A click on a palette's backdrop lands on the dialog itself, outside its box.
+    if (e.target.matches("dialog.palette[open]")) {
+      const r = e.target.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) e.target.close();
+    }
     if (e.target.closest("[data-remove-row]")) e.target.closest("tr")?.remove();
     if (e.target.closest("[data-reload]")) location.reload();
     const nav = e.target.closest("[data-comment-nav]");
