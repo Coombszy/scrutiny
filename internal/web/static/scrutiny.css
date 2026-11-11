@@ -204,7 +204,7 @@ details.status-row { display: block; }
 
 /* Language Server status: a ring spins while starting or indexing; a badge
    shows ready (tick) or failed (cross). */
-.lsp-status { position: relative; display: inline-flex; width: 20px; height: 20px; color: var(--fg-dim); cursor: help; }
+.lsp-status { position: relative; display: inline-flex; width: 20px; height: 20px; color: var(--fg-dim); cursor: default; }
 .lsp-icon { width: 20px; height: 20px; }
 .lsp-ring { position: absolute; inset: -4px; width: 28px; height: 28px; fill: none; stroke: var(--yellow); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 20 60; opacity: 0; }
 .lsp-busy .lsp-ring { opacity: 1; animation: spin .9s linear infinite; }
