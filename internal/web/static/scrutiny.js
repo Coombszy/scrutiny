@@ -117,13 +117,6 @@ window.Scrutiny = { actions: {} };
     if (e.target.closest("[data-close-dialog]")) e.target.closest("dialog")?.close();
     if (e.target.closest("[data-remove-row]")) e.target.closest("tr")?.remove();
     if (e.target.closest("[data-reload]")) location.reload();
-    const add = e.target.closest(".add-comment");
-    if (add) {
-      const row = add.closest("tr");
-      if (row.nextElementSibling?.classList.contains("new-thread")) return;
-      const url = `${add.closest("table").dataset.newThread}&side=${add.dataset.side}&line=${add.dataset.line}`;
-      htmx.ajax("GET", url, { target: row, swap: "afterend" });
-    }
     const nav = e.target.closest("[data-comment-nav]");
     if (nav) Scrutiny.busy(navigate(nav.dataset.commentNav === "next" ? 1 : -1));
     const toggle = e.target.closest("[data-full-toggle]");
@@ -280,7 +273,7 @@ window.Scrutiny = { actions: {} };
   async function navigate(direction) {
     const includeResolved = document.getElementById("nav-include-resolved")?.checked;
     await loadThreadFiles(includeResolved);
-    const threads = [...document.querySelectorAll(".thread")].filter(
+    const threads = [...document.querySelectorAll(".thread:not(.new)")].filter(
       (t) => (includeResolved || t.dataset.resolved === "false") && t.getClientRects().length > 0,
     );
     if (threads.length === 0) return toast("No more comments.");
@@ -978,4 +971,141 @@ window.Scrutiny = { actions: {} };
     }
   }
   run();
+})();
+
+// Review Threads start from a line's + button: click it for one line, or
+// drag from it to another line's + for the lines between, as on GitHub. A
+// range stays within its hunk and, in a split diff, on its side; its lines
+// stay highlighted while the form is open.
+(() => {
+  "use strict";
+  let drag = null; // { start, end, reach }
+  let marked = [];
+
+  const isBreak = (tr) => tr.classList.contains("hunk") || tr.classList.contains("expander");
+  const isSplit = (b) => b.closest("table").classList.contains("split");
+
+  // The + buttons a range from start can reach, top to bottom.
+  function reachable(start) {
+    const split = isSplit(start);
+    let first = start.closest("tr");
+    while (first.previousElementSibling && !isBreak(first.previousElementSibling)) first = first.previousElementSibling;
+    const out = [];
+    for (let tr = first; tr && !isBreak(tr); tr = tr.nextElementSibling) {
+      for (const b of tr.querySelectorAll(".add-comment")) {
+        if (!split || b.dataset.side === start.dataset.side) out.push(b);
+      }
+    }
+    return out;
+  }
+
+  const anchor = (b) => ({ side: b.dataset.side, line: Number(b.dataset.line) });
+
+  // span anchors the range from first to last (top to bottom), or is null
+  // when GitHub could not take it: across sides it must start on the left,
+  // so one from a context line onto deleted lines starts at its old number.
+  function span(first, last) {
+    let start = anchor(first);
+    const end = anchor(last);
+    if (start.side === "RIGHT" && end.side === "LEFT") {
+      if (!first.dataset.oldLine) return null;
+      start = { side: "LEFT", line: Number(first.dataset.oldLine) };
+    }
+    if (start.side === end.side && start.line >= end.line) return null;
+    return { start, end };
+  }
+
+  function ordered(a, b) {
+    return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_PRECEDING ? [b, a] : [a, b];
+  }
+
+  function clear() {
+    for (const td of marked) td.classList.remove("in-range");
+    marked = [];
+  }
+  function mark(first, last) {
+    clear();
+    const split = isSplit(first);
+    const side = first.dataset.side;
+    const end = last.closest("tr");
+    for (let tr = first.closest("tr"); tr; tr = tr.nextElementSibling) {
+      if (!tr.classList.contains("thread-row")) {
+        const cells = [...tr.children];
+        marked.push(...(split ? (side === "LEFT" ? cells.slice(0, 2) : cells.slice(2)) : cells));
+      }
+      if (tr === end) break;
+    }
+    for (const td of marked) td.classList.add("in-range");
+  }
+
+  // open loads the new-thread form below last's row, for range if given.
+  function open(last, range) {
+    const row = last.closest("tr");
+    const existing = row.nextElementSibling;
+    if (existing?.classList.contains("new-thread")) {
+      if (existing.querySelector("textarea")?.value) return existing.querySelector("textarea").focus();
+      existing.remove();
+    }
+    const end = range?.end ?? anchor(last);
+    let url = `${last.closest("table").dataset.newThread}&side=${end.side}&line=${end.line}`;
+    if (range) url += `&start_side=${range.start.side}&start_line=${range.start.line}`;
+    htmx.ajax("GET", url, { target: row, swap: "afterend" });
+  }
+
+  // Mouse and touch open the form on release, a click being a drag that
+  // never left its line; nothing hangs on the click event that follows,
+  // whose timing browsers differ on. Keyboard activation is a click with
+  // no pointer behind it (detail 0).
+  function stop() {
+    drag = null;
+    document.documentElement.classList.remove("dragging-range");
+  }
+  document.addEventListener("pointerdown", (e) => {
+    const b = e.target.closest(".add-comment");
+    if (!b || e.button !== 0) return;
+    e.preventDefault(); // no text selection or focus change while dragging
+    document.documentElement.classList.add("dragging-range");
+    drag = { start: b, end: b, reach: reachable(b) };
+  });
+  document.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const tr = document.elementFromPoint(e.clientX, e.clientY)?.closest("tr");
+    const b = drag.reach.find((x) => x.closest("tr") === tr);
+    if (!b || b === drag.end) return;
+    const [first, last] = ordered(drag.start, b);
+    if (first !== last && !span(first, last)) return;
+    drag.end = b;
+    if (first === last) clear();
+    else mark(first, last);
+  });
+  addEventListener("pointerup", () => {
+    if (!drag) return;
+    const { start, end } = drag;
+    stop();
+    if (start === end) {
+      clear();
+      open(start, null);
+      return;
+    }
+    const [first, last] = ordered(start, end);
+    open(last, span(first, last));
+  });
+  addEventListener("pointercancel", () => {
+    if (!drag) return;
+    stop();
+    clear();
+  });
+
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest(".add-comment");
+    if (b && e.detail === 0) {
+      clear();
+      open(b, null);
+    }
+    if (e.target.closest(".new-thread [data-remove-row]")) clear();
+  });
+  // A posted thread replaces its form.
+  document.addEventListener("htmx:afterRequest", (e) => {
+    if (e.detail.successful && e.detail.elt.closest?.(".new-thread")) clear();
+  });
 })();

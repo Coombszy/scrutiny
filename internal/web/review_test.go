@@ -85,6 +85,52 @@ func TestCreatingAThreadReturnsItWithTheNewPendingCount(t *testing.T) {
 	}
 }
 
+func TestDraggingOverLinesCommentsOnTheRange(t *testing.T) {
+	a := newApp(t)
+	a.do(t, http.MethodGet, prPath, nil)
+	mustContain(t, a.do(t, http.MethodGet, fileURL(), nil).Body.String(), `class="add-comment"`, "drag for several")
+
+	form := a.do(t, http.MethodGet, prPath+"/threads/new?"+url.Values{
+		"base": {string(mb)}, "head": {string(c2)}, "path": {"parser.go"}, "cols": {"4"},
+		"side": {"RIGHT"}, "line": {"3"}, "start_side": {"RIGHT"}, "start_line": {"1"},
+	}.Encode(), nil).Body.String()
+	mustContain(t, form, `name="start_line" value="1"`, `name="start_side" value="RIGHT"`, "parser.go:1-3", "New comment")
+
+	rec := a.do(t, http.MethodPost, prPath+"/threads", url.Values{
+		"base": {string(mb)}, "head": {string(c2)}, "path": {"parser.go"}, "line": {"3"}, "side": {"RIGHT"},
+		"start_line": {"1"}, "start_side": {"RIGHT"}, "body": {"These three"},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	mustContain(t, rec.Body.String(), "These three", "parser.go:1-3")
+	th := a.host.State(ref).Threads
+	if len(th) != 1 || th[0].StartLine != 1 || th[0].StartSide != domain.Right || th[0].Line != 3 {
+		t.Errorf("Threads = %+v", th)
+	}
+}
+
+func TestRangesMustRunDownTheDiff(t *testing.T) {
+	a := newApp(t)
+	a.do(t, http.MethodGet, prPath, nil)
+	for _, start := range []url.Values{
+		{"start_line": {"3"}, "start_side": {"RIGHT"}}, // a single line
+		{"start_line": {"5"}, "start_side": {"RIGHT"}}, // upwards
+		{"start_line": {"1"}, "start_side": {"UP"}},
+	} {
+		form := url.Values{"base": {string(mb)}, "head": {string(c2)}, "path": {"parser.go"}, "line": {"3"}, "side": {"RIGHT"}, "body": {"x"}}
+		for k, v := range start {
+			form[k] = v
+		}
+		if rec := a.do(t, http.MethodPost, prPath+"/threads", form); rec.Code != http.StatusBadRequest {
+			t.Errorf("%v: status %d, want 400", start, rec.Code)
+		}
+	}
+	if th := a.host.State(ref).Threads; len(th) != 0 {
+		t.Errorf("Threads = %+v", th)
+	}
+}
+
 func TestCommentingWhereItWouldBeMisplacedIsAConflict(t *testing.T) {
 	a := newApp(t)
 	a.repos.ChangeSets[repostore.Pair{From: c1, To: c2}] = []domain.FileChange{{Path: "parser.go", OldPath: "parser.go", Status: domain.Modified}}

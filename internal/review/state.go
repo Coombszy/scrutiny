@@ -127,7 +127,7 @@ func (s *Service) AddThread(ctx context.Context, ref domain.PRRef, base, head do
 		for _, th := range snap.State.Threads {
 			known[th.ID] = true
 		}
-		if t.Side == domain.Left && base != snap.MergeBase {
+		if (t.Side == domain.Left || t.StartSide == domain.Left) && base != snap.MergeBase {
 			return fmt.Errorf("%w: the left side of this Comparison is not the pull request's base", ErrCannotComment)
 		}
 		reviewID := ""

@@ -69,7 +69,7 @@ templ DiffRows(c DiffContext, lines []review.DiffLine) {
 			<tr class={ kindClass(l.Kind) }>
 				<td class="ln">{ lineNo(l.OldNo) }</td>
 				<td class="ln">
-					@addComment(c, c.File.Path, unifiedSide(l), unifiedLine(l), 3)
+					@addComment(c, unifiedSide(l), unifiedLine(l), contextOldLine(l))
 					{ lineNo(l.NewNo) }
 				</td>
 				<td
@@ -87,7 +87,7 @@ templ DiffRows(c DiffContext, lines []review.DiffLine) {
 				if row.Left != nil {
 					<td class={ "ln", kindClass(row.Left.Kind) }>
 						if row.Left.Kind == domain.Delete {
-							@addComment(c, c.File.Path, domain.Left, row.Left.OldNo, 4)
+							@addComment(c, domain.Left, row.Left.OldNo, 0)
 						}
 						{ lineNo(row.Left.OldNo) }
 					</td>
@@ -98,7 +98,7 @@ templ DiffRows(c DiffContext, lines []review.DiffLine) {
 				}
 				if row.Right != nil {
 					<td class={ "ln", kindClass(row.Right.Kind) }>
-						@addComment(c, c.File.Path, domain.Right, row.Right.NewNo, 4)
+						@addComment(c, domain.Right, row.Right.NewNo, 0)
 						{ lineNo(row.Right.NewNo) }
 					</td>
 					<td class={ "code", kindClass(row.Right.Kind) } data-line={ itoa(row.Right.NewNo) }>@tokens(row.Right.Tokens)</td>
@@ -179,11 +179,21 @@ templ expandActions(c DiffContext, g review.Gap, header string) {
 	</span>
 }
 
-// addComment is a button that loads the new-thread form below its row; the
-// URL comes from the table's data-new-thread so each line stays small.
-templ addComment(c DiffContext, path string, side domain.DiffSide, line int, cols int) {
+// addComment is a button that loads the new-thread form below its row, or
+// dragged to another line's, for the lines between; the URL comes from the
+// table's data-new-thread so each line stays small. oldLine, on a unified
+// context line, lets a range from it continue onto deleted lines.
+templ addComment(c DiffContext, side domain.DiffSide, line, oldLine int) {
 	if c.CanComment && line > 0 && (side == domain.Right || c.CanCommentLeft) {
-		<button class="add-comment" title="Comment on this line" data-side={ string(side) } data-line={ itoa(line) }>+</button>
+		<button
+			class="add-comment"
+			title="Comment on this line, or drag for several"
+			data-side={ string(side) }
+			data-line={ itoa(line) }
+			if oldLine > 0 && c.CanCommentLeft {
+				data-old-line={ itoa(oldLine) }
+			}
+		>+</button>
 	}
 }
 

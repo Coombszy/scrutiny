@@ -38,6 +38,18 @@ func threadAnchor(r *http.Request) (views.ThreadAnchor, int, error) {
 		return a, 0, fmt.Errorf("%w: base, head, path, line and side are required", errBadRequest)
 	}
 	a.Line = line
+	if v := r.FormValue("start_line"); v != "" {
+		start, err := strconv.Atoi(v)
+		a.StartSide = r.FormValue("start_side")
+		// A range runs down the diff: on one side its lines increase, and
+		// across sides (unified view) it starts on the left.
+		sameSide := a.StartSide == a.Side && start < line
+		crossSide := a.StartSide == string(domain.Left) && a.Side == string(domain.Right)
+		if err != nil || start < 1 || !(sameSide || crossSide) {
+			return a, 0, fmt.Errorf("%w: start_line and start_side must begin a range ending at line", errBadRequest)
+		}
+		a.StartLine = start
+	}
 	cols := 4
 	if r.FormValue("cols") == "3" {
 		cols = 3
@@ -71,7 +83,8 @@ func (s *Server) createThread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	threads, err := s.review.AddThread(r.Context(), ref, domain.SHA(a.Base), domain.SHA(a.Head), codehost.NewThread{
-		Path: a.Path, Line: a.Line, Side: domain.DiffSide(a.Side), Body: r.FormValue("body"),
+		Path: a.Path, Line: a.Line, Side: domain.DiffSide(a.Side),
+		StartLine: a.StartLine, StartSide: domain.DiffSide(a.StartSide), Body: r.FormValue("body"),
 	})
 	if err != nil {
 		s.fail(w, r, err)

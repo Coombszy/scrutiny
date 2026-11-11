@@ -136,23 +136,34 @@ templ ThreadRows(pr domain.PRRef, threads []domain.ReviewThread, cols int) {
 	}
 }
 
-// NewThreadForm is the form for a new Review Thread, as a table row.
+// NewThreadForm is the form for a new Review Thread, as a table row,
+// styled as the thread it will become.
 templ NewThreadForm(pr domain.PRRef, a ThreadAnchor, cols int) {
 	<tr class="thread-row new-thread">
 		<td colspan={ itoa(cols) }>
-			<form autocomplete="off" hx-post={ pr.Path() + "/threads" } hx-target="closest tr" hx-swap="outerHTML">
-				<input type="hidden" name="base" value={ a.Base }/>
-				<input type="hidden" name="head" value={ a.Head }/>
-				<input type="hidden" name="path" value={ a.Path }/>
-				<input type="hidden" name="line" value={ itoa(a.Line) }/>
-				<input type="hidden" name="side" value={ a.Side }/>
-				<input type="hidden" name="cols" value={ itoa(cols) }/>
-				<textarea autocomplete="off" name="body" rows="3" placeholder="Leave a comment" required autofocus></textarea>
-				<div class="actions">
-					<button type="submit">Add to review</button>
-					<button type="button" class="cancel" data-remove-row>Cancel</button>
+			<div class="thread new">
+				<div class="thread-summary">
+					<span class="path">{ a.Location() }</span>
+					<span class="muted">New comment</span>
 				</div>
-			</form>
+				<form class="reply" autocomplete="off" hx-post={ pr.Path() + "/threads" } hx-target="closest tr" hx-swap="outerHTML">
+					<input type="hidden" name="base" value={ a.Base }/>
+					<input type="hidden" name="head" value={ a.Head }/>
+					<input type="hidden" name="path" value={ a.Path }/>
+					<input type="hidden" name="line" value={ itoa(a.Line) }/>
+					<input type="hidden" name="side" value={ a.Side }/>
+					if a.StartLine != 0 {
+						<input type="hidden" name="start_line" value={ itoa(a.StartLine) }/>
+						<input type="hidden" name="start_side" value={ a.StartSide }/>
+					}
+					<input type="hidden" name="cols" value={ itoa(cols) }/>
+					<textarea autocomplete="off" name="body" rows="3" placeholder="Leave a comment" required autofocus></textarea>
+					<div class="actions">
+						<button type="submit">Add to review</button>
+						<button type="button" data-remove-row>Cancel</button>
+					</div>
+				</form>
+			</div>
 		</td>
 	</tr>
 }

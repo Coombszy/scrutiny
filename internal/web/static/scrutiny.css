@@ -125,6 +125,11 @@ button.primary:hover { filter: brightness(1.1); background: var(--green); }
   background: var(--blue); color: var(--bg0); border: 0; opacity: 0;
 }
 .diff tr:hover .add-comment, .add-comment:focus { opacity: 1; }
+.add-comment { touch-action: none; cursor: pointer; }
+.dragging-range, .dragging-range * { user-select: none; cursor: ns-resize !important; }
+/* Lines a comment range covers, while dragging and while its form is open */
+.diff td.in-range { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--blue) 20%, transparent); }
+.diff td.ln.in-range:first-child, .diff.split td.ln.in-range:nth-child(3) { box-shadow: inset 3px 0 0 var(--blue), inset 0 0 0 100vmax color-mix(in srgb, var(--blue) 20%, transparent); }
 
 .thread-row > td { padding: .4rem .6rem !important; background: var(--bg-soft); }
 .thread, .unplaced .thread, .other-threads .thread {
@@ -144,13 +149,18 @@ button.primary:hover { filter: brightness(1.1); background: var(--green); }
 .thread > details[open] > .thread-summary::before { transform: rotate(45deg); margin-top: -.2rem; }
 .thread-summary:hover::before { border-color: var(--fg); }
 .thread-summary .path { font-family: var(--mono); font-size: var(--fs-sm); }
+/* The new-thread form's header is a plain heading, not a fold toggle */
+.thread.new .thread-summary { cursor: default; }
+.thread.new .thread-summary::before { content: none; }
+.thread.new .reply { border-top: 1px solid var(--bg1); }
 .comment { padding: .5rem .8rem; border-top: 1px solid var(--bg1); }
 .comment header { display: flex; gap: .6rem; align-items: baseline; }
 .comment-actions { margin-left: auto; display: flex; gap: .3rem; }
 .comment-actions button { background: none; border: none; padding: 0 .3rem; color: var(--gray); font-size: var(--fs-sm); }
 .comment-actions button:hover { color: var(--fg); background: none; }
 .comment-actions .danger:hover { color: var(--red); }
-.thread-row:not(:has(.thread)) { display: none; }
+/* A thread row left empty by deleting its last comment; not the new-thread form's */
+.thread-row:not(.new-thread):not(:has(.thread)) { display: none; }
 .badge.pending { background: var(--yellow); color: var(--bg0); }
 .markdown { overflow-wrap: anywhere; }
 .markdown img { max-width: 100%; }

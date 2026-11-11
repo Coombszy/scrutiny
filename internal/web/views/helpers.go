@@ -67,6 +67,24 @@ type ThreadAnchor struct {
 	Base, Head, Path string
 	Line             int
 	Side             string
+	// StartLine and StartSide begin a multi-line range ending at Line;
+	// StartLine is zero for a single line.
+	StartLine int
+	StartSide string
+}
+
+// Location names the anchor's file and lines as a thread's header does,
+// e.g. "parser.go:7" or "parser.go:3-7"; a range across sides marks each
+// end with - or +, e.g. "parser.go:-3 to +7".
+func (a ThreadAnchor) Location() string {
+	switch {
+	case a.StartLine == 0:
+		return a.Path + ":" + strconv.Itoa(a.Line)
+	case a.StartSide != a.Side:
+		return a.Path + ":-" + strconv.Itoa(a.StartLine) + " to +" + strconv.Itoa(a.Line)
+	default:
+		return a.Path + ":" + strconv.Itoa(a.StartLine) + "-" + strconv.Itoa(a.Line)
+	}
 }
 
 // newThreadURL is the new-thread form's URL without its side and line,
@@ -81,6 +99,9 @@ func boolString(b bool) string { return strconv.FormatBool(b) }
 func threadLocation(t domain.ReviewThread) string {
 	if t.Line == 0 {
 		return t.Path
+	}
+	if t.StartLine != 0 && t.StartLine != t.Line {
+		return t.Path + ":" + strconv.Itoa(t.StartLine) + "-" + strconv.Itoa(t.Line)
 	}
 	return t.Path + ":" + strconv.Itoa(t.Line)
 }
@@ -130,6 +151,14 @@ func unifiedSide(l review.DiffLine) domain.DiffSide {
 		return domain.Left
 	}
 	return domain.Right
+}
+
+// contextOldLine is a context line's number in the old file, or zero.
+func contextOldLine(l review.DiffLine) int {
+	if l.Kind == domain.Context {
+		return l.OldNo
+	}
+	return 0
 }
 
 func unifiedLine(l review.DiffLine) int {
