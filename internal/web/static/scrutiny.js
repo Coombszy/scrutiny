@@ -74,6 +74,9 @@ window.Scrutiny = { actions: {} };
   "use strict";
   let release = null;
   Scrutiny.barBottom = () => document.querySelector(".topbar")?.getBoundingClientRect().bottom ?? 0;
+  // centred is the offset for pin that puts el in the middle of the page
+  // below the top bar, or at its top when el is too tall to fit.
+  Scrutiny.centred = (el) => Math.max(0, (innerHeight - Scrutiny.barBottom() - el.offsetHeight) / 2);
   Scrutiny.pin = (el, offset = 0) => {
     release?.();
     const place = () => {
@@ -114,7 +117,7 @@ window.Scrutiny = { actions: {} };
   function centre() {
     const n = location.hash.match(/^#L(\d+)$/)?.[1];
     const row = n && document.getElementById("L" + n);
-    if (row) Scrutiny.pin(row, Math.max(0, (innerHeight - Scrutiny.barBottom() - row.offsetHeight) / 2));
+    if (row) Scrutiny.pin(row, Scrutiny.centred(row));
   }
   // centreHash follows a link to a line on this same page: setting the hash
   // centres it, and one already set (no hashchange) is centred again.
@@ -244,7 +247,7 @@ window.Scrutiny = { actions: {} };
     setCollapsed(thread.closest(".file"), false);
     thread.querySelector("details")?.setAttribute("open", "");
     select(thread);
-    Scrutiny.pin(thread, 40);
+    Scrutiny.pin(thread, Scrutiny.centred(thread));
   }
 
   // select marks thread as the selected comment, which Current returns to,
@@ -531,8 +534,13 @@ window.Scrutiny = { actions: {} };
       (t) => (includeResolved || t.dataset.resolved === "false") && at(t),
     );
     if (threads.length === 0) return toast("No more comments.");
-    const offset = 80; // below the sticky top bar
-    const tops = threads.map((t) => at(t).getBoundingClientRect().top - offset);
+    // Each is measured from where going to it would put it, so the one just
+    // gone to is neither before nor after itself.
+    const bar = Scrutiny.barBottom();
+    const tops = threads.map((t) => {
+      const el = at(t);
+      return el.getBoundingClientRect().top - bar - Scrutiny.centred(el);
+    });
     const target =
       direction > 0
         ? threads.find((_, i) => tops[i] > 1) ?? threads[0]
@@ -540,7 +548,7 @@ window.Scrutiny = { actions: {} };
     setCollapsed(target.closest(".file"), false);
     target.querySelector("details")?.setAttribute("open", "");
     select(target);
-    Scrutiny.pin(target, 40);
+    Scrutiny.pin(target, Scrutiny.centred(target));
   }
 
   // goToCurrent scrolls back to the comment ↑/↓ or a jump last selected,
@@ -550,7 +558,7 @@ window.Scrutiny = { actions: {} };
     if (!thread) return navigate(1);
     setCollapsed(thread.closest(".file"), false);
     thread.querySelector("details")?.setAttribute("open", "");
-    Scrutiny.pin(thread, 40);
+    Scrutiny.pin(thread, Scrutiny.centred(thread));
   }
 })();
 
@@ -616,7 +624,7 @@ window.Scrutiny = { actions: {} };
     const cell = file.querySelector(`td.code[data-line="${line}"]`);
     if (!cell) return false;
     const row = cell.closest("tr");
-    Scrutiny.pin(row, Math.max(0, (innerHeight - Scrutiny.barBottom() - row.offsetHeight) / 2));
+    Scrutiny.pin(row, Scrutiny.centred(row));
     row.classList.remove("flash");
     void row.offsetWidth;
     row.classList.add("flash");
