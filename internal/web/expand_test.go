@@ -38,7 +38,7 @@ func TestGapsBetweenChangesCanBeExpanded(t *testing.T) {
 	a.do(t, http.MethodGet, prPath, nil)
 
 	body := a.do(t, http.MethodGet, fileURL(), nil).Body.String()
-	mustContain(t, body, `class="expander"`, "Show 9 lines", "88 hidden lines", "↓ 64 lines", "↑ 64 lines", "98 hidden lines",
+	mustContain(t, body, `class="expander"`, "Show 9 lines", "Show all 88 lines", "↓ 64 lines", "↑ 64 lines", "Show all 98 lines",
 		prPath+"/context?")
 	if strings.Contains(body, `data-line="50"`) {
 		t.Error("an unchanged line is shown before expanding")
@@ -89,7 +89,7 @@ func TestGapControlsSitOnTheHunkHeader(t *testing.T) {
 	// The middle gap's controls are on the second hunk's header row.
 	row := body[strings.Index(body, "@@ -99,3 +100,3 @@"):]
 	row = row[:strings.Index(row, "</tr>")]
-	mustContain(t, row, `class="expand-actions"`, "↓ 64 lines", "88 hidden lines", "↑ 64 lines")
+	mustContain(t, row, `class="expand-actions"`, "↓ 64 lines", "Show all 88 lines", "↑ 64 lines")
 	if n := strings.Count(body, `class="expander"`); n != 1 {
 		t.Errorf("%d standalone expander rows, want 1 (the end of the file)", n)
 	}

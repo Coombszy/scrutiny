@@ -162,7 +162,8 @@ templ expander(c DiffContext, g review.Gap) {
 
 // expandActions reveal a gap: small gaps open whole; bigger ones a few
 // lines at a time from either end (only upwards at the top of the file,
-// downwards at the bottom). Each replaces the row it is on.
+// downwards at the bottom), or whole from the middle. Each replaces the
+// row it is on.
 templ expandActions(c DiffContext, g review.Gap, header string) {
 	<span class="expand-actions">
 		if g.Size() <= c.ExpandLines {
@@ -171,7 +172,7 @@ templ expandActions(c DiffContext, g review.Gap, header string) {
 			if !g.First {
 				<button hx-get={ contextURL(c, g, review.Down, header) } hx-target="closest tr" hx-swap="outerHTML" title="Show the lines below the change above">↓ { itoa(c.ExpandLines) } lines</button>
 			}
-			<span class="muted">{ itoa(g.Size()) } hidden lines</span>
+			<button hx-get={ contextURL(c, g, review.All, header) } hx-target="closest tr" hx-swap="outerHTML">Show all { itoa(g.Size()) } lines</button>
 			if !g.Last {
 				<button hx-get={ contextURL(c, g, review.Up, header) } hx-target="closest tr" hx-swap="outerHTML" title="Show the lines above the change below">↑ { itoa(c.ExpandLines) } lines</button>
 			}
