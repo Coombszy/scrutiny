@@ -70,6 +70,11 @@ func NewServer(d Deps) *Server {
 	s.mux.HandleFunc("POST /settings", s.saveSettings)
 	s.mux.HandleFunc("POST /settings/view-mode", s.setViewMode)
 	s.mux.HandleFunc("POST /settings/theme", s.setTheme)
+	s.mux.HandleFunc("GET /settings/themes/new", s.newTheme)
+	s.mux.HandleFunc("POST /settings/themes", s.createTheme)
+	s.mux.HandleFunc("GET /settings/themes/{id}/edit", s.editTheme)
+	s.mux.HandleFunc("POST /settings/themes/{id}", s.updateTheme)
+	s.mux.HandleFunc("POST /settings/themes/{id}/delete", s.deleteTheme)
 	s.mux.HandleFunc("POST /settings/keys", s.setKey)
 	s.mux.HandleFunc("GET /theme.css", s.themeCSS)
 	s.mux.HandleFunc("GET /github.com/{owner}/{repo}/pull/{number}/events", s.events)
@@ -108,9 +113,10 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, status int, 
 	if cfg, err := s.settings.Load(); err == nil {
 		page.Theme, page.Keys, page.ViewMode = cfg.Theme, cfg.Keys, string(cfg.ViewMode)
 	}
+	page.ThemesDir = s.themesDir
 	themes, _ := theme.Load(s.themesDir)
 	for _, t := range themes {
-		page.Themes = append(page.Themes, views.ThemeOption{ID: t.ID, Name: t.Name})
+		page.Themes = append(page.Themes, views.ThemeOption{ID: t.ID, Name: t.Name, Custom: t.Custom})
 	}
 	ctx := views.WithPage(r.Context(), page)
 	for _, c := range cs {
@@ -127,7 +133,7 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, codehost.ErrNotFound), errors.Is(err, repostore.ErrNotFound):
 		status = http.StatusNotFound
-	case errors.Is(err, navigator.ErrNoServer), errors.Is(err, installer.ErrNotFound):
+	case errors.Is(err, navigator.ErrNoServer), errors.Is(err, installer.ErrNotFound), errors.Is(err, theme.ErrNotFound):
 		status = http.StatusNotFound
 	case errors.Is(err, codehost.ErrOffline):
 		status = http.StatusServiceUnavailable

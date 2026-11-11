@@ -62,11 +62,25 @@ templ SettingsFormView(form SettingsForm) {
 			<h2>General</h2>
 			<label>
 				<span>Theme</span>
-				<select name="theme">
-					for _, t := range pageFrom(ctx).Themes {
-						<option value={ t.ID } selected?={ t.ID == form.Settings.Theme }>{ t.Name }</option>
+				<span class="theme-picker">
+					<select name="theme">
+						for _, t := range pageFrom(ctx).Themes {
+							<option value={ t.ID } selected?={ t.ID == form.Settings.Theme }>{ t.Name }</option>
+						}
+					</select>
+					<button type="button" hx-get="/settings/themes/new" hx-target="#theme-editor" hx-swap="innerHTML">New theme…</button>
+					if t, ok := themeOption(ctx, form.Settings.Theme); ok && t.Custom {
+						<button type="button" hx-get={ "/settings/themes/" + t.ID + "/edit" } hx-target="#theme-editor" hx-swap="innerHTML">Edit</button>
+						<button
+							type="button"
+							class="danger"
+							hx-post={ "/settings/themes/" + t.ID + "/delete" }
+							hx-confirm={ "Delete the theme " + t.Name + "? Its file is removed; this cannot be undone." }
+							data-confirm-label="Delete"
+							hx-swap="none"
+						>Delete</button>
 					}
-				</select>
+				</span>
 			</label>
 			<label>
 				<span>View Mode</span>

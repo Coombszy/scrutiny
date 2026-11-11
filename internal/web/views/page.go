@@ -16,11 +16,12 @@ type Page struct {
 	Languages     []review.LanguageStatus
 	// Refresh puts the Refresh banner in the top bar, for pages the live
 	// stream updates, so it is seen however far down the page is scrolled.
-	Refresh bool
-	Theme         string
-	Themes        []ThemeOption
-	Keys          map[string]string // action -> key sequence
-	ViewMode      string
+	Refresh   bool
+	Theme     string
+	Themes    []ThemeOption
+	ThemesDir string            // where New Themes are saved
+	Keys      map[string]string // action -> key sequence
+	ViewMode  string
 	// KeyHelp offers the keyboard shortcuts in the top bar; only pages with
 	// hotkeys to show (the PR, file and Dashboard pages) set it. CodeHelp adds the
 	// mouse and editing shortcuts of pages showing code.
@@ -31,8 +32,9 @@ type Page struct {
 
 // ThemeOption is a Theme the Command Palette can switch to.
 type ThemeOption struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Custom bool   `json:"custom"` // in the themes directory, so editable
 }
 
 // taglines are typed out, one after another, after the brand in the top bar.

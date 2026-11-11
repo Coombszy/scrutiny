@@ -328,6 +328,29 @@ tr:target td { background: rgba(250, 189, 47, .18); }
 .settings-form input[type="number"] { width: 7rem; }
 .settings-form input[type="text"] { width: 12rem; font-family: var(--mono); }
 .settings-status { min-height: 1.5em; }
+.theme-picker { display: inline-flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.theme-picker .danger:hover { color: var(--red); border-color: var(--red); }
+.theme-editor { width: min(48rem, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+.theme-editor header { display: flex; justify-content: space-between; align-items: center; }
+.theme-editor .close { border: 0; background: none; font-size: var(--fs-xl); line-height: 1; padding: 0 .3rem; }
+.theme-editor h3 { font-size: var(--fs-md); margin: .5rem 0 .3rem; color: var(--fg-dim); }
+.theme-editor p { margin: 0; }
+.theme-editor code { overflow-wrap: anywhere; }
+.theme-editor .actions { justify-content: flex-end; }
+.theme-name, .theme-from, .theme-scheme { display: flex; gap: .5rem; align-items: center; }
+.theme-name > span, .theme-from > span { flex: 0 0 5.5rem; }
+.theme-name input, .theme-from select { flex: 1; min-width: 0; }
+.theme-modes { display: flex; gap: 1rem; }
+.theme-modes label { display: inline-flex; gap: .3rem; align-items: center; cursor: pointer; }
+.theme-editor form:has([name="mode"][value="paste"]:checked) .theme-pick,
+.theme-editor form:has([name="mode"][value="pick"]:checked) .theme-paste { display: none; }
+.theme-pick, .theme-paste { display: flex; flex-direction: column; gap: .5rem; }
+.theme-paste textarea { font-family: var(--mono); font-size: var(--fs-sm); white-space: pre; }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .3rem .8rem; }
+.swatch { display: flex; gap: .5rem; align-items: center; min-width: 0; font-size: var(--fs-sm); cursor: pointer; }
+.swatch span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.swatch input[type="color"] { flex: none; width: 2rem; height: 1.6rem; padding: 0 2px; border: 1px solid var(--bg2); border-radius: 4px; background: var(--bg1); cursor: pointer; }
+.swatch input[type="text"] { width: 7rem; font-family: var(--mono); font-size: var(--fs-sm); }
 .settings-saved { color: var(--green); }
 .settings-error { color: var(--red); }
 @media (max-width: 700px) {

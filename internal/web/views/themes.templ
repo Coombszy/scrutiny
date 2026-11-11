@@ -1,0 +1,162 @@
+package views
+
+import (
+	"context"
+	"github.com/Coombszy/scrutiny/internal/theme"
+	"strconv"
+)
+
+// ThemeEditor is a Theme being created or edited, by pasting a colour
+// scheme or by picking each colour.
+type ThemeEditor struct {
+	ID     string // set when editing
+	Name   string
+	Scheme string
+	From   string // the Theme its colours were copied from
+	Paste  bool   // the Paste tab is open, rather than the colour pickers
+	Source string // the Paste tab's text: the Theme's file, when editing
+	UI     map[string]string
+	Syntax map[string]string
+}
+
+// uiLabels name the interface colours, in the order the pickers show them.
+var uiLabels = []struct{ Key, Label string }{
+	{"bg0", "Background"}, {"bg-soft", "Panels"}, {"bg1", "Raised"}, {"bg2", "Borders"},
+	{"fg", "Text"}, {"fg-dim", "Dim text"}, {"gray", "Muted"},
+	{"red", "Red"}, {"orange", "Orange"}, {"yellow", "Yellow"}, {"green", "Green"},
+	{"aqua", "Aqua"}, {"blue", "Blue"}, {"purple", "Purple"},
+	{"add-bg", "Added line"}, {"add-ln", "Added line number"},
+	{"del-bg", "Deleted line"}, {"del-ln", "Deleted line number"},
+}
+
+const pastePlaceholder = `hi Normal guifg=#c0caf5 guibg=#1a1b26
+hi Comment guifg=#565f89
+hi link Conditional Keyword
+vim.api.nvim_set_hl(0, "@keyword", { fg = "#bb9af7" })`
+
+func themeOption(ctx context.Context, id string) (ThemeOption, bool) {
+	for _, t := range pageFrom(ctx).Themes {
+		if t.ID == id {
+			return t, true
+		}
+	}
+	return ThemeOption{}, false
+}
+
+func syntaxKeys() []string {
+	_, syntax := theme.Keys()
+	return syntax
+}
+
+// editorURL is where the Theme Editor re-renders itself from, to copy
+// another Theme's colours.
+func (ed ThemeEditor) editorURL() string {
+	if ed.ID != "" {
+		return "/settings/themes/" + ed.ID + "/edit"
+	}
+	return "/settings/themes/new"
+}
+
+templ ThemeEditorView(ed ThemeEditor) {
+	<form
+		if ed.ID != "" {
+			hx-post={ "/settings/themes/" + ed.ID }
+		} else {
+			hx-post="/settings/themes"
+		}
+		hx-target="#theme-editor-status"
+		hx-swap="innerHTML"
+		autocomplete="off"
+	>
+		<header>
+			<h2>
+				if ed.ID != "" {
+					Edit theme
+				} else {
+					New theme
+				}
+			</h2>
+			<button type="button" class="close" data-close-dialog title="Close (Esc)" aria-label="Close">×</button>
+		</header>
+		<label class="theme-name">
+			<span>Name</span>
+			<input type="text" id="theme-editor-name" name="name" value={ ed.Name } required autocomplete="off" spellcheck="false" placeholder="e.g. Tokyo Night"/>
+		</label>
+		<label class="theme-from">
+			<span>Copy from</span>
+			<select name="from" hx-get={ ed.editorURL() } hx-include="#theme-editor-name" hx-target="#theme-editor" hx-swap="innerHTML">
+				<option value="" selected?={ ed.From == "" }>Choose a theme to start from…</option>
+				for _, t := range pageFrom(ctx).Themes {
+					<option value={ t.ID } selected?={ t.ID == ed.From }>{ t.Name }</option>
+				}
+			</select>
+		</label>
+		<div class="theme-modes">
+			<label><input type="radio" name="mode" value="pick" checked?={ !ed.Paste }/> Pick colours</label>
+			<label><input type="radio" name="mode" value="paste" checked?={ ed.Paste }/> Paste a colour scheme</label>
+		</div>
+		<div class="theme-pick">
+			<label class="theme-scheme">
+				<span>Mode</span>
+				<select name="scheme">
+					<option value="dark" selected?={ ed.Scheme != "light" }>Dark</option>
+					<option value="light" selected?={ ed.Scheme == "light" }>Light</option>
+				</select>
+			</label>
+			<h3>Interface</h3>
+			<div class="swatches">
+				for _, l := range uiLabels {
+					@swatch("ui", l.Key, l.Label, ed.UI[l.Key])
+				}
+			</div>
+			<h3>Syntax</h3>
+			<div class="swatches">
+				for _, k := range syntaxKeys() {
+					@swatch("syntax", k, k, ed.Syntax[k])
+				}
+			</div>
+			<p class="muted">Colours preview on the page as you pick them.</p>
+		</div>
+		<div class="theme-paste">
+			<textarea name="source" rows="14" autocomplete="off" spellcheck="false" placeholder={ pastePlaceholder }>{ ed.Source }</textarea>
+			<p class="muted">
+				A Vim or Neovim colour scheme (<code>highlight</code> commands, <code>:highlight</code> output, or Lua <code>nvim_set_hl</code> calls and group tables), or a Scrutiny theme in TOML. Colours the scheme leaves out are derived from the ones it gives.
+			</p>
+		</div>
+		if pageFrom(ctx).ThemesDir != "" {
+			<p class="muted">Saved to <code>{ pageFrom(ctx).ThemesDir }</code>.</p>
+		}
+		<p id="theme-editor-status" class="settings-status" aria-live="polite"></p>
+		<div class="actions">
+			<button type="button" data-close-dialog>Cancel</button>
+			<button type="submit" class="primary">
+				if ed.ID != "" {
+					Save and use
+				} else {
+					Create and use
+				}
+			</button>
+		</div>
+	</form>
+}
+
+// swatch is a colour picker for one colour, keeping its alpha; a colour the
+// picker cannot show is edited as text.
+templ swatch(section, key, label, value string) {
+	<label class="swatch" title={ key }>
+		if hex, alpha, ok := theme.Swatch(value); ok {
+			<input type="color" name={ section + "." + key } value={ hex } data-section={ section } data-key={ key } data-alpha={ strconv.FormatFloat(alpha, 'f', -1, 64) }/>
+			if alpha < 1 {
+				<input type="hidden" name={ "alpha." + section + "." + key } value={ strconv.FormatFloat(alpha, 'f', -1, 64) }/>
+			}
+		} else {
+			<input type="text" name={ section + "." + key } value={ value } data-section={ section } data-key={ key } spellcheck="false"/>
+		}
+		<span>{ label }</span>
+	</label>
+}
+
+// ThemeEditorError says why the Theme was not saved.
+templ ThemeEditorError(msg string) {
+	<span class="settings-error">Not saved: { msg }</span>
+}

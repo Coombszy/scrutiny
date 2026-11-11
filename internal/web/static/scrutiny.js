@@ -1078,7 +1078,17 @@ window.Scrutiny = { actions: {} };
       ...link("since-last-review", "Show changes since your last review"),
       ...link("stack-parent", "Go to the parent PR in the Stack"),
       ...link("stack-child", "Go to the child PR in the Stack"),
-      { label: "Change theme…", run: () => show(themes.map((t) => ({ label: t.name, run: () => setTheme(t.id) }))) },
+      {
+        label: "Change theme…",
+        run: () =>
+          show([
+            ...themes.map((t) => ({ label: t.name, run: () => setTheme(t.id) })),
+            { label: "Create a new theme…", run: () => Scrutiny.editTheme("/settings/themes/new") },
+          ]),
+      },
+      ...(themes.find((t) => t.id === body.dataset.theme)?.custom
+        ? [{ label: "Edit this theme…", run: () => Scrutiny.editTheme(`/settings/themes/${body.dataset.theme}/edit`) }]
+        : []),
       { label: "Rebind a hotkey…", run: () => show(rebindItems()) },
       { label: "Go to the Dashboard", run: () => (location.href = "/") },
       { label: "Open settings", run: () => (location.href = "/settings") },
@@ -1740,4 +1750,49 @@ window.Scrutiny = { actions: {} };
     const text = `[${sel}](${url})`;
     replace(box, s, end, text, s + text.length);
   });
+})();
+
+// The Theme Editor loads into its dialog, which opens once it has. While its
+// colour pickers are showing, the page previews their colours.
+(() => {
+  "use strict";
+  // Looked up each time, so a swap that replaced the dialog cannot leave a
+  // stale one behind.
+  const editor = () => document.getElementById("theme-editor");
+  Scrutiny.editTheme = (url) => htmx.ajax("GET", url, { target: "#theme-editor", swap: "innerHTML" });
+
+  function rgba(hex, alpha) {
+    if (!(alpha < 1)) return hex;
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${n >> 16 & 255}, ${n >> 8 & 255}, ${n & 255}, ${alpha})`;
+  }
+  function preview() {
+    const dialog = editor();
+    const form = dialog?.querySelector("form");
+    let style = document.getElementById("theme-preview");
+    if (!dialog?.open || form?.elements.mode?.value !== "pick") return style?.remove();
+    const ui = [], syntax = [];
+    for (const input of form.querySelectorAll("[data-key]")) {
+      const v = input.type === "color" ? rgba(input.value, parseFloat(input.dataset.alpha)) : input.value;
+      if (input.dataset.section === "ui") ui.push(`--${input.dataset.key}: ${v};`);
+      else syntax.push(`.hl-${input.dataset.key.replaceAll(".", "-")} { color: ${v}; }`);
+    }
+    if (!style) {
+      style = document.createElement("style");
+      style.id = "theme-preview";
+      document.head.append(style);
+    }
+    style.textContent = `:root { color-scheme: ${form.elements.scheme.value}; ${ui.join(" ")} }\n${syntax.join("\n")}`;
+  }
+  document.addEventListener("htmx:afterSwap", (e) => {
+    const dialog = editor();
+    if (!dialog || e.detail.target !== dialog) return;
+    if (!dialog.open) dialog.showModal();
+    preview();
+  });
+  const inEditor = (e) => e.target.closest?.("#theme-editor") && preview();
+  document.addEventListener("input", inEditor);
+  document.addEventListener("change", inEditor);
+  // close does not bubble, so it is caught on the way down.
+  document.addEventListener("close", inEditor, true);
 })();

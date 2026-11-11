@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -37,9 +38,15 @@ func main() {
 	host, repos, ref := demo()
 	cfg := settings.NewMemory(settings.Defaults())
 	svc := review.NewService(review.Deps{CodeHost: host, Repos: repos, Highlighter: treesitter.New(), Cache: cache.NewMemory(), Settings: cfg})
+	// New Themes go to a directory that lasts as long as the process.
+	themes, err := os.MkdirTemp("", "scrutiny-themes-")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.RemoveAll(themes)
 	handler := web.NewServer(web.Deps{
 		CSRFToken: "fake", Review: svc, Settings: cfg, Hub: live.NewHub(),
-		Servers: servers.New(installer.NewFake(), exec.LookPath),
+		Servers: servers.New(installer.NewFake(), exec.LookPath), ThemesDir: themes,
 	}).Handler()
 	log.Printf("serving the fake demo PR at http://%s%s", *addr, ref.Path())
 	log.Fatal(http.ListenAndServe(*addr, handler))
@@ -125,7 +132,9 @@ func changed(path string) ([]string, fileDiff) {
 	newLines := append(append(append([]string{}, old[:49]...), edited), old[50:120]...)
 	newLines = append(append(newLines, added), old[120:]...)
 
-	ctx := func(o, n int) domain.Line { return domain.Line{Kind: domain.Context, OldNo: o, NewNo: n, Text: old[o-1]} }
+	ctx := func(o, n int) domain.Line {
+		return domain.Line{Kind: domain.Context, OldNo: o, NewNo: n, Text: old[o-1]}
+	}
 	change := domain.FileChange{Path: path, OldPath: path, Status: domain.Modified, Additions: 2, Deletions: 1}
 	return old, fileDiff{newLines: newLines, diff: domain.FileDiff{FileChange: change, Hunks: []domain.Hunk{
 		{OldStart: 47, OldLines: 7, NewStart: 47, NewLines: 7, Lines: []domain.Line{
