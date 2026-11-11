@@ -129,6 +129,27 @@ func (s *Stack) at(position int) *StackPR {
 	return nil
 }
 
+// ReviewVerdict is how a submitted review came out.
+type ReviewVerdict string
+
+const (
+	ReviewApproved         ReviewVerdict = "approved"
+	ReviewChangesRequested ReviewVerdict = "changes_requested"
+	ReviewCommented        ReviewVerdict = "commented"
+	ReviewDismissed        ReviewVerdict = "dismissed"
+)
+
+// SubmittedReview is a review submitted on the PR, with its summary.
+type SubmittedReview struct {
+	ID              string
+	Author          string
+	Verdict         ReviewVerdict
+	Body            string // the review's summary, as Markdown; often empty
+	BodyHTML        string
+	SubmittedAt     time.Time
+	ViewerDidAuthor bool
+}
+
 // ReviewState is the review activity on a PR, as seen by the viewer.
 type ReviewState struct {
 	PRID         string // the PR's node ID
@@ -142,4 +163,7 @@ type ReviewState struct {
 	// review, or empty if they have not.
 	LastReviewed SHA
 	Stack        *Stack // nil when the PR is not in a Stack
+	// Reviews are the submitted reviews, oldest first, shown in the
+	// Conversation alongside Conversation Comments.
+	Reviews []SubmittedReview
 }

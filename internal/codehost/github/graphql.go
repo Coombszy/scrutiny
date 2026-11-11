@@ -142,10 +142,18 @@ type gqlReviewState struct {
 			} `json:"reviews"`
 			Submitted struct {
 				Nodes []struct {
-					ViewerDidAuthor bool `json:"viewerDidAuthor"`
+					ID              string `json:"id"`
+					ViewerDidAuthor bool   `json:"viewerDidAuthor"`
 					Commit          *struct {
 						OID string `json:"oid"`
 					} `json:"commit"`
+					State  string `json:"state"`
+					Author *struct {
+						Login string `json:"login"`
+					} `json:"author"`
+					Body        string    `json:"body"`
+					BodyHTML    string    `json:"bodyHTML"`
+					SubmittedAt time.Time `json:"submittedAt"`
 				} `json:"nodes"`
 			} `json:"submitted"`
 			StackEntry *struct {
@@ -205,6 +213,14 @@ func (c *Client) ReviewState(ctx context.Context, ref domain.PRRef) (domain.Revi
 				if r.ViewerDidAuthor && r.Commit != nil {
 					state.LastReviewed = domain.SHA(r.Commit.OID)
 				}
+				author := "ghost"
+				if r.Author != nil {
+					author = r.Author.Login
+				}
+				state.Reviews = append(state.Reviews, domain.SubmittedReview{
+					ID: r.ID, Author: author, Verdict: domain.ReviewVerdict(strings.ToLower(r.State)),
+					Body: r.Body, BodyHTML: r.BodyHTML, SubmittedAt: r.SubmittedAt, ViewerDidAuthor: r.ViewerDidAuthor,
+				})
 			}
 			if e := pr.StackEntry; e != nil {
 				stack := &domain.Stack{Position: e.Position, Size: e.Stack.Size}

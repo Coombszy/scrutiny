@@ -137,3 +137,17 @@ func TestPollCarriesThePendingCommentsWhenTheyChange(t *testing.T) {
 		t.Errorf("Update = %+v", u)
 	}
 }
+
+func TestPollReportsNewlySubmittedReviews(t *testing.T) {
+	f := newFixture(t)
+	f.openPage(t)
+	f.host.State(ref).Reviews = []domain.SubmittedReview{{ID: "R1", Author: "ana", Verdict: domain.ReviewApproved, Body: "Ship it"}}
+
+	u, err := f.svc.Poll(context.Background(), ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !u.ConversationChanged || len(u.Reviews) != 1 || u.Reviews[0].Verdict != domain.ReviewApproved {
+		t.Errorf("Update = %+v", u)
+	}
+}

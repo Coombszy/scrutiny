@@ -196,3 +196,24 @@ func TestGraphQLErrorsAreLogged(t *testing.T) {
 		}
 	}
 }
+
+func TestReviewStateListsSubmittedReviews(t *testing.T) {
+	body := fixture(t, "review_state_comments.json") // cli/cli#14998: reviewed by Copilot, approved by BagToad
+	srv, _ := graphqlServer(t, func(gqlRequest) []byte { return body })
+
+	got, err := newClient(srv, cache.NewMemory()).ReviewState(context.Background(), pr14956)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Reviews) != 2 {
+		t.Fatalf("Reviews = %+v", got.Reviews)
+	}
+	r := got.Reviews[1]
+	if r.Author != "BagToad" || r.Verdict != domain.ReviewApproved || !strings.HasPrefix(r.Body, "LGTM.") || r.BodyHTML == "" ||
+		!r.SubmittedAt.Equal(time.Date(2026, 11, 9, 20, 35, 19, 0, time.UTC)) || r.ID == "" {
+		t.Errorf("Reviews[1] = %+v", r)
+	}
+	if got.Reviews[0].Verdict != domain.ReviewCommented || got.Reviews[0].Author != "copilot-pull-request-reviewer" {
+		t.Errorf("Reviews[0] = %+v", got.Reviews[0])
+	}
+}

@@ -8,7 +8,7 @@ query ReviewState($owner: String!, $name: String!, $number: Int!, $threads: Stri
         nodes { id commit { oid } comments { totalCount } }
       }
       submitted: reviews(last: 50, states: [APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED]) {
-        nodes { viewerDidAuthor commit { oid } }
+        nodes { id viewerDidAuthor commit { oid } state author { login } body bodyHTML submittedAt }
       }
       stackEntry {
         position

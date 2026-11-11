@@ -348,6 +348,11 @@ func (f *Fake) SubmitReview(_ context.Context, prID, reviewID string, commit dom
 		commit = s.Pending.Commit
 	}
 	s.Pending = nil
+	verdict := map[domain.ReviewEvent]domain.ReviewVerdict{
+		domain.Approve: domain.ReviewApproved, domain.RequestChanges: domain.ReviewChangesRequested, domain.CommentOnly: domain.ReviewCommented,
+	}[event]
+	s.Reviews = append(s.Reviews, domain.SubmittedReview{ID: f.id("PRR"), Author: s.Viewer, Verdict: verdict,
+		Body: body, BodyHTML: renderBody(body), ViewerDidAuthor: true})
 	for i := range s.Threads {
 		for j := range s.Threads[i].Comments {
 			s.Threads[i].Comments[j].Pending = false
