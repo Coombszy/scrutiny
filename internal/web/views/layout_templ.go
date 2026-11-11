@@ -201,7 +201,53 @@ func Layout(title string) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<dialog id=\"commands\" class=\"palette\"><input type=\"search\" placeholder=\"Type a command\" autocomplete=\"off\" spellcheck=\"false\"><div class=\"palette-results\"><ul class=\"results\"></ul></div></dialog></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<dialog id=\"commands\" class=\"palette\"><input type=\"search\" placeholder=\"Type a command\" autocomplete=\"off\" spellcheck=\"false\"><div class=\"palette-results\"><ul class=\"results\"></ul></div></dialog>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = AuthDialog(pageFrom(ctx).AuthFailed).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</body></html>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// AuthDialog explains that GitHub rejected Scrutiny's `gh auth` token. It
+// opens on load when open is set, and scrutiny.js opens it when a request
+// or the live stream reports the rejection later.
+func AuthDialog(open bool) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<dialog id=\"auth-failed\" class=\"auth-failed\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if open {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, " data-open-on-load")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "><header><h2>GitHub rejected Scrutiny's credentials</h2><button class=\"close\" data-close-dialog title=\"Close (Esc)\" aria-label=\"Close\">×</button></header><p>Scrutiny uses the GitHub CLI's login, and GitHub no longer accepts it. The token may have expired or been revoked.</p><p>Log in again in a terminal, then reload this page:</p><pre><code>gh auth login</code></pre><p class=\"muted\">If you are still logged in, <code>gh auth refresh</code> renews the token. <code>gh auth status</code> shows what the GitHub CLI is using.</p><div class=\"actions\"><button data-close-dialog>Close</button> <button class=\"primary\" data-reload>Reload</button></div></dialog>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

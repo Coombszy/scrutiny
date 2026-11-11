@@ -22,6 +22,8 @@ type Page struct {
 	// hotkeys to show (the PR page and Dashboard) set it. CodeHelp adds the
 	// mouse and editing shortcuts of pages showing code.
 	KeyHelp, CodeHelp bool
+	// AuthFailed opens the dialog saying GitHub rejected the credentials.
+	AuthFailed bool
 }
 
 // ThemeOption is a Theme the Command Palette can switch to.

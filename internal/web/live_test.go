@@ -3,6 +3,7 @@ package web_test
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Coombszy/scrutiny/internal/codehost"
 	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/review"
 )
@@ -41,6 +43,26 @@ func TestOfflinePageShowsTheBannerAndRefusesWrites(t *testing.T) {
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Errorf("reply while offline: status %d, want 503", rec.Code)
 	}
+}
+
+func TestRejectedCredentialsOpenTheLoginDialog(t *testing.T) {
+	a := newApp(t)
+	body := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	mustContain(t, body, `id="auth-failed"`)
+	if strings.Contains(body, "data-open-on-load") {
+		t.Error("login dialog opens while the credentials are accepted")
+	}
+
+	a.host.FailAddThread = fmt.Errorf("graphql: %w", codehost.ErrUnauthorized)
+	a.host.Health.Unauthorized = true
+	rec := a.do(t, http.MethodPost, prPath+"/threads", url.Values{
+		"base": {string(mb)}, "head": {string(c2)}, "path": {"parser.go"}, "line": {"3"}, "side": {"RIGHT"}, "body": {"x"},
+	})
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("comment while rejected: status %d, want 401", rec.Code)
+	}
+	body = a.do(t, http.MethodGet, prPath, nil).Body.String()
+	mustContain(t, body, `id="auth-failed"`, "data-open-on-load", "gh auth login")
 }
 
 func TestEventsStreamRendersUpdatesAsOutOfBandSwaps(t *testing.T) {

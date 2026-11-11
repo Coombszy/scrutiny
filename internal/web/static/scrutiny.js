@@ -74,8 +74,16 @@ window.Scrutiny = { actions: {} };
     document.body.append(el);
     setTimeout(() => el.remove(), 6000);
   }
+  // GitHub rejecting the credentials gets the dialog rather than a toast:
+  // it needs the user to log in again, not just to notice.
+  const authFailed = document.getElementById("auth-failed");
+  Scrutiny.authFailed = () => {
+    if (authFailed && !authFailed.open) authFailed.showModal();
+  };
+  if (authFailed?.hasAttribute("data-open-on-load")) Scrutiny.authFailed();
   document.addEventListener("htmx:responseError", (e) => {
-    toast(e.detail.xhr.responseText.trim() || e.detail.xhr.statusText);
+    if (e.detail.xhr.status === 401) Scrutiny.authFailed();
+    else toast(e.detail.xhr.responseText.trim() || e.detail.xhr.statusText);
   });
   document.addEventListener("htmx:sendError", () => toast("Scrutiny is not reachable."));
 
@@ -147,6 +155,7 @@ window.Scrutiny = { actions: {} };
     if (stream || document.hidden || !live) return;
     stream = new EventSource(live.dataset.live);
     stream.addEventListener("update", (e) => htmx.swap(document.body, e.data, { swapStyle: "none" }));
+    stream.addEventListener("unauthorized", () => Scrutiny.authFailed());
   }
   function disconnect() {
     stream?.close();

@@ -16,11 +16,16 @@ var (
 	// ErrOffline is returned when the code host is unreachable and there is
 	// no cached copy to serve instead.
 	ErrOffline = errors.New("code host unreachable")
+	// ErrUnauthorized is returned when the code host rejects the
+	// credentials, e.g. an expired or revoked `gh auth` token.
+	ErrUnauthorized = errors.New("code host rejected the credentials")
 )
 
 // Status is the code host connection's health as of the last request.
 type Status struct {
 	Online bool
+	// Unauthorized is set while the code host rejects the credentials.
+	Unauthorized bool
 	// RateLimit is the most constrained limit seen; Limit is zero before
 	// any response has reported one.
 	RateLimit RateLimit

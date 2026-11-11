@@ -316,6 +316,12 @@ kbd { font-family: var(--mono); font-size: var(--fs-sm); background: var(--bg2);
 .help h2 { margin: 0; font-size: var(--fs-lg); }
 .help h3 { font-size: var(--fs-md); margin: 1rem 0 .3rem; color: var(--fg-dim); }
 .help .close { border: 0; background: none; font-size: var(--fs-xl); line-height: 1; padding: 0 .3rem; }
+/* Shown when GitHub rejects the `gh auth` token */
+.auth-failed header { display: flex; justify-content: space-between; align-items: center; }
+.auth-failed h2 { color: var(--red); }
+.auth-failed .close { border: 0; background: none; font-size: var(--fs-xl); line-height: 1; padding: 0 .3rem; }
+.auth-failed pre { background: var(--bg1); padding: .5rem .75rem; border-radius: 4px; user-select: all; }
+.auth-failed .actions { justify-content: flex-end; }
 .keys { width: 100%; border-collapse: collapse; }
 .keys td { padding: .3rem .2rem; border-bottom: 1px solid var(--bg1); }
 .keys td:first-child { white-space: nowrap; width: 40%; }

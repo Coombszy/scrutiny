@@ -42,7 +42,10 @@ func (c *Client) graphql(ctx context.Context, query string, vars map[string]any,
 		return fmt.Errorf("graphql: %w: %v", codehost.ErrOffline, err)
 	}
 	defer resp.Body.Close()
-	c.status.observe(resp.Header)
+	c.status.observe(resp)
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("graphql: %w", codehost.ErrUnauthorized)
+	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err

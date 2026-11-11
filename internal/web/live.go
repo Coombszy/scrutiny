@@ -52,7 +52,12 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case <-ping.C:
-			fmt.Fprint(w, ": ping\n\n")
+			if s.review.Status().Unauthorized {
+				// Polling has failed since; the page opens its dialog.
+				fmt.Fprint(w, "event: unauthorized\ndata:\n\n")
+			} else {
+				fmt.Fprint(w, ": ping\n\n")
+			}
 		case u := <-updates:
 			s.writeUpdate(w, r, ref, u)
 		}

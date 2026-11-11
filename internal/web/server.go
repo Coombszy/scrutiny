@@ -103,6 +103,7 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, status int, 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	page.CSRFToken = s.csrfToken
+	page.AuthFailed = s.review.Status().Unauthorized
 	if cfg, err := s.settings.Load(); err == nil {
 		page.Theme, page.Keys, page.ViewMode = cfg.Theme, cfg.Keys, string(cfg.ViewMode)
 	}
@@ -129,6 +130,9 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		status = http.StatusNotFound
 	case errors.Is(err, codehost.ErrOffline):
 		status = http.StatusServiceUnavailable
+	case errors.Is(err, codehost.ErrUnauthorized):
+		// The page's dialog explains how to log in again.
+		status = http.StatusUnauthorized
 	case errors.Is(err, review.ErrThreadNotFound):
 		status = http.StatusNotFound
 	case errors.Is(err, review.ErrCannotComment), errors.Is(err, review.ErrCannotChangeComment),

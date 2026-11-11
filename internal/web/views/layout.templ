@@ -64,6 +64,33 @@ templ Layout(title string) {
 				<input type="search" placeholder="Type a command" autocomplete="off" spellcheck="false"/>
 				<div class="palette-results"><ul class="results"></ul></div>
 			</dialog>
+			@AuthDialog(pageFrom(ctx).AuthFailed)
 		</body>
 	</html>
+}
+
+// AuthDialog explains that GitHub rejected Scrutiny's `gh auth` token. It
+// opens on load when open is set, and scrutiny.js opens it when a request
+// or the live stream reports the rejection later.
+templ AuthDialog(open bool) {
+	<dialog
+		id="auth-failed"
+		class="auth-failed"
+		if open {
+			data-open-on-load
+		}
+	>
+		<header>
+			<h2>GitHub rejected Scrutiny's credentials</h2>
+			<button class="close" data-close-dialog title="Close (Esc)" aria-label="Close">×</button>
+		</header>
+		<p>Scrutiny uses the GitHub CLI's login, and GitHub no longer accepts it. The token may have expired or been revoked.</p>
+		<p>Log in again in a terminal, then reload this page:</p>
+		<pre><code>gh auth login</code></pre>
+		<p class="muted">If you are still logged in, <code>gh auth refresh</code> renews the token. <code>gh auth status</code> shows what the GitHub CLI is using.</p>
+		<div class="actions">
+			<button data-close-dialog>Close</button>
+			<button class="primary" data-reload>Reload</button>
+		</div>
+	</dialog>
 }

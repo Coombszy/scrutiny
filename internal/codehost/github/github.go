@@ -1,5 +1,6 @@
-// Package github is the CodeHost adapter for github.com, using the REST API
-// with ETag conditional requests cached in the Cache port.
+// Package github is the CodeHost adapter for github.com: REST reads with
+// ETag conditional requests cached in the Cache port, and GraphQL for
+// review state and writes.
 package github
 
 import (
@@ -22,7 +23,7 @@ import (
 	"github.com/Coombszy/scrutiny/internal/domain"
 )
 
-// Client talks to the GitHub REST API.
+// Client talks to the GitHub REST and GraphQL APIs.
 type Client struct {
 	http    *http.Client
 	baseURL string
@@ -44,7 +45,7 @@ func New(httpClient *http.Client, baseURL string, c cache.Cache) *Client {
 func NewFromGH(c cache.Cache, wrap func(http.RoundTripper) http.RoundTripper) (*Client, error) {
 	hc, err := ghapi.DefaultHTTPClient()
 	if err != nil {
-		return nil, fmt.Errorf("gh auth: %w", err)
+		return nil, fmt.Errorf("not logged in to the GitHub CLI; run `gh auth login`, then start Scrutiny again (%w)", err)
 	}
 	if wrap != nil {
 		base := hc.Transport
@@ -175,7 +176,7 @@ func (c *Client) get(ctx context.Context, path string, v any) (link string, err 
 		return "", fmt.Errorf("GET %s: %w: %v", path, codehost.ErrOffline, err)
 	}
 	defer resp.Body.Close()
-	c.status.observe(resp.Header)
+	c.status.observe(resp)
 
 	var body []byte
 	switch {
@@ -184,6 +185,8 @@ func (c *Client) get(ctx context.Context, path string, v any) (link string, err 
 		link = cachedLink(cached)
 	case resp.StatusCode == http.StatusNotFound:
 		return "", fmt.Errorf("GET %s: %w", path, codehost.ErrNotFound)
+	case resp.StatusCode == http.StatusUnauthorized:
+		return "", fmt.Errorf("GET %s: %w", path, codehost.ErrUnauthorized)
 	case resp.StatusCode != http.StatusOK:
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return "", fmt.Errorf("GET %s: %s: %s", path, resp.Status, strings.TrimSpace(string(msg)))

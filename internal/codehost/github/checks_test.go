@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/Coombszy/scrutiny/internal/cache"
@@ -124,5 +125,38 @@ func TestChecksIncludeReviewStatus(t *testing.T) {
 	want := []domain.Verdict{{Reviewer: "ana", State: domain.VerdictApproved}, {Reviewer: "bo", State: domain.VerdictChangesRequested}}
 	if got.ReviewDecision != domain.ChangesRequestedDecision || !got.Draft || len(got.Verdicts) != 2 || got.Verdicts[0] != want[0] || got.Verdicts[1] != want[1] {
 		t.Errorf("status = %+v", got)
+	}
+}
+
+func TestRejectedCredentialsAreReportedUntilAccepted(t *testing.T) {
+	var rejected atomic.Bool
+	rejected.Store(true)
+	pull := fixture(t, "pull.json")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if rejected.Load() {
+			http.Error(w, `{"message":"Bad credentials"}`, http.StatusUnauthorized)
+			return
+		}
+		w.Write(pull)
+	}))
+	t.Cleanup(srv.Close)
+	client := newClient(srv, cache.NewMemory())
+
+	if _, err := client.PullRequest(context.Background(), pr325); !errors.Is(err, codehost.ErrUnauthorized) {
+		t.Errorf("REST read error = %v, want ErrUnauthorized", err)
+	}
+	if _, err := client.ReviewState(context.Background(), pr14956); !errors.Is(err, codehost.ErrUnauthorized) {
+		t.Errorf("GraphQL read error = %v, want ErrUnauthorized", err)
+	}
+	if st := client.Status(); !st.Online || !st.Unauthorized {
+		t.Errorf("Status while rejected = %+v", st)
+	}
+
+	rejected.Store(false)
+	if _, err := client.PullRequest(context.Background(), pr325); err != nil {
+		t.Fatal(err)
+	}
+	if st := client.Status(); st.Unauthorized {
+		t.Errorf("Status once accepted = %+v", st)
 	}
 }
