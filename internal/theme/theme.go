@@ -28,6 +28,7 @@ const Default = "gruvbox-dark"
 // names (e.g. "keyword", "function.method").
 type Theme struct {
 	ID     string            `toml:"-"` // the file name without .toml
+	Custom bool              `toml:"-"` // its file is in the themes directory, so it can be edited
 	Name   string            `toml:"name"`
 	Scheme string            `toml:"scheme"` // "dark" or "light"
 	UI     map[string]string `toml:"ui"`
@@ -47,13 +48,13 @@ var (
 func Load(dir string) ([]Theme, []error) {
 	byID := map[string]Theme{}
 	var errs []error
-	read := func(fsys fs.FS, name string) {
+	read := func(fsys fs.FS, name string, custom bool) {
 		id := strings.TrimSuffix(filepath.Base(name), ".toml")
 		b, err := fs.ReadFile(fsys, name)
 		if err == nil {
 			var t Theme
 			if err = toml.Unmarshal(b, &t); err == nil {
-				t.ID = id
+				t.ID, t.Custom = id, custom
 				err = t.validate()
 			}
 			if err == nil {
@@ -65,12 +66,12 @@ func Load(dir string) ([]Theme, []error) {
 	}
 	entries, _ := fs.Glob(builtins, "builtin/*.toml")
 	for _, e := range entries {
-		read(builtins, e)
+		read(builtins, e, false)
 	}
 	if dir != "" {
 		files, _ := filepath.Glob(filepath.Join(dir, "*.toml"))
 		for _, f := range files {
-			read(os.DirFS(dir), filepath.Base(f))
+			read(os.DirFS(dir), filepath.Base(f), true)
 		}
 	}
 	themes := make([]Theme, 0, len(byID))
