@@ -684,11 +684,23 @@ window.Scrutiny = { actions: {} };
     if (!pos) return;
     e.preventDefault();
     lastPoint = { x: e.clientX, y: e.clientY };
-    menu(lastPoint, [
+    const items = [
       ["Go to definition", () => definition(pos), `${navMod}Click`],
       ["Find usages", () => usages(pos), `${navMod}${mac ? "⇧" : "Shift+"}Click`],
-    ]);
+    ];
+    // This menu replaces the browser's, so it offers Copy for a selection.
+    const selected = getSelection().toString();
+    if (selected) items.unshift(["Copy", () => copy(selected), `${navMod}C`]);
+    menu(lastPoint, items);
   });
+
+  async function copy(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      if (!document.execCommand("copy")) toast("Could not copy to the clipboard.");
+    }
+  }
 
   async function revealFile(path) {
     const file = [...document.querySelectorAll(".file[data-path]")].find((f) => f.dataset.path === path);
