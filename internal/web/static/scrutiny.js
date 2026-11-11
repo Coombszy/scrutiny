@@ -116,6 +116,12 @@ window.Scrutiny = { actions: {} };
     const row = n && document.getElementById("L" + n);
     if (row) Scrutiny.pin(row, Math.max(0, (innerHeight - Scrutiny.barBottom() - row.offsetHeight) / 2));
   }
+  // centreHash follows a link to a line on this same page: setting the hash
+  // centres it, and one already set (no hashchange) is centred again.
+  Scrutiny.centreHash = (hash) => {
+    if (location.hash === hash) centre();
+    else location.hash = hash;
+  };
   addEventListener("load", () => requestAnimationFrame(centre));
   addEventListener("hashchange", centre);
 })();
@@ -642,9 +648,19 @@ window.Scrutiny = { actions: {} };
     if (!e.target.closest(".context-menu")) closeMenu();
     if (e.target.closest("[data-close-panel]")) document.getElementById("side-panel")?.remove();
     const link = e.target.closest("a[data-nav-path]");
+    if (link && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      // A result chosen in Symbol Search closes it, including one on this
+      // page, which the browser follows without leaving it.
+      document.getElementById("palette")?.close();
+      const url = new URL(link.href);
+      if (link.dataset.navInPr !== "true" && url.pathname + url.search === location.pathname + location.search && url.hash) {
+        e.preventDefault();
+        Scrutiny.centreHash(url.hash);
+        return;
+      }
+    }
     if (link && link.dataset.navInPr === "true" && !e.ctrlKey && !e.metaKey) {
       e.preventDefault();
-      document.getElementById("palette")?.close();
       const line = Number(link.dataset.navLine || 0);
       const path = link.dataset.navPath;
       Scrutiny.busy((line ? reveal(path, line) : revealFile(path)).then((shown) => shown || (location.href = link.href)));
