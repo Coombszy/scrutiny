@@ -218,7 +218,8 @@ func (c *Collector) Summary(ctx context.Context) ([]Series, error) {
 	return out, nil
 }
 
-// Transport counts the GitHub API traffic going through base.
+// Transport counts the GitHub API traffic going through base, and logs
+// each failed request with what GitHub said about it.
 func Transport(base http.RoundTripper, c *Collector) http.RoundTripper {
 	return roundTripper{base: base, c: c}
 }
@@ -233,18 +234,27 @@ func (t roundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	if strings.HasSuffix(r.URL.Path, "/graphql") {
 		t.c.Inc(GitHubGraphQL)
 	}
+	start := time.Now()
 	resp, err := t.base.RoundTrip(r)
 	switch {
 	case err != nil:
 		t.c.Inc(GitHubErrors)
+		slog.Warn("GitHub request failed", "method", r.Method, "path", r.URL.RequestURI(),
+			"err", err, "duration", time.Since(start).Round(time.Millisecond))
 	case resp.StatusCode == http.StatusNotModified:
 		t.c.Inc(GitHubNotModified)
 	case resp.StatusCode >= 400:
 		t.c.Inc(GitHubErrors)
-		if resp.StatusCode == http.StatusTooManyRequests ||
-			resp.StatusCode == http.StatusForbidden && resp.Header.Get("X-RateLimit-Remaining") == "0" {
+		limited := resp.StatusCode == http.StatusTooManyRequests ||
+			resp.StatusCode == http.StatusForbidden && resp.Header.Get("X-RateLimit-Remaining") == "0"
+		if limited {
 			t.c.Inc(GitHubRateLimited)
 		}
+		slog.Warn("GitHub request failed", "method", r.Method, "path", r.URL.RequestURI(),
+			"status", resp.StatusCode, "rate_limited", limited,
+			"rate_limit_remaining", resp.Header.Get("X-RateLimit-Remaining"),
+			"request_id", resp.Header.Get("X-GitHub-Request-Id"),
+			"duration", time.Since(start).Round(time.Millisecond))
 	}
 	return resp, err
 }

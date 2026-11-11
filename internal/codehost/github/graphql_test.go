@@ -1,10 +1,12 @@
 package github_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -173,5 +175,24 @@ func TestReviewStateFindsTheViewersLastSubmittedReview(t *testing.T) {
 	}
 	if !strings.HasPrefix(string(got.LastReviewed), "9e4e44a") {
 		t.Errorf("LastReviewed = %q", got.LastReviewed)
+	}
+}
+
+func TestGraphQLErrorsAreLogged(t *testing.T) {
+	var logs bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	srv, _ := graphqlServer(t, func(gqlRequest) []byte {
+		return []byte(`{"data":null,"errors":[{"type":"FORBIDDEN","message":"Resource not accessible by integration"}]}`)
+	})
+	newClient(srv, cache.NewMemory()).SetViewed(context.Background(), "PR_1", "a.go", true)
+
+	out := logs.String()
+	for _, want := range []string{`msg="GitHub GraphQL error"`, "type=FORBIDDEN", `message="Resource not accessible by integration"`, "operation=markFileAsViewed"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("logs lack %s:\n%s", want, out)
+		}
 	}
 }

@@ -1,10 +1,13 @@
 package metrics_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -144,4 +147,46 @@ func byKey(bs []metrics.Bucket) map[string]int {
 		m[b.Name+"@"+b.Minute.UTC().Format("15:04")] += b.Count
 	}
 	return m
+}
+
+func TestFailedGitHubRequestsAreLogged(t *testing.T) {
+	var logs bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	col, _, _ := newCollector(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/fine" {
+			w.Write([]byte(`{}`))
+			return
+		}
+		w.Header().Set("X-GitHub-Request-Id", "ABCD:1234")
+		w.Header().Set("X-RateLimit-Remaining", "0")
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer srv.Close()
+	client := &http.Client{Transport: metrics.Transport(http.DefaultTransport, col)}
+	for _, p := range []string{"/fine", "/repos/o/r/pulls/1?x=1"} {
+		resp, _ := client.Get(srv.URL + p)
+		resp.Body.Close()
+	}
+	failing := &http.Client{Transport: metrics.Transport(roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("no route to host")
+	}), col)}
+	failing.Get("http://unreachable/graphql")
+
+	out := logs.String()
+	for _, want := range []string{
+		`msg="GitHub request failed"`, "method=GET", `path="/repos/o/r/pulls/1?x=1"`, "status=403",
+		"request_id=ABCD:1234", "rate_limit_remaining=0", "duration=",
+		`path=/graphql`, `err="no route to host"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("logs lack %s:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "/fine") {
+		t.Errorf("a successful request was logged:\n%s", out)
+	}
 }

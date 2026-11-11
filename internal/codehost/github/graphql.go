@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -57,6 +59,10 @@ func (c *Client) graphql(ctx context.Context, query string, vars map[string]any,
 	}
 	if len(envelope.Errors) > 0 {
 		e := envelope.Errors[0]
+		// GraphQL reports failures in a 200 response, which the transport
+		// does not see as failed, so they are logged here.
+		slog.Warn("GitHub GraphQL error", "operation", operation(query), "type", e.Type, "message", e.Message,
+			"errors", len(envelope.Errors), "request_id", resp.Header.Get("X-GitHub-Request-Id"))
 		if e.Type == "NOT_FOUND" {
 			return fmt.Errorf("graphql: %s: %w", e.Message, codehost.ErrNotFound)
 		}
@@ -293,4 +299,21 @@ func cursor(c string) any {
 		return nil
 	}
 	return c
+}
+
+var (
+	namedOperation = regexp.MustCompile(`^\s*(?:query|mutation)\s+(\w+)`)
+	firstField     = regexp.MustCompile(`\{\s*(\w+)`)
+)
+
+// operation names a GraphQL document for logs: its operation name, else
+// its first field (e.g. the mutation it runs).
+func operation(query string) string {
+	if m := namedOperation.FindStringSubmatch(query); m != nil {
+		return m[1]
+	}
+	if m := firstField.FindStringSubmatch(query); m != nil {
+		return m[1]
+	}
+	return "unknown"
 }
