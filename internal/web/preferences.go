@@ -29,7 +29,22 @@ func (s *Server) settingsPage(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	s.render(w, r, http.StatusOK, views.SettingsPage(views.SettingsForm{Settings: cfg.WithKeyDefaults()}, list))
+	s.render(w, r, http.StatusOK, views.SettingsPage(views.SettingsForm{Settings: cfg.WithKeyDefaults()}, list, s.activity(r)))
+}
+
+// activityPanel re-renders the Settings page's Activity panel.
+func (s *Server) activityPanel(w http.ResponseWriter, r *http.Request) {
+	s.render(w, r, http.StatusOK, views.ActivityPanel(s.activity(r)))
+}
+
+func (s *Server) activity(r *http.Request) views.Activity {
+	a := views.Activity{RateLimit: s.review.Status().RateLimit}
+	if s.metrics != nil {
+		if series, err := s.metrics.Summary(r.Context()); err == nil {
+			a.Series = series
+		}
+	}
+	return a
 }
 
 // saveSettings saves the Settings form. Invalid input is shown in the form

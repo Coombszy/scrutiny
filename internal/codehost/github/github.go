@@ -39,11 +39,19 @@ func New(httpClient *http.Client, baseURL string, c cache.Cache) *Client {
 	return &Client{http: httpClient, baseURL: strings.TrimSuffix(baseURL, "/"), cache: c, now: time.Now}
 }
 
-// NewFromGH returns a Client for api.github.com authenticated through `gh auth`.
-func NewFromGH(c cache.Cache) (*Client, error) {
+// NewFromGH returns a Client for api.github.com authenticated through `gh
+// auth`. wrap, if given, wraps its HTTP transport, e.g. to count requests.
+func NewFromGH(c cache.Cache, wrap func(http.RoundTripper) http.RoundTripper) (*Client, error) {
 	hc, err := ghapi.DefaultHTTPClient()
 	if err != nil {
 		return nil, fmt.Errorf("gh auth: %w", err)
+	}
+	if wrap != nil {
+		base := hc.Transport
+		if base == nil {
+			base = http.DefaultTransport
+		}
+		hc.Transport = wrap(base)
 	}
 	return New(hc, "https://api.github.com", c), nil
 }

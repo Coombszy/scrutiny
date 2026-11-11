@@ -12,6 +12,7 @@ import (
 	"github.com/Coombszy/scrutiny/internal/codehost"
 	"github.com/Coombszy/scrutiny/internal/installer"
 	"github.com/Coombszy/scrutiny/internal/live"
+	"github.com/Coombszy/scrutiny/internal/metrics"
 	"github.com/Coombszy/scrutiny/internal/navigator"
 	"github.com/Coombszy/scrutiny/internal/repostore"
 	"github.com/Coombszy/scrutiny/internal/review"
@@ -29,7 +30,8 @@ type Deps struct {
 	Settings  settings.Store
 	Hub       *live.Hub // live updates for open pages
 	Servers   *servers.Service
-	ThemesDir string // drop-in Themes; may be empty
+	ThemesDir string             // drop-in Themes; may be empty
+	Metrics   *metrics.Collector // optional: the Settings page's Activity panel
 	// Dev relaxes the Content-Security-Policy for a live-reload proxy.
 	Dev bool
 }
@@ -42,6 +44,7 @@ type Server struct {
 	hub       *live.Hub
 	servers   *servers.Service
 	themesDir string
+	metrics   *metrics.Collector
 	dev       bool
 	mux       *http.ServeMux
 }
@@ -50,7 +53,7 @@ type Server struct {
 func NewServer(d Deps) *Server {
 	s := &Server{
 		csrfToken: d.CSRFToken, review: d.Review, settings: d.Settings, hub: d.Hub, servers: d.Servers,
-		themesDir: d.ThemesDir, dev: d.Dev, mux: http.NewServeMux(),
+		themesDir: d.ThemesDir, metrics: d.Metrics, dev: d.Dev, mux: http.NewServeMux(),
 	}
 	static, _ := fs.Sub(staticFS, "static")
 	s.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
@@ -62,6 +65,7 @@ func NewServer(d Deps) *Server {
 	s.mux.HandleFunc("GET /github.com/{owner}/{repo}/pull/{number}/file", s.file)
 	s.mux.HandleFunc("GET /github.com/{owner}/{repo}/pull/{number}/context", s.expandGap)
 	s.mux.HandleFunc("GET /settings", s.settingsPage)
+	s.mux.HandleFunc("GET /settings/metrics", s.activityPanel)
 	s.mux.HandleFunc("POST /settings", s.saveSettings)
 	s.mux.HandleFunc("POST /settings/view-mode", s.setViewMode)
 	s.mux.HandleFunc("POST /settings/theme", s.setTheme)

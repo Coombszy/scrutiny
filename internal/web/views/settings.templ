@@ -1,6 +1,8 @@
 package views
 
 import (
+	"github.com/Coombszy/scrutiny/internal/codehost"
+	"github.com/Coombszy/scrutiny/internal/metrics"
 	"github.com/Coombszy/scrutiny/internal/servers"
 	"github.com/Coombszy/scrutiny/internal/settings"
 )
@@ -23,12 +25,14 @@ var keyLabels = []struct{ Action, Label string }{
 	{"help", "Show keyboard shortcuts"},
 }
 
-templ SettingsPage(form SettingsForm, list []servers.Status) {
+templ SettingsPage(form SettingsForm, list []servers.Status, activity Activity) {
 	@Layout("Settings") {
 		<header class="pr-header">
 			<h1>Settings</h1>
 			<p class="muted">Changes save as you make them, to Scrutiny's config file.</p>
 		</header>
+		<div class="settings-layout">
+		<div class="settings-main">
 		@SettingsFormView(form)
 		<section id="language-servers" class="settings-section">
 			<h2>Language Servers</h2>
@@ -43,6 +47,9 @@ templ SettingsPage(form SettingsForm, list []servers.Status) {
 			</div>
 			@ServerList(list)
 		</section>
+		</div>
+		@ActivityPanel(activity)
+		</div>
 	}
 }
 
@@ -92,4 +99,57 @@ templ SettingsFormView(form SettingsForm) {
 			}
 		</p>
 	</form>
+}
+
+// Activity is what the Settings page's Activity panel shows.
+type Activity struct {
+	Series    []metrics.Series // nil when metrics are not collected
+	RateLimit codehost.RateLimit
+}
+
+// ActivityPanel shows Scrutiny's recent GitHub and git activity, per
+// minute over the last hour, refreshing itself quietly.
+templ ActivityPanel(a Activity) {
+	<aside id="activity-panel" class="activity-panel" hx-get="/settings/metrics" hx-trigger="every 30s" hx-swap="outerHTML" data-quiet>
+		<h2>Activity</h2>
+		if a.RateLimit.Limit > 0 {
+			<p class="rate-limit" title="The GitHub API rate limit closest to running out">
+				GitHub { rateLimitName(a.RateLimit.Resource) } limit: <strong>{ thousands(a.RateLimit.Remaining) } of { thousands(a.RateLimit.Limit) }</strong> left
+				if !a.RateLimit.Reset.IsZero() {
+					<span class="muted">(resets { a.RateLimit.Reset.Local().Format("15:04") })</span>
+				}
+			</p>
+		}
+		if a.Series == nil {
+			<p class="muted">Activity is not being recorded.</p>
+		} else {
+			<table class="activity">
+				<thead><tr><th></th><th>Last hour</th><th>24h</th></tr></thead>
+				<tbody>
+					for _, s := range a.Series {
+						<tr class={ templ.KV("bad", s.Bad && s.LastDay > 0) }>
+							<td>
+								<div>{ s.Label }</div>
+								@spark(s)
+							</td>
+							<td class="num">{ thousands(s.LastHour) }</td>
+							<td class="num">{ thousands(s.LastDay) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			<p class="muted">Per minute over the last hour; kept for a week.</p>
+		}
+	</aside>
+}
+
+// spark is a bar per minute of the last hour.
+templ spark(s metrics.Series) {
+	<svg class={ "spark", templ.KV("spark-bad", s.Bad) } viewBox="0 0 120 20" preserveAspectRatio="none" aria-hidden="true">
+		for i, n := range s.Minutes {
+			if n > 0 {
+				<rect x={ itoa(i * 2) } y={ sparkY(n, s.Max()) } width="1.6" height={ sparkH(n, s.Max()) }></rect>
+			}
+		}
+	</svg>
 }

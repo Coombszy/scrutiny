@@ -53,4 +53,5 @@ just run-live  # live reload with air on :7878 (or --port N); edits rebuild, res
 - `internal/live`: the SSE hub and the poller that pushes PR changes to open pages.
 - `internal/servers`: which Language Server launches for a language, and background installs.
 - `internal/theme`: built-in and drop-in Themes, rendered as CSS.
+- `internal/metrics`: per-minute counts of GitHub and git activity (stored in the sqlite cache, kept a week), shown on the Settings page.
 - `internal/web`: the driving HTTP adapter (handlers, Templ views, embedded static assets).

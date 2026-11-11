@@ -53,6 +53,7 @@ func TestStatusTracksTheLowestRateLimit(t *testing.T) {
 		w.Header().Set("X-RateLimit-Limit", "5000")
 		w.Header().Set("X-RateLimit-Remaining", remaining[0])
 		w.Header().Set("X-RateLimit-Reset", "1800000000")
+		w.Header().Set("X-RateLimit-Resource", "graphql")
 		remaining = remaining[1:]
 		w.Write(body)
 	}))
@@ -67,7 +68,7 @@ func TestStatusTracksTheLowestRateLimit(t *testing.T) {
 		t.Errorf("after first = %+v", st)
 	}
 	client.ReviewState(context.Background(), pr14956)
-	if st := client.Status(); st.RateLimit.Remaining != 300 || !st.RateLimit.Low() || st.RateLimit.Reset.Unix() != 1800000000 {
+	if st := client.Status(); st.RateLimit.Remaining != 300 || !st.RateLimit.Low() || st.RateLimit.Reset.Unix() != 1800000000 || st.RateLimit.Resource != "graphql" {
 		t.Errorf("after second = %+v", st)
 	}
 }

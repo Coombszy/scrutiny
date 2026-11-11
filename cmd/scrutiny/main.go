@@ -22,8 +22,10 @@ import (
 	"github.com/Coombszy/scrutiny/internal/highlight/treesitter"
 	"github.com/Coombszy/scrutiny/internal/installer/mason"
 	"github.com/Coombszy/scrutiny/internal/live"
+	"github.com/Coombszy/scrutiny/internal/metrics"
 	"github.com/Coombszy/scrutiny/internal/navigator"
 	"github.com/Coombszy/scrutiny/internal/navigator/lsp"
+	"github.com/Coombszy/scrutiny/internal/repostore"
 	"github.com/Coombszy/scrutiny/internal/repostore/gitcli"
 	"github.com/Coombszy/scrutiny/internal/review"
 	"github.com/Coombszy/scrutiny/internal/servers"
@@ -74,7 +76,12 @@ func serve(portOverride int, dev bool) error {
 		return err
 	}
 	defer db.Close()
-	host, err := github.NewFromGH(db)
+	counts := metrics.NewCollector(db, time.Now)
+	go counts.Run(ctx, 15*time.Second)
+	defer counts.Flush(context.Background()) // before the database closes
+	host, err := github.NewFromGH(db, func(base http.RoundTripper) http.RoundTripper {
+		return metrics.Transport(base, counts)
+	})
 	if err != nil {
 		return err
 	}
@@ -85,7 +92,7 @@ func serve(portOverride int, dev bool) error {
 	repos := gitcli.New(filepath.Join(dirs.State, "repos"), filepath.Join(dirs.State, "worktrees"), gitcli.HTTPSCloneURL, gitcli.GHCredentialConfig("github.com")...)
 	svc := review.NewService(review.Deps{
 		CodeHost:    host,
-		Repos:       repos,
+		Repos:       countedRepos{Store: repos, counts: counts},
 		Highlighter: treesitter.New(),
 		Cache:       db,
 		Settings:    settings,
@@ -119,6 +126,7 @@ func serve(portOverride int, dev bool) error {
 		Handler: web.NewServer(web.Deps{
 			CSRFToken: web.NewCSRFToken(), Review: svc, Settings: settings, Hub: hub,
 			Servers: languageServers, ThemesDir: filepath.Join(dirs.Config, "themes"), Dev: dev,
+			Metrics: counts,
 		}).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		// Requests share ctx so that open event streams end on shutdown.
@@ -136,4 +144,19 @@ func serve(portOverride int, dev bool) error {
 		defer cancel()
 		return srv.Shutdown(shutdownCtx)
 	}
+}
+
+// countedRepos counts git fetches and their failures.
+type countedRepos struct {
+	repostore.Store
+	counts *metrics.Collector
+}
+
+func (r countedRepos) FetchPR(ctx context.Context, pr domain.PRRef, baseBranch string, baseSHA domain.SHA) (domain.SHA, error) {
+	r.counts.Inc(metrics.GitFetches)
+	sha, err := r.Store.FetchPR(ctx, pr, baseBranch, baseSHA)
+	if err != nil {
+		r.counts.Inc(metrics.GitFetchErrors)
+	}
+	return sha, err
 }

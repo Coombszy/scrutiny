@@ -9,6 +9,7 @@ import (
 	"github.com/Coombszy/scrutiny/internal/cache"
 	"github.com/Coombszy/scrutiny/internal/cache/sqlite"
 	"github.com/Coombszy/scrutiny/internal/domain"
+	"github.com/Coombszy/scrutiny/internal/metrics"
 )
 
 func open(t *testing.T, path string) *sqlite.Cache {
@@ -110,5 +111,35 @@ func TestDeletingEntriesAndVisits(t *testing.T) {
 	}
 	if got, _ := c.RecentVisits(ctx, 10); len(got) != 1 || got[0].PR != two {
 		t.Errorf("RecentVisits = %+v, want only #2", got)
+	}
+}
+
+func TestMetricCountsSumPersistAndPrune(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "cache.db")
+	m0 := time.Date(2026, 11, 11, 10, 0, 0, 0, time.UTC)
+	c := open(t, path)
+	var _ metrics.Store = c
+	if err := c.AddCounts(ctx, []metrics.Bucket{{Name: "a", Minute: m0, Count: 2}, {Name: "a", Minute: m0.Add(time.Minute), Count: 1}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.AddCounts(ctx, []metrics.Bucket{{Name: "a", Minute: m0, Count: 3}}); err != nil {
+		t.Fatal(err)
+	}
+	c.Close()
+
+	c = open(t, path)
+	got, err := c.CountsSince(ctx, m0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].Count != 5 || !got[0].Minute.Equal(m0) || got[1].Count != 1 {
+		t.Errorf("CountsSince = %+v", got)
+	}
+	if err := c.PruneCounts(ctx, m0.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := c.CountsSince(ctx, m0); len(got) != 1 || !got[0].Minute.Equal(m0.Add(time.Minute)) {
+		t.Errorf("after pruning: %+v", got)
 	}
 }

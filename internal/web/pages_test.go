@@ -14,6 +14,7 @@ import (
 	"github.com/Coombszy/scrutiny/internal/highlight"
 	"github.com/Coombszy/scrutiny/internal/installer"
 	"github.com/Coombszy/scrutiny/internal/live"
+	"github.com/Coombszy/scrutiny/internal/metrics"
 	"github.com/Coombszy/scrutiny/internal/navigator"
 	"github.com/Coombszy/scrutiny/internal/repostore"
 	"github.com/Coombszy/scrutiny/internal/review"
@@ -35,6 +36,7 @@ const (
 )
 
 type app struct {
+	metrics   *metrics.Collector
 	themesDir string
 	inst      *installer.Fake
 	nav       *navigator.Fake
@@ -78,9 +80,10 @@ func newApp(t *testing.T) *app {
 	})
 	lookPath := func(string) (string, error) { return "", exec.ErrNotFound }
 	a.themesDir = t.TempDir()
+	a.metrics = metrics.NewCollector(metrics.NewMemory(), nil)
 	a.handler = web.NewServer(web.Deps{
 		CSRFToken: token, Review: svc, Settings: a.settings, Hub: a.hub,
-		Servers: servers.New(a.inst, lookPath), ThemesDir: a.themesDir,
+		Servers: servers.New(a.inst, lookPath), ThemesDir: a.themesDir, Metrics: a.metrics,
 	}).Handler()
 	return a
 }

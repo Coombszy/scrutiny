@@ -30,6 +30,7 @@ type Status struct {
 type RateLimit struct {
 	Remaining, Limit int
 	Reset            time.Time
+	Resource         string // which limit, e.g. "core", "graphql" or "search"
 }
 
 // Low reports whether less than 10% of the limit remains.

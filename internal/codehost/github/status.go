@@ -32,7 +32,7 @@ func (t *statusTracker) observe(h http.Header) {
 	if err1 != nil || err2 != nil {
 		return
 	}
-	rl := codehost.RateLimit{Remaining: remaining, Limit: limit}
+	rl := codehost.RateLimit{Remaining: remaining, Limit: limit, Resource: h.Get("X-RateLimit-Resource")}
 	if reset, err := strconv.ParseInt(h.Get("X-RateLimit-Reset"), 10, 64); err == nil {
 		rl.Reset = time.Unix(reset, 0)
 	}

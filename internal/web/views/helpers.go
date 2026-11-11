@@ -445,3 +445,38 @@ func languageName(id string) string {
 	}
 	return id
 }
+
+// thousands writes n with comma separators, e.g. 4,812.
+func thousands(n int) string {
+	s := strconv.Itoa(n)
+	for i := len(s) - 3; i > 0 && s[i-1] != '-'; i -= 3 {
+		s = s[:i] + "," + s[i:]
+	}
+	return s
+}
+
+// sparkH and sparkY size a bar of a 20-unit-high spark chart; any count
+// shows at least a sliver.
+func sparkH(n, max int) string {
+	h := float64(n) / float64(max) * 20
+	if h < 1.5 {
+		h = 1.5
+	}
+	return strconv.FormatFloat(h, 'f', 2, 64)
+}
+
+func sparkY(n, max int) string {
+	h, _ := strconv.ParseFloat(sparkH(n, max), 64)
+	return strconv.FormatFloat(20-h, 'f', 2, 64)
+}
+
+// rateLimitName names a GitHub rate limit resource for people.
+func rateLimitName(resource string) string {
+	switch resource {
+	case "", "core":
+		return "API"
+	case "graphql":
+		return "GraphQL"
+	}
+	return resource
+}

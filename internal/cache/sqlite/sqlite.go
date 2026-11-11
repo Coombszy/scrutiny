@@ -14,9 +14,16 @@ import (
 
 	"github.com/Coombszy/scrutiny/internal/cache"
 	"github.com/Coombszy/scrutiny/internal/domain"
+	"github.com/Coombszy/scrutiny/internal/metrics"
 )
 
 const schema = `
+CREATE TABLE IF NOT EXISTS metrics (
+	name   TEXT NOT NULL,
+	minute INTEGER NOT NULL,
+	count  INTEGER NOT NULL,
+	PRIMARY KEY (name, minute)
+);
 CREATE TABLE IF NOT EXISTS entries (
 	key        TEXT PRIMARY KEY,
 	value      BLOB NOT NULL,
@@ -129,5 +136,52 @@ func (c *Cache) DeleteVisit(ctx context.Context, pr domain.PRRef) error {
 	_, err := c.db.ExecContext(ctx,
 		`DELETE FROM visits WHERE host = ? AND owner = ? AND repo = ? AND number = ?`,
 		pr.Host, pr.Owner, pr.Name, pr.Number)
+	return err
+}
+
+// AddCounts adds to the per-minute metric counts.
+func (c *Cache) AddCounts(ctx context.Context, buckets []metrics.Bucket) error {
+	tx, err := c.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, b := range buckets {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO metrics (name, minute, count) VALUES (?, ?, ?)
+			 ON CONFLICT (name, minute) DO UPDATE SET count = count + excluded.count`,
+			b.Name, b.Minute.Unix(), b.Count); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// CountsSince returns the metric counts from since on, by name and minute.
+func (c *Cache) CountsSince(ctx context.Context, since time.Time) ([]metrics.Bucket, error) {
+	rows, err := c.db.QueryContext(ctx,
+		`SELECT name, minute, count FROM metrics WHERE minute >= ? ORDER BY name, minute`, since.Unix())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []metrics.Bucket
+	for rows.Next() {
+		var (
+			b      metrics.Bucket
+			minute int64
+		)
+		if err := rows.Scan(&b.Name, &minute, &b.Count); err != nil {
+			return nil, err
+		}
+		b.Minute = time.Unix(minute, 0).UTC()
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+// PruneCounts deletes metric counts from before before.
+func (c *Cache) PruneCounts(ctx context.Context, before time.Time) error {
+	_, err := c.db.ExecContext(ctx, `DELETE FROM metrics WHERE minute < ?`, before.Unix())
 	return err
 }
