@@ -42,7 +42,7 @@ func (i *Installer) fetchRelease(ctx context.Context, p plan, dir string) error 
 			return err
 		}
 		defer os.Remove(archive)
-		return i.opts.Run(ctx, into, os.Environ(), "tar", "-xf", archive)
+		return i.opts.Run(ctx, into, commandEnv(), "tar", "-xf", archive)
 	case strings.HasSuffix(name, ".zip"):
 		return unzip(body, into)
 	case strings.HasSuffix(name, ".gz"):

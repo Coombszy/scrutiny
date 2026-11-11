@@ -186,6 +186,35 @@ func TestInstallNpmPackageWithExtraPackages(t *testing.T) {
 		filepath.Join(pkgDir, "node_modules", ".bin", "typescript-language-server"))
 }
 
+func TestInstallCommandsDoNotSeeGitHubTokens(t *testing.T) {
+	tokens := []string{"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"}
+	for _, k := range tokens {
+		t.Setenv(k, "s3cret")
+	}
+	e := newEnv(t)
+	e.onRun = func(c command) {
+		touch(t, filepath.Join(c.Dir, "gopls"))
+		touch(t, filepath.Join(c.Dir, "node_modules", ".bin", "typescript-language-server"))
+	}
+
+	for _, name := range []string{"gopls", "typescript-language-server"} {
+		if err := e.inst.Install(context.Background(), name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, run := range e.runs {
+		for _, kv := range run.Env {
+			k, _, _ := strings.Cut(kv, "=")
+			if slices.Contains(tokens, k) {
+				t.Errorf("%s ran with %s", run.Argv[0], k)
+			}
+		}
+	}
+	if !slices.ContainsFunc(e.runs[0].Env, func(kv string) bool { return strings.HasPrefix(kv, "PATH=") }) {
+		t.Error("dropped the rest of the environment")
+	}
+}
+
 func TestInstallGitHubReleaseGzipForThisPlatform(t *testing.T) {
 	e := newEnv(t)
 	e.assets["/rust-lang/rust-analyzer/releases/download/2026-11-09/rust-analyzer-x86_64-unknown-linux-gnu.gz"] = gz(t, "ELF rust-analyzer")

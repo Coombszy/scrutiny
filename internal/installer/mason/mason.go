@@ -78,6 +78,19 @@ func run(ctx context.Context, dir string, env []string, argv ...string) error {
 	return nil
 }
 
+// commandEnv is this process's environment without GitHub tokens, which
+// the go, npm and tar commands that install packages have no need for.
+func commandEnv() []string {
+	return slices.DeleteFunc(os.Environ(), func(kv string) bool {
+		k, _, _ := strings.Cut(kv, "=")
+		switch k {
+		case "GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN":
+			return true
+		}
+		return false
+	})
+}
+
 // plan is how to install one package on this machine.
 type plan struct {
 	pkg   installer.Package
@@ -312,10 +325,10 @@ func (i *Installer) fetch(ctx context.Context, p plan, dir string) error {
 		if p.purl.Subpath != "" {
 			target += "/" + p.purl.Subpath
 		}
-		return i.opts.Run(ctx, dir, append(os.Environ(), "GOBIN="+dir), "go", "install", target+"@"+p.purl.Version)
+		return i.opts.Run(ctx, dir, append(commandEnv(), "GOBIN="+dir), "go", "install", target+"@"+p.purl.Version)
 	case "npm":
 		argv := []string{"npm", "install", "--prefix", dir, "--no-save", "--no-audit", "--no-fund", p.purl.fullName() + "@" + p.purl.Version}
-		return i.opts.Run(ctx, dir, os.Environ(), append(argv, p.spec.Source.ExtraPackages...)...)
+		return i.opts.Run(ctx, dir, commandEnv(), append(argv, p.spec.Source.ExtraPackages...)...)
 	case "github":
 		return i.fetchRelease(ctx, p, dir)
 	}
