@@ -342,9 +342,9 @@ func PR(p review.PRPage, mode settings.ViewMode) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var21 string
-			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(len(p.Review.Conversation)))
+			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(len(p.Review.Conversation) + len(p.Review.Reviews)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/pr.templ`, Line: 38, Col: 90}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/pr.templ`, Line: 38, Col: 114}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
@@ -354,7 +354,7 @@ func PR(p review.PRPage, mode settings.ViewMode) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = Conversation(p.PR.Ref, p.Review.Conversation).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = Conversation(p.PR.Ref, p.Review.Conversation, p.Review.Reviews).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

@@ -509,3 +509,45 @@ func rateLimitName(resource string) string {
 	}
 	return resource
 }
+
+// conversationEntry is a Conversation Comment or a submitted review.
+type conversationEntry struct {
+	Comment *domain.Comment
+	Review  *domain.SubmittedReview
+	At      time.Time
+}
+
+// conversationEntries merges comments and reviews by time, oldest first.
+func conversationEntries(comments []domain.Comment, reviews []domain.SubmittedReview) []conversationEntry {
+	out := make([]conversationEntry, 0, len(comments)+len(reviews))
+	for i := range comments {
+		out = append(out, conversationEntry{Comment: &comments[i], At: comments[i].CreatedAt})
+	}
+	for i := range reviews {
+		out = append(out, conversationEntry{Review: &reviews[i], At: reviews[i].SubmittedAt})
+	}
+	slices.SortStableFunc(out, func(a, b conversationEntry) int { return a.At.Compare(b.At) })
+	return out
+}
+
+func reviewVerdictText(v domain.ReviewVerdict) string {
+	switch v {
+	case domain.ReviewApproved:
+		return "approved these changes"
+	case domain.ReviewChangesRequested:
+		return "requested changes"
+	case domain.ReviewDismissed:
+		return "reviewed (dismissed)"
+	}
+	return "reviewed"
+}
+
+func reviewIcon(v domain.ReviewVerdict) string {
+	switch v {
+	case domain.ReviewApproved:
+		return "✓"
+	case domain.ReviewChangesRequested:
+		return "✗"
+	}
+	return "●"
+}

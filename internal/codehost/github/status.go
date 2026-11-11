@@ -15,7 +15,7 @@ type statusTracker struct {
 	mu           sync.Mutex
 	online       bool
 	unauthorized bool
-	limits map[string]codehost.RateLimit // by X-RateLimit-Resource
+	limits       map[string]codehost.RateLimit // by X-RateLimit-Resource
 }
 
 func (t *statusTracker) failed() {

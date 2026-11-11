@@ -49,11 +49,11 @@ func LiveUpdate(pr domain.PRRef, u review.Update) templ.Component {
 			}
 		}
 		if u.ConversationChanged {
-			templ_7745c5c3_Err = conversationView(pr, u.Conversation, true).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = conversationView(pr, u.Conversation, u.Reviews, true).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ConversationCount(len(u.Conversation)).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ConversationCount(len(u.Conversation)+len(u.Reviews)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

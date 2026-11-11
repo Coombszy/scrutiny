@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Coombszy/scrutiny/internal/codehost"
 	"github.com/Coombszy/scrutiny/internal/domain"
@@ -289,4 +290,44 @@ func attr(n *html.Node, key string) string {
 		}
 	}
 	return ""
+}
+
+func TestSubmittedReviewsAppearInTheConversationInTimeOrder(t *testing.T) {
+	a := newApp(t)
+	at := func(m int) time.Time { return time.Date(2026, 11, 11, 9, m, 0, 0, time.UTC) }
+	st := a.host.State(ref)
+	st.Conversation = []domain.Comment{{ID: "IC1", Author: "sam", BodyHTML: "<p>Looks promising</p>", CreatedAt: at(10)}}
+	st.Reviews = []domain.SubmittedReview{
+		{ID: "R1", Author: "bo", Verdict: domain.ReviewChangesRequested, BodyHTML: "<p>Needs tests</p>", SubmittedAt: at(5)},
+		{ID: "R2", Author: "ana", Verdict: domain.ReviewApproved, BodyHTML: "<p>Ship it</p>", SubmittedAt: at(20)},
+		{ID: "R3", Author: "cy", Verdict: domain.ReviewCommented, SubmittedAt: at(25)},
+	}
+
+	page := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	mustContain(t, page, `Conversation (<span id="conversation-count">4</span>)`)
+	conv := page[strings.Index(page, `id="conversation"`):]
+	conv = conv[:strings.Index(conv, `id="conversation-new"`)]
+	order := []string{"requested changes", "Looks promising", "approved these changes", "reviewed"}
+	last := -1
+	for _, want := range order {
+		i := strings.Index(conv, want)
+		if i < 0 || i < last {
+			t.Fatalf("%q missing or out of order in:\n%s", want, conv)
+		}
+		last = i
+	}
+	mustContain(t, conv, "review-changes_requested", "<p>Needs tests</p>", "review-approved", "<p>Ship it</p>", "bo", "ana")
+}
+
+func TestASubmittedReviewShowsUpAfterSubmitting(t *testing.T) {
+	a := newApp(t)
+	a.do(t, http.MethodGet, prPath, nil)
+	a.do(t, http.MethodPost, prPath+"/review", url.Values{"head": {string(c2)}, "event": {"REQUEST_CHANGES"}, "body": {"Please add tests"}})
+
+	page := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	mustContain(t, page, "requested changes", "Please add tests", `<span id="conversation-count">1</span>`)
+
+	// Posting a comment keeps the review and counts both.
+	rec := a.do(t, http.MethodPost, prPath+"/comments", url.Values{"body": {"Done"}})
+	mustContain(t, rec.Body.String(), "requested changes", "Done", `<span id="conversation-count" hx-swap-oob="true">2</span>`)
 }

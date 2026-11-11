@@ -380,3 +380,13 @@ kbd { font-family: var(--mono); font-size: var(--fs-sm); background: var(--bg2);
 .spark { display: block; width: 100%; height: 18px; margin-top: .2rem; fill: var(--blue); background: var(--bg1); border-radius: 2px; }
 .spark-bad { fill: var(--red); }
 @media (max-width: 900px) { .settings-layout { grid-template-columns: 1fr; } .activity-panel { position: static; } }
+
+/* Submitted reviews in the Conversation */
+.review-event { padding: .5rem .8rem; border-top: 1px solid var(--bg1); }
+.review-event header { display: flex; gap: .5rem; align-items: baseline; flex-wrap: wrap; }
+.review-icon { display: inline-flex; width: 1.3rem; height: 1.3rem; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg2); font-size: var(--fs-sm); }
+.review-approved .review-icon { background: var(--green); color: var(--bg0); }
+.review-approved .review-verdict { color: var(--green); }
+.review-changes_requested .review-icon { background: var(--red); color: var(--bg0); }
+.review-changes_requested .review-verdict { color: var(--red); }
+.review-event .markdown { margin-top: .3rem; padding-left: 1.8rem; }

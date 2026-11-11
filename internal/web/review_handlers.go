@@ -142,12 +142,12 @@ func (s *Server) comment(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	comments, err := s.review.AddConversationComment(r.Context(), ref, r.FormValue("body"))
+	comments, reviews, err := s.review.AddConversationComment(r.Context(), ref, r.FormValue("body"))
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	s.render(w, r, http.StatusOK, views.Conversation(ref, comments), views.ConversationCount(len(comments)))
+	s.render(w, r, http.StatusOK, views.Conversation(ref, comments, reviews), views.ConversationCount(len(comments)+len(reviews)))
 }
 
 func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
@@ -184,7 +184,7 @@ func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {
 func (s *Server) renderCommentChange(w http.ResponseWriter, r *http.Request, ref domain.PRRef, ch review.CommentChange) {
 	switch {
 	case ch.InConversation:
-		s.render(w, r, http.StatusOK, views.Conversation(ref, ch.Conversation), views.ConversationCount(len(ch.Conversation)))
+		s.render(w, r, http.StatusOK, views.Conversation(ref, ch.Conversation, ch.Reviews), views.ConversationCount(len(ch.Conversation)+len(ch.Reviews)))
 	case ch.Thread != nil:
 		s.renderWithPending(w, r, views.Thread(ref, *ch.Thread))
 	default:

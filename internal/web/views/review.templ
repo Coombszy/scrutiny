@@ -216,19 +216,25 @@ templ PendingList(comments []review.PendingComment, oob bool) {
 }
 
 // Conversation renders the Conversation Comments and the form for a new one.
-templ Conversation(pr domain.PRRef, comments []domain.Comment) {
-	@conversationView(pr, comments, false)
+templ Conversation(pr domain.PRRef, comments []domain.Comment, reviews []domain.SubmittedReview) {
+	@conversationView(pr, comments, reviews, false)
 }
 
-templ conversationView(pr domain.PRRef, comments []domain.Comment, oob bool) {
+// conversationView interleaves Conversation Comments with submitted
+// reviews, oldest first, as GitHub's conversation does.
+templ conversationView(pr domain.PRRef, comments []domain.Comment, reviews []domain.SubmittedReview, oob bool) {
 	<section
 		id="conversation"
 		if oob {
 			hx-swap-oob="true"
 		}
 	>
-		for _, c := range comments {
-			@commentView(pr, c, "#conversation")
+		for _, e := range conversationEntries(comments, reviews) {
+			if e.Review != nil {
+				@reviewEvent(*e.Review)
+			} else {
+				@commentView(pr, *e.Comment, "#conversation")
+			}
 		}
 		<form class="reply" autocomplete="off" hx-post={ pr.Path() + "/comments" } hx-target="#conversation" hx-swap="outerHTML">
 			<textarea autocomplete="off" id="conversation-new" name="body" rows="3" placeholder="Add a comment" required></textarea>
@@ -255,4 +261,24 @@ templ submitDialog(pr domain.PRRef, head domain.SHA, pending []review.PendingCom
 			</div>
 		</form>
 	</dialog>
+}
+
+// reviewEvent is a submitted review in the Conversation: who, the verdict,
+// and its summary if it has one.
+templ reviewEvent(r domain.SubmittedReview) {
+	<article class={ "review-event", "review-" + string(r.Verdict) } id={ "review-" + r.ID }>
+		<header>
+			<span class="review-icon" aria-hidden="true">{ reviewIcon(r.Verdict) }</span>
+			<strong>{ r.Author }</strong>
+			<span class="review-verdict">{ reviewVerdictText(r.Verdict) }</span>
+			if !r.SubmittedAt.IsZero() {
+				<span class="muted">{ r.SubmittedAt.Local().Format("2 Jan 2006 15:04") }</span>
+			}
+		</header>
+		if r.BodyHTML != "" {
+			<div class="markdown" hx-disable>
+				@templ.Raw(r.BodyHTML)
+			</div>
+		}
+	</article>
 }

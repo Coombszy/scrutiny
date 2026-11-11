@@ -191,7 +191,7 @@ func TestConversationCommentsArePostedImmediately(t *testing.T) {
 	f.withDiff(mb, c3)
 	ctx := context.Background()
 
-	conv, err := f.svc.AddConversationComment(ctx, ref, "Thanks!")
+	conv, _, err := f.svc.AddConversationComment(ctx, ref, "Thanks!")
 	if err != nil {
 		t.Fatal(err)
 	}

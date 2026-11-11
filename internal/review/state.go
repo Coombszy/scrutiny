@@ -235,12 +235,13 @@ func (s *Service) SetReaction(ctx context.Context, ref domain.PRRef, subjectID s
 	return nil, fmt.Errorf("comment %s: %w", subjectID, ErrThreadNotFound)
 }
 
-// AddConversationComment posts a Conversation Comment, returning them all.
-func (s *Service) AddConversationComment(ctx context.Context, ref domain.PRRef, body string) ([]domain.Comment, error) {
+// AddConversationComment posts a Conversation Comment, returning all of
+// them and the submitted reviews shown among them.
+func (s *Service) AddConversationComment(ctx context.Context, ref domain.PRRef, body string) ([]domain.Comment, []domain.SubmittedReview, error) {
 	snap, err := s.write(ctx, ref, func(snap snapshot) error {
 		return s.CodeHost.AddConversationComment(ctx, snap.State.PRID, body)
 	})
-	return snap.State.Conversation, err
+	return snap.State.Conversation, snap.State.Reviews, err
 }
 
 // SetViewed marks or unmarks a file as Viewed.
@@ -325,6 +326,7 @@ func pendingComments(st domain.ReviewState) []PendingComment {
 type CommentChange struct {
 	InConversation bool
 	Conversation   []domain.Comment
+	Reviews        []domain.SubmittedReview // shown in the Conversation too
 	ThreadID       string
 	// Thread is nil when deleting its last comment deleted the thread.
 	Thread *domain.ReviewThread
@@ -388,7 +390,7 @@ func (s *Service) changeComment(ctx context.Context, ref domain.PRRef, commentID
 		return CommentChange{}, err
 	}
 	if out.InConversation {
-		out.Conversation = snap.State.Conversation
+		out.Conversation, out.Reviews = snap.State.Conversation, snap.State.Reviews
 	} else if t, err := findThread(snap.State, out.ThreadID); err == nil {
 		out.Thread = &t
 	}
