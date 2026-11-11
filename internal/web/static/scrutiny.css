@@ -89,7 +89,7 @@ main { padding: 1rem; max-width: 100%; }
 .diff tr.hunk td { background: var(--bg1); color: var(--gray); padding: .15rem .5rem; }
 
 /* Syntax: colours come from the Theme (/theme.css); only styles live here. */
-.hl-comment { font-style: italic; }
+.hl-comment, .markdown .pl-c { font-style: italic; }
 .hl-function { font-weight: 600; }
 .hl-function-method { font-weight: normal; }
 .hl-text-title { font-weight: 700; }
@@ -178,6 +178,24 @@ button.primary:hover { filter: brightness(1.1); background: var(--green); }
 .markdown { overflow-wrap: anywhere; }
 .markdown img { max-width: 100%; }
 .markdown pre { background: var(--bg1); padding: .5rem; overflow-x: auto; }
+.markdown .highlight pre { margin: 0 0 1em; }
+/* A suggested change: GitHub's bodyHTML holds the diff (removed rows, then
+   added ones, changed words in .x); the Preview tab builds the same. */
+.markdown .js-suggested-changes-blob { border: 1px solid var(--bg2); border-radius: 6px; overflow: hidden; margin: .5rem 0; }
+.markdown .js-suggested-changes-blob > div:first-child { background: var(--bg1); color: var(--fg-dim); font-size: var(--fs-sm); padding: .2rem .6rem; border-bottom: 1px solid var(--bg2); }
+.markdown .js-suggested-changes-blob table { width: 100%; border-collapse: collapse; margin: 0; font: var(--fs-code)/1.45 var(--mono); }
+.markdown .js-suggested-changes-blob td { border: 0; padding: 0 .5rem; vertical-align: top; }
+.markdown .blob-code-inner { white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4; width: 100%; }
+.markdown .blob-num { width: 1.6rem; text-align: center; color: var(--fg-dim); user-select: none; font-size: 0; }
+.markdown .blob-num::before { font-size: var(--fs-code); }
+.markdown .blob-num-deletion { background: var(--del-ln); }
+.markdown .blob-num-deletion::before { content: "\2212"; }
+.markdown .blob-num-addition { background: var(--add-ln); }
+.markdown .blob-num-addition::before { content: "+"; }
+.markdown .blob-code-deletion { background: var(--del-bg); }
+.markdown .blob-code-addition { background: var(--add-bg); }
+.markdown .blob-code-deletion .x { background: var(--del-ln); border-radius: 2px; }
+.markdown .blob-code-addition .x { background: var(--add-ln); border-radius: 2px; }
 .reply { padding: .5rem .8rem; display: flex; flex-direction: column; gap: .4rem; }
 textarea { font: inherit; color: var(--fg); background: var(--bg1); border: 1px solid var(--bg2); border-radius: 4px; padding: .4rem; width: 100%; resize: vertical; }
 .actions { display: flex; gap: .5rem; }

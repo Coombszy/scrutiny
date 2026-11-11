@@ -25,7 +25,8 @@ func TestCSSCoversChromeAndSyntax(t *testing.T) {
 	css := light.CSS()
 	for _, want := range []string{
 		"color-scheme: light", "--bg0: #fbf1c7;", "--add-bg: rgba(121, 116, 14, 0.14);",
-		".hl-keyword { color: #9d0006; }", ".hl-function-method { color: #427b58; }",
+		".hl-keyword { color: #9d0006; }", ".markdown .pl-k { color: #9d0006; }",
+		".markdown .pl-s, .markdown .pl-pds, .markdown .pl-sr { color: #79740e; }", ".hl-function-method { color: #427b58; }",
 	} {
 		if !strings.Contains(css, want) {
 			t.Errorf("CSS missing %q", want)

@@ -1587,27 +1587,55 @@ window.Scrutiny = { actions: {} };
     replace(box, s, e, text, url, url + 3);
   }
 
+  // diffLines is the diff's code cells for head lines start to end, or
+  // none when any of them is not on the page.
+  function diffLines(table, start, end) {
+    const cells = [];
+    for (let n = start; n <= end && table; n++) {
+      const cell = table.querySelector(`td.code[data-line="${n}"]`);
+      if (!cell) return [];
+      cells.push(cell);
+    }
+    return cells;
+  }
+
   // suggest adds a suggested change holding the lines it replaces, read
   // from the diff; lines not on the page leave the block empty.
   function suggest(box, button) {
-    const start = Number(button.dataset.start);
-    const end = Number(button.dataset.end);
-    const table = box.closest("table.diff");
-    const code = [];
-    for (let n = start; n <= end && table; n++) {
-      const cell = table.querySelector(`td.code[data-line="${n}"]`);
-      if (!cell) {
-        code.length = 0;
-        break;
-      }
-      code.push(cell.textContent.replace(/\n$/, ""));
-    }
+    const cells = diffLines(box.closest("table.diff"), Number(button.dataset.start), Number(button.dataset.end));
     const { value, selectionStart: s, selectionEnd: e } = box;
     const lead = s === 0 || value[s - 1] === "\n" ? "" : "\n";
-    const body = code.join("\n");
+    const body = cells.map((c) => c.textContent.replace(/\n$/, "")).join("\n");
     const text = `${lead}\`\`\`suggestion\n${body}\n\`\`\`\n`;
     const caret = s + lead.length + "```suggestion\n".length;
     replace(box, s, e, text, caret, caret + body.length);
+  }
+
+  // suggestionDiffs turns the preview's suggestion blocks into the diff
+  // GitHub shows once posted: the lines replaced, from the page's diff,
+  // then the lines suggested.
+  function suggestionDiffs(editor, pane) {
+    const button = editor.querySelector('.md-toolbar [data-md="suggestion"]');
+    const old = button ? diffLines(editor.closest("table.diff"), Number(button.dataset.start), Number(button.dataset.end)) : [];
+    for (const pre of pane.querySelectorAll('pre[lang="suggestion"]')) {
+      const blob = document.createElement("div");
+      blob.className = "js-suggested-changes-blob";
+      const head = document.createElement("div");
+      head.textContent = "Suggested change";
+      const table = document.createElement("table");
+      const row = (kind, fill) => {
+        const tr = table.insertRow();
+        tr.insertCell().className = `blob-num blob-num-${kind}`;
+        const td = tr.insertCell();
+        td.className = `blob-code-inner blob-code-${kind}`;
+        fill(td);
+      };
+      for (const cell of old) row("deletion", (td) => (td.innerHTML = cell.innerHTML));
+      const text = pre.textContent.replace(/\n$/, "");
+      if (text !== "" || old.length === 0) for (const line of text.split("\n")) row("addition", (td) => (td.textContent = line));
+      blob.append(head, table);
+      pre.replaceWith(blob);
+    }
   }
 
   const actions = {
@@ -1663,7 +1691,10 @@ window.Scrutiny = { actions: {} };
       const text = await res.text();
       if (box.value !== body || !editor.classList.contains("previewing")) return; // superseded
       if (res.status === 401) Scrutiny.authFailed();
-      if (res.ok) pane.innerHTML = text;
+      if (res.ok) {
+        pane.innerHTML = text;
+        suggestionDiffs(editor, pane);
+      }
       else pane.replaceChildren(Object.assign(document.createElement("p"), { className: "muted", textContent: `Preview failed: ${text.trim() || res.statusText}` }));
     } catch {
       pane.innerHTML = '<p class="muted">Preview failed: Scrutiny is not reachable.</p>';

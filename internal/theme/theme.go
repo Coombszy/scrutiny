@@ -139,7 +139,28 @@ func (t Theme) CSS() string {
 	}
 	b.WriteString("}\n")
 	for _, k := range slices.Sorted(maps.Keys(t.Syntax)) {
-		fmt.Fprintf(&b, ".hl-%s { color: %s; }\n", strings.ReplaceAll(k, ".", "-"), strings.TrimSpace(t.Syntax[k]))
+		colour := strings.TrimSpace(t.Syntax[k])
+		fmt.Fprintf(&b, ".hl-%s { color: %s; }\n", strings.ReplaceAll(k, ".", "-"), colour)
+		if cs := githubClasses[k]; len(cs) > 0 {
+			fmt.Fprintf(&b, ".markdown .%s { color: %s; }\n", strings.Join(cs, ", .markdown ."), colour)
+		}
 	}
 	return b.String()
+}
+
+// githubClasses are the classes GitHub puts on code it highlights in
+// comment bodies, by the capture name whose colour they take. pl-s1 and
+// pl-smi stay plain, as on GitHub.
+var githubClasses = map[string][]string{
+	"keyword":       {"pl-k"},
+	"string":        {"pl-s", "pl-pds", "pl-sr"},
+	"string.escape": {"pl-cce", "pl-pse"},
+	"comment":       {"pl-c"},
+	"constant":      {"pl-c1"},
+	"function":      {"pl-en"},
+	"variable":      {"pl-v"},
+	"attribute":     {"pl-e"},
+	"type":          {"pl-ent"},
+	"punctuation":   {"pl-kos"},
+	"text.title":    {"pl-mh"},
 }
