@@ -26,6 +26,16 @@ button:hover { background: var(--bg2); }
 
 .topbar { display: flex; gap: 1rem; align-items: center; padding: .5rem 1rem; background: var(--bg1); position: sticky; top: 0; z-index: 2; }
 .brand { font-weight: 700; color: var(--yellow); text-decoration: none; }
+/* The tagline types phrases after the brand; scrutiny.js drives it. */
+.tagline { margin-left: -.5rem; color: var(--gray); font-family: var(--mono); font-size: var(--fs-sm); white-space: pre; user-select: none; }
+.tagline-text span { animation: tagline-fade .36s cubic-bezier(.25, 1, .5, 1); }
+.tagline-cursor { display: inline-block; width: 2px; height: 1.1em; margin-left: .06em; vertical-align: -.2em; border-radius: 1px; background: currentColor; animation: tagline-blink 1s ease-in-out infinite; }
+.tagline.typing .tagline-cursor { animation: none; }
+@keyframes tagline-fade { from { opacity: 0; } }
+@keyframes tagline-blink { 0%, 35%, 100% { opacity: 1; } 55%, 80% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .tagline-text span, .tagline-cursor { animation: none; }
+}
 main { padding: 1rem; max-width: 100%; }
 
 .badge { display: inline-block; font-size: var(--fs-sm); padding: 0 .45rem; border-radius: 999px; background: var(--bg2); color: var(--fg-dim); text-transform: capitalize; }

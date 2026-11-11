@@ -30,6 +30,14 @@ type ThemeOption struct {
 	Name string `json:"name"`
 }
 
+// taglines are typed out, one after another, after the brand in the top bar.
+var taglines = []string{
+	"GitHub is down... again",
+	"F**k GitHub",
+	"Stupid Buggy GitHub Diff page",
+	"Why is GitHub S**t",
+}
+
 type pageKey struct{}
 
 // WithPage stores p in ctx for components to read.

@@ -861,3 +861,88 @@ window.Scrutiny = { actions: {} };
 
   Scrutiny.actions.command_palette = () => show(commands());
 })();
+
+// The tagline after the brand types a phrase, now and then hitting a
+// neighbouring key and correcting it, pauses, backspaces it, then types the
+// next. With reduced motion it shows one phrase and stays still.
+(() => {
+  "use strict";
+  const root = document.querySelector(".tagline");
+  if (!root) return;
+  const text = root.querySelector(".tagline-text");
+  let phrases;
+  try {
+    phrases = JSON.parse(root.dataset.phrases || "[]");
+  } catch {
+    phrases = [];
+  }
+  if (!phrases.length) return;
+  let index = Math.floor(Math.random() * phrases.length);
+
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    text.textContent = phrases[index];
+    return;
+  }
+
+  const neighbours = {
+    a: "qwsz", b: "vghn", c: "xdfv", d: "serfcx", e: "wsdr", f: "drtgvc", g: "ftyhbv",
+    h: "gyujnb", i: "ujko", j: "huikmn", k: "jiolm", l: "kop", m: "njk", n: "bhjm",
+    o: "iklp", p: "ol", q: "wa", r: "edft", s: "awedxz", t: "rfgy", u: "yhji",
+    v: "cfgb", w: "qase", x: "zsdc", y: "tghu", z: "asx",
+  };
+  const typoChance = 0.04;
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const between = (min, max) => min + Math.random() * (max - min);
+
+  function typo(char) {
+    const keys = neighbours[char.toLowerCase()];
+    if (!keys) return null;
+    const pick = keys[Math.floor(Math.random() * keys.length)];
+    return char === char.toLowerCase() ? pick : pick.toUpperCase();
+  }
+  function type(char) {
+    const span = document.createElement("span");
+    span.textContent = char;
+    text.append(span);
+  }
+  const backspace = () => text.lastChild?.remove();
+
+  async function run() {
+    for (;;) {
+      const chars = Array.from(phrases[index]);
+      root.classList.add("typing");
+      for (let i = 0; i < chars.length; i++) {
+        const wrong = i > 0 && Math.random() < typoChance ? typo(chars[i]) : null;
+        if (wrong) {
+          await sleep(between(50, 110));
+          type(wrong);
+          // Sometimes the next key lands too before the slip is noticed.
+          const extra = chars[i + 1]?.trim() && Math.random() < 0.4;
+          if (extra) {
+            await sleep(between(50, 110));
+            type(chars[i + 1]);
+          }
+          await sleep(between(260, 580));
+          for (let n = extra ? 2 : 1; n > 0; n--) {
+            backspace();
+            await sleep(60);
+          }
+          await sleep(between(90, 230));
+        }
+        await sleep(between(50, 110));
+        type(chars[i]);
+      }
+      root.classList.remove("typing");
+      await sleep(2500);
+      root.classList.add("typing");
+      while (text.lastChild) {
+        backspace();
+        await sleep(35);
+      }
+      root.classList.remove("typing");
+      await sleep(600);
+      index = (index + 1) % phrases.length;
+    }
+  }
+  run();
+})();
