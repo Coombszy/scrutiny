@@ -342,12 +342,9 @@ window.Scrutiny = { actions: {} };
     if (!id) return;
     const find = () => document.getElementById("thread-" + id);
     if (!find()) await Promise.all([...document.querySelectorAll(".file")].filter((f) => Number(f.dataset.threads || 0) > 0).map(loadDiff));
-    const thread = find();
-    if (thread) {
-      thread.closest(".file.viewed")?.classList.add("peek");
-      thread.querySelector("details")?.setAttribute("open", "");
-    }
-    select(thread);
+    // Selected again, but left as the page renders it: a resolved thread
+    // stays folded and a Viewed file collapsed. Going to it opens it.
+    select(find());
   }
 
   // A reload (Refresh, toggling the View Mode, the browser's own) puts the
@@ -414,7 +411,6 @@ window.Scrutiny = { actions: {} };
       y: scrollY,
       anchor: captureAnchor(),
       conversation: !!document.querySelector(".conversation-panel")?.open,
-      peek: paths((f) => f.classList.contains("peek")),
       full: paths((f) => f.querySelector('[data-full-toggle][aria-pressed="true"]')),
       loaded: paths((f) => !!f.querySelector(".file-body table")),
     };
@@ -432,15 +428,17 @@ window.Scrutiny = { actions: {} };
     if (!saved) return;
 
     if (saved.conversation) document.querySelector(".conversation-panel")?.setAttribute("open", "");
+    // Viewed files opened for a look are not reopened: they, like resolved
+    // threads, start collapsed on every load.
     const byPath = new Map([...document.querySelectorAll(".file[data-path]")].map((f) => [fileKey(f), f]));
-    for (const p of saved.peek) byPath.get(p)?.classList.add("peek");
     // Re-open what was opened by hand, and the anchor's own diff; lazy
     // diffs elsewhere load as they come into view, as before.
     const anchorFile = byPath.get(saved.anchor?.path);
     const loads = [];
     for (const p of saved.full) {
-      const button = byPath.get(p)?.querySelector("[data-full-toggle]");
-      if (button) loads.push(toggleFullFile(button));
+      const f = byPath.get(p);
+      const button = f?.querySelector("[data-full-toggle]");
+      if (button && !f.classList.contains("viewed")) loads.push(toggleFullFile(button)); // it would un-collapse a Viewed file
     }
     for (const p of saved.loaded) {
       const f = byPath.get(p);
