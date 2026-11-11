@@ -118,10 +118,12 @@ func TestKeyboardHelpIsOfferedOnThePRPageAndDashboard(t *testing.T) {
 	mustContain(t, a.do(t, http.MethodGet, prPath, nil).Body.String(), "<kbd>h</kbd>")
 }
 
-func TestEveryPageHasAnActivitySpinner(t *testing.T) {
+func TestActivityShowsInTheCursorNotTheTopBar(t *testing.T) {
 	a := newApp(t)
 	for _, path := range []string{"/", prPath, "/settings"} {
-		mustContain(t, a.do(t, http.MethodGet, path, nil).Body.String(), `id="activity"`)
+		if strings.Contains(a.do(t, http.MethodGet, path, nil).Body.String(), `id="activity"`) {
+			t.Errorf("%s still has the top bar activity spinner", path)
+		}
 	}
 }
 

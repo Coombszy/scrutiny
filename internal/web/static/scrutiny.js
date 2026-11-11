@@ -2,21 +2,21 @@
 // named actions in Scrutiny.actions; hotkeys and the Command Palette run them.
 window.Scrutiny = { actions: {} };
 
-// The top bar's activity spinner shows while anything the user started is
-// in flight: htmx requests, script fetches (Scrutiny.busy), and page loads
-// that actions end in. It waits a moment so instant actions do not flicker;
-// background polling marked data-quiet never shows it.
+// While anything the user started is in flight, the cursor shows progress:
+// htmx requests from their clicks, forms and hotkeys, script work wrapped
+// in Scrutiny.busy (code navigation, jumping to comments), and the page
+// load an action ends in (switching View Mode or Theme). Requests the page
+// makes by itself (on load, on scroll, polling, or marked data-quiet) do not.
 (() => {
   "use strict";
-  const activity = document.getElementById("activity");
   let active = 0;
   let leaving = false;
   let timer;
   function update() {
     clearTimeout(timer);
-    if (!activity) return;
-    if (active > 0 || leaving) timer = setTimeout(() => (activity.hidden = false), 150);
-    else activity.hidden = true;
+    // A short delay keeps instant actions from flickering the cursor.
+    if (active > 0 || leaving) timer = setTimeout(() => document.body.classList.add("busy"), 80);
+    else document.body.classList.remove("busy");
   }
   function start() {
     active++;
@@ -30,8 +30,14 @@ window.Scrutiny = { actions: {} };
     start();
     return Promise.resolve(promise).finally(stop);
   };
+  const automatic = /\b(load|every|intersect|revealed)\b/;
+  function userCaused(elt) {
+    if (!elt?.closest) return true;
+    if (elt.closest("[data-quiet]")) return false;
+    return !automatic.test(elt.getAttribute("hx-trigger") || "");
+  }
   document.addEventListener("htmx:beforeRequest", (e) => {
-    if (e.detail.elt?.closest?.("[data-quiet]")) return;
+    if (!userCaused(e.detail.elt)) return;
     e.detail.xhr.scrutinyBusy = true;
     start();
   });
@@ -87,14 +93,14 @@ window.Scrutiny = { actions: {} };
       htmx.ajax("GET", url, { target: row, swap: "afterend" });
     }
     const nav = e.target.closest("[data-comment-nav]");
-    if (nav) navigate(nav.dataset.commentNav === "next" ? 1 : -1);
+    if (nav) Scrutiny.busy(navigate(nav.dataset.commentNav === "next" ? 1 : -1));
     const toggle = e.target.closest("[data-full-toggle]");
-    if (toggle) toggleFullFile(toggle);
+    if (toggle) Scrutiny.busy(toggleFullFile(toggle));
     const jump = e.target.closest("[data-jump-thread]");
     if (jump) {
       e.preventDefault();
       jump.closest("dialog")?.close();
-      jumpToThread(jump.dataset.jumpThread, jump.dataset.path);
+      Scrutiny.busy(jumpToThread(jump.dataset.jumpThread, jump.dataset.path));
     }
   });
 
@@ -223,8 +229,8 @@ window.Scrutiny = { actions: {} };
 
   // Only the PR page has comments to step through and a View Mode.
   if (document.querySelector(".comment-nav")) {
-    Scrutiny.actions.next_comment = () => navigate(1);
-    Scrutiny.actions.prev_comment = () => navigate(-1);
+    Scrutiny.actions.next_comment = () => Scrutiny.busy(navigate(1));
+    Scrutiny.actions.prev_comment = () => Scrutiny.busy(navigate(-1));
     Scrutiny.actions.toggle_view_mode = () =>
       htmx.ajax("POST", "/settings/view-mode", {
         values: { mode: document.body.dataset.viewMode === "split" ? "unified" : "split" },
@@ -333,22 +339,14 @@ window.Scrutiny = { actions: {} };
     location.href = target.url;
   }
 
-  // waitingOn shows the wait cursor while a query waits on the Language
-  // Server, which can take a while as it indexes.
-  let waits = 0;
-  async function waitingOn(promise) {
-    waits++;
-    document.body.classList.add("lsp-waiting");
-    try {
-      return await promise;
-    } finally {
-      if (--waits === 0) document.body.classList.remove("lsp-waiting");
-    }
-  }
+  // definition and usages keep the progress cursor up for the whole flow:
+  // waiting on the Language Server, then loading the diff to land in.
+  const definition = (pos) => Scrutiny.busy(findDefinition(pos));
+  const usages = (pos) => Scrutiny.busy(findUsages(pos));
 
-  async function definition(pos) {
+  async function findDefinition(pos) {
     try {
-      const targets = await waitingOn(fetchOK(`${prPath}/definition?${query(pos)}`).then((r) => r.json()));
+      const targets = await (await fetchOK(`${prPath}/definition?${query(pos)}`)).json();
       if (targets.length === 0) return toast("No definition found.");
       if (targets.length === 1) return go(targets[0]);
       menu(lastPoint, targets.map((t) => [`${t.path}:${t.line}`, () => go(t)]));
@@ -357,9 +355,9 @@ window.Scrutiny = { actions: {} };
     }
   }
 
-  async function usages(pos) {
+  async function findUsages(pos) {
     try {
-      const html = await waitingOn(fetchOK(`${prPath}/references?${query(pos)}`).then((r) => r.text()));
+      const html = await (await fetchOK(`${prPath}/references?${query(pos)}`)).text();
       document.getElementById("side-panel")?.remove();
       document.body.insertAdjacentHTML("beforeend", html);
     } catch (err) {
@@ -412,7 +410,7 @@ window.Scrutiny = { actions: {} };
       document.getElementById("palette")?.close();
       const line = Number(link.dataset.navLine || 0);
       const path = link.dataset.navPath;
-      (line ? reveal(path, line) : revealFile(path)).then((shown) => shown || (location.href = link.href));
+      Scrutiny.busy((line ? reveal(path, line) : revealFile(path)).then((shown) => shown || (location.href = link.href)));
       return;
     }
     if ((e.ctrlKey || e.metaKey) && e.button === 0) {

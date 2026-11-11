@@ -199,7 +199,7 @@ details.status-row { display: block; }
 
 /* Code navigation */
 .topbar-hint { font-size: var(--fs-sm); }
-/* The top bar's right-hand group: Language Server icon, settings cog, activity. */
+/* The top bar's right-hand group: keyboard hint, Language Server icon, settings cog. */
 .topbar-end { margin-left: auto; display: inline-flex; gap: 1rem; align-items: center; }
 
 /* Language Server status: a ring spins while starting or indexing; a badge
@@ -216,8 +216,9 @@ details.status-row { display: block; }
 .lsp-cross circle { fill: var(--red); }
 .lsp-ready .lsp-tick, .lsp-failed .lsp-cross { display: block; }
 
-/* While a navigation query waits on the Language Server. */
-body.lsp-waiting, body.lsp-waiting * { cursor: progress !important; }
+/* While something the user did is in flight (a request, or the page it
+   leads to), the cursor says so. */
+body.busy, body.busy * { cursor: progress !important; }
 .spinner { width: .9rem; height: .9rem; border: 2px solid var(--bg2); border-top-color: var(--yellow); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -311,8 +312,7 @@ kbd { font-family: var(--mono); font-size: var(--fs-sm); background: var(--bg2);
 
 /* Activity spinner, far right of the top bar */
 /* Its space is always reserved so the top bar never shifts when it shows. */
-.activity { display: inline-flex; align-items: center; justify-content: center; width: 1rem; margin-left: -.5rem; /* sits .5rem after the settings cog, inside the top bar's 1rem gap */ }
-.activity[hidden] { display: inline-flex; visibility: hidden; }
+
 .files-bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin: 0 0 .6rem; }
 .files-bar-actions { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-left: auto; }
 
