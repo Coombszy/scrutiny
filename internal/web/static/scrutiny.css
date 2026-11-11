@@ -390,3 +390,18 @@ kbd { font-family: var(--mono); font-size: var(--fs-sm); background: var(--bg2);
 .review-changes_requested .review-icon { background: var(--red); color: var(--bg0); }
 .review-changes_requested .review-verdict { color: var(--red); }
 .review-event .markdown { margin-top: .3rem; padding-left: 1.8rem; }
+
+/* Comparison commit pickers: two-line options */
+.picker-label { color: var(--fg-dim); }
+.commit-picker { position: relative; }
+.commit-picker-button { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: .05rem; max-width: 22rem; padding: .2rem 1.8rem .2rem .6rem; position: relative; }
+.commit-picker-button::after { content: ""; position: absolute; right: .7rem; top: 50%; width: .4rem; height: .4rem; margin-top: -.3rem; border-right: 2px solid var(--fg-dim); border-bottom: 2px solid var(--fg-dim); transform: rotate(45deg); }
+.commit-line { display: flex; gap: .4rem; align-items: baseline; max-width: 100%; min-width: 0; }
+.commit-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.commit-hash { background: none; padding: 0; font-size: var(--fs-sm); color: var(--blue); flex: none; }
+.commit-date { font-size: var(--fs-sm); color: var(--gray); }
+.commit-picker-button .commit-date { display: none; } /* the time shows in the list only */
+.commit-picker-list { position: absolute; z-index: 20; top: calc(100% + 2px); left: 0; min-width: 100%; width: max-content; max-width: min(32rem, 90vw); max-height: 22rem; overflow-y: auto; margin: 0; padding: .25rem; list-style: none; background: var(--bg1); border: 1px solid var(--bg2); border-radius: 6px; box-shadow: 0 6px 20px rgba(0, 0, 0, .4); }
+.commit-picker-list li { display: flex; flex-direction: column; gap: .05rem; padding: .3rem .6rem; border-radius: 4px; cursor: pointer; }
+.commit-picker-list li:hover, .commit-picker-list li.active { background: var(--bg2); }
+.commit-picker-list li[aria-selected="true"] { box-shadow: inset 2px 0 0 var(--yellow); }

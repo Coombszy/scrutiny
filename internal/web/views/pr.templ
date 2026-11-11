@@ -1,6 +1,7 @@
 package views
 
 import (
+	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/review"
 	"github.com/Coombszy/scrutiny/internal/settings"
 )
@@ -95,22 +96,10 @@ templ comparisonPicker(p review.PRPage) {
 				<a id="since-last-review" href={ templ.SafeURL(comparisonURL(p.PR.Ref, slr.First, slr.Last)) }>Since your last review</a>
 			}
 		}
-		<label>
-			from
-			<select name="first">
-				for _, c := range p.Commits {
-					<option value={ string(c.SHA) } selected?={ c.SHA == p.Comparison.First }>{ c.SHA.Short() } { c.Headline }</option>
-				}
-			</select>
-		</label>
-		<label>
-			to
-			<select name="last">
-				for i, c := range p.Commits {
-					<option value={ string(c.SHA) } selected?={ c.SHA == p.Comparison.Last || (p.Comparison.IsDefault() && i == len(p.Commits)-1) }>{ c.SHA.Short() } { c.Headline }</option>
-				}
-			</select>
-		</label>
+		<span class="picker-label">from</span>
+		@commitPicker("first", p.Commits, pickedFirst(p))
+		<span class="picker-label">to</span>
+		@commitPicker("last", p.Commits, pickedLast(p))
 		<button type="submit">Compare</button>
 	</form>
 }
@@ -160,4 +149,33 @@ templ fileSection(p review.PRPage, i int, f review.FileEntry) {
 			}
 		</div>
 	</section>
+}
+
+// commitPicker is a select for one end of the Comparison. A native select
+// cannot show an option on two lines, so it is a button and a listbox; the
+// hidden input carries the choice in the form.
+templ commitPicker(name string, commits []domain.Commit, picked domain.SHA) {
+	<div class="commit-picker">
+		<input type="hidden" name={ name } value={ string(picked) }/>
+		<button type="button" class="commit-picker-button" aria-haspopup="listbox" aria-expanded="false" aria-label={ "Comparison " + name + " commit" }>
+			for _, c := range commits {
+				if c.SHA == picked {
+					@commitLabel(c)
+				}
+			}
+		</button>
+		<ul class="commit-picker-list" role="listbox" hidden>
+			for _, c := range commits {
+				<li role="option" data-value={ string(c.SHA) } aria-selected={ boolString(c.SHA == picked) } tabindex="-1">
+					@commitLabel(c)
+				</li>
+			}
+		</ul>
+	</div>
+}
+
+// commitLabel is "{title} {hash}" over the commit's time.
+templ commitLabel(c domain.Commit) {
+	<span class="commit-line"><span class="commit-title">{ c.Headline }</span> <code class="commit-hash">{ c.SHA.Short() }</code></span>
+	<span class="commit-date">{ commitTime(c) }</span>
 }

@@ -551,3 +551,27 @@ func reviewIcon(v domain.ReviewVerdict) string {
 	}
 	return "●"
 }
+
+// pickedFirst and pickedLast are the Comparison's ends for the pickers:
+// the default Comparison runs from the first commit to the last.
+func pickedFirst(p review.PRPage) domain.SHA {
+	if p.Comparison.First != "" || len(p.Commits) == 0 {
+		return p.Comparison.First
+	}
+	return p.Commits[0].SHA
+}
+
+func pickedLast(p review.PRPage) domain.SHA {
+	if p.Comparison.Last != "" || len(p.Commits) == 0 {
+		return p.Comparison.Last
+	}
+	return p.Commits[len(p.Commits)-1].SHA
+}
+
+// commitTime is when a commit was authored, as MM/DD HH:MM.
+func commitTime(c domain.Commit) string {
+	if c.AuthoredAt.IsZero() {
+		return ""
+	}
+	return c.AuthoredAt.Local().Format("01/02 15:04")
+}

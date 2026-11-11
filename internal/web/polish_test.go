@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/settings"
@@ -146,5 +147,28 @@ func TestTheHelpHintSitsWithTheIconsOnTheRight(t *testing.T) {
 	mustContain(t, end[:strings.Index(end, `id="lsp-status"`)], `id="help-hint"`, "<kbd>?</kbd> for keyboard shortcuts")
 	if strings.Contains(page, "Press <kbd>") {
 		t.Error("the hint still says Press")
+	}
+}
+
+func TestCommitPickersShowTitleHashAndTime(t *testing.T) {
+	a := newApp(t)
+	a.host.CommitsOf[ref] = []domain.Commit{
+		{SHA: c1, Headline: "first step", AuthoredAt: time.Date(2026, 11, 10, 13, 57, 0, 0, time.Local)},
+		{SHA: c2, Headline: "second step", AuthoredAt: time.Date(2026, 11, 11, 9, 5, 0, 0, time.Local)},
+	}
+	page := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	form := page[strings.Index(page, `class="comparison"`):]
+	form = form[:strings.Index(form, "</form>")]
+
+	// The default Comparison starts at the first commit and ends at the last.
+	mustContain(t, form,
+		`<input type="hidden" name="first" value="`+string(c1)+`"`,
+		`<input type="hidden" name="last" value="`+string(c2)+`"`,
+		`role="listbox"`, `data-value="`+string(c2)+`"`,
+		`<span class="commit-title">first step</span>`, `<code class="commit-hash">`+c1.Short()+`</code>`, `<span class="commit-date">11/10 13:57</span>`,
+		`<span class="commit-date">11/11 09:05</span>`,
+	)
+	if strings.Contains(form, "<select") {
+		t.Error("still a native select, which cannot show two lines")
 	}
 }

@@ -1109,3 +1109,64 @@ window.Scrutiny = { actions: {} };
     if (e.detail.successful && e.detail.elt.closest?.(".new-thread")) clear();
   });
 })();
+
+// Comparison commit pickers: a button and a listbox standing in for a
+// select, so options can show a title, hash and time on two lines.
+(() => {
+  "use strict";
+  const pickers = document.querySelectorAll(".commit-picker");
+  if (pickers.length === 0) return;
+  function close(picker, focusButton) {
+    picker.querySelector(".commit-picker-list").hidden = true;
+    picker.querySelector(".commit-picker-button").setAttribute("aria-expanded", "false");
+    if (focusButton) picker.querySelector(".commit-picker-button").focus();
+  }
+  function open(picker) {
+    pickers.forEach((p) => p !== picker && close(p));
+    const list = picker.querySelector(".commit-picker-list");
+    list.hidden = false;
+    picker.querySelector(".commit-picker-button").setAttribute("aria-expanded", "true");
+    const current = list.querySelector('[aria-selected="true"]') || list.firstElementChild;
+    activate(list, current);
+  }
+  function activate(list, item) {
+    if (!item) return;
+    list.querySelectorAll(".active").forEach((i) => i.classList.remove("active"));
+    item.classList.add("active");
+    item.focus();
+    item.scrollIntoView({ block: "nearest" });
+  }
+  function choose(picker, item) {
+    picker.querySelector("input[type=hidden]").value = item.dataset.value;
+    picker.querySelectorAll('[role="option"]').forEach((o) => o.setAttribute("aria-selected", String(o === item)));
+    picker.querySelector(".commit-picker-button").innerHTML = item.innerHTML;
+    close(picker, true);
+  }
+  pickers.forEach((picker) => {
+    const button = picker.querySelector(".commit-picker-button");
+    const list = picker.querySelector(".commit-picker-list");
+    button.addEventListener("click", () => (list.hidden ? open(picker) : close(picker)));
+    button.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        open(picker);
+      }
+    });
+    list.addEventListener("click", (e) => {
+      const item = e.target.closest('[role="option"]');
+      if (item) choose(picker, item);
+    });
+    list.addEventListener("keydown", (e) => {
+      const active = list.querySelector(".active");
+      if (e.key === "ArrowDown") activate(list, active?.nextElementSibling);
+      else if (e.key === "ArrowUp") activate(list, active?.previousElementSibling);
+      else if (e.key === "Enter" || e.key === " ") active && choose(picker, active);
+      else if (e.key === "Tab") return close(picker); // let focus move on
+      else if (e.key === "Escape") close(picker, true);
+      else return;
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  });
+  document.addEventListener("click", (e) => pickers.forEach((p) => !p.contains(e.target) && close(p)));
+})();
