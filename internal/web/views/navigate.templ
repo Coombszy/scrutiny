@@ -101,7 +101,6 @@ templ ReferencesPanel(pr domain.PRRef, refs []review.Reference) {
 templ FileViewPage(pr domain.PRRef, f review.FileView) {
 	@Layout(f.Path + " · Scrutiny") {
 		<div data-live={ pr.Path() + "/events?head=" + string(f.Head) } hidden></div>
-		@RefreshBanner()
 		<header class="pr-header">
 			<p><a id="back-to-pr" href={ templ.SafeURL(pr.Path()) }>← { pr.String() }</a></p>
 			<h1 class="path">{ f.Path }</h1>

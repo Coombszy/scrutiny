@@ -14,6 +14,9 @@ type Page struct {
 	// pages of a PR; Languages is what it shows.
 	ShowLanguages bool
 	Languages     []review.LanguageStatus
+	// Refresh puts the Refresh banner in the top bar, for pages the live
+	// stream updates, so it is seen however far down the page is scrolled.
+	Refresh bool
 	Theme         string
 	Themes        []ThemeOption
 	Keys          map[string]string // action -> key sequence

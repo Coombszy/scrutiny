@@ -24,6 +24,9 @@ templ Layout(title string) {
 		>
 			<header class="topbar">
 				<a class="brand" href="/">Scrutiny</a>
+				if pageFrom(ctx).Refresh {
+					@RefreshBanner()
+				}
 				<span class="tagline" data-phrases={ toJSON(taglines) } aria-hidden="true"><span class="tagline-text"></span><span class="tagline-cursor"></span></span>
 				<span class="topbar-end">
 				if pageFrom(ctx).KeyHelp {

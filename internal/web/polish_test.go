@@ -150,6 +150,20 @@ func TestTheHelpHintSitsWithTheIconsOnTheRight(t *testing.T) {
 	}
 }
 
+func TestTheRefreshBannerSitsInTheTopBar(t *testing.T) {
+	a := newApp(t)
+	a.do(t, http.MethodGet, prPath, nil)
+	a.repos.Blobs[c2] = map[string]string{"main.go": "package main\n"}
+	for _, path := range []string{prPath, prPath + "/blob?path=main.go"} {
+		page := a.do(t, http.MethodGet, path, nil).Body.String()
+		bar := page[strings.Index(page, `class="topbar"`):strings.Index(page, "</header>")]
+		mustContain(t, bar, `id="refresh-banner"`, `id="refresh-commits"`, `id="refresh-comments"`)
+	}
+	if page := a.do(t, http.MethodGet, "/", nil).Body.String(); strings.Contains(page, `id="refresh-banner"`) {
+		t.Error("the Dashboard shows the Refresh banner")
+	}
+}
+
 func TestCommitPickersShowTitleHashAndTime(t *testing.T) {
 	a := newApp(t)
 	a.host.CommitsOf[ref] = []domain.Commit{

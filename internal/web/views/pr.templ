@@ -10,7 +10,6 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 	@Layout(p.PR.Title + " #" + itoa(p.PR.Ref.Number)) {
 		<div data-live={ p.PR.Ref.Path() + "/events?head=" + string(p.PR.HeadSHA) } hidden></div>
 		@OfflineBanner(p.Offline, false)
-		@RefreshBanner()
 		<header class="pr-header">
 			<div class="pr-header-side">
 				@StatusBox(p.Checks)
