@@ -103,7 +103,7 @@ templ FileViewPage(pr domain.PRRef, f review.FileView) {
 		<div data-live={ pr.Path() + "/events?head=" + string(f.Head) } hidden></div>
 		@RefreshBanner()
 		<header class="pr-header">
-			<p><a href={ templ.SafeURL(pr.Path()) }>← { pr.String() }</a></p>
+			<p><a id="back-to-pr" href={ templ.SafeURL(pr.Path()) }>← { pr.String() }</a></p>
 			<h1 class="path">{ f.Path }</h1>
 			<p class="muted">
 				At <code>{ f.Head.Short() }</code>.

@@ -19,7 +19,7 @@ type Page struct {
 	Keys          map[string]string // action -> key sequence
 	ViewMode      string
 	// KeyHelp offers the keyboard shortcuts in the top bar; only pages with
-	// hotkeys to show (the PR page and Dashboard) set it. CodeHelp adds the
+	// hotkeys to show (the PR, file and Dashboard pages) set it. CodeHelp adds the
 	// mouse and editing shortcuts of pages showing code.
 	KeyHelp, CodeHelp bool
 	// AuthFailed opens the dialog saying GitHub rejected the credentials.

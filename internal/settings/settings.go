@@ -40,6 +40,7 @@ func DefaultKeys() map[string]string {
 		"toggle_view_mode": "s",
 		"refresh":          "r",
 		"help":             "?",
+		"back_to_pr":       "escape",
 	}
 }
 

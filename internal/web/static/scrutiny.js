@@ -847,6 +847,7 @@ window.Scrutiny = { actions: {} };
     toggle_view_mode: "Toggle split/unified diff",
     refresh: "Refresh",
     help: "Show keyboard shortcuts",
+    back_to_pr: "Back to the pull request",
   };
   if (document.getElementById("pr-search")) {
     labels.symbol_search = "Search pull requests";
@@ -894,10 +895,13 @@ window.Scrutiny = { actions: {} };
 
   document.addEventListener("keydown", (e) => {
     if (capture) return;
+    // Escape closes what is open first; only then may it run a binding.
     if (e.key === "Escape") {
-      document.querySelector(".context-menu")?.remove();
-      document.getElementById("side-panel")?.remove();
-      return;
+      const open = document.querySelectorAll(".context-menu, #side-panel");
+      if (open.length || document.querySelector("dialog[open]")) {
+        open.forEach((el) => el.remove());
+        return;
+      }
     }
     const k = spec(e);
     if (!k) return;
@@ -923,6 +927,17 @@ window.Scrutiny = { actions: {} };
     }
     pending = [];
   });
+
+  // The file view links back to its PR; return there, to where it was left
+  // when that is the page we came from.
+  const back = document.getElementById("back-to-pr");
+  if (back) {
+    Scrutiny.actions.back_to_pr = () => {
+      const from = document.referrer && new URL(document.referrer);
+      if (from?.origin === location.origin && from.pathname === back.pathname && history.length > 1) history.back();
+      else location.href = back.href;
+    };
+  }
 
   // Keyboard shortcuts help, built from the live bindings so it is right
   // straight after a rebind. Only pages that include the dialog offer it.

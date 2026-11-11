@@ -79,7 +79,7 @@ func TestFileViewShowsTheWholeFileAtHead(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
-	mustContain(t, rec.Body.String(), "lib/util.go", `id="L3"`, `data-line="3"`, "func Util() {}", `data-path="lib/util.go"`, `id="palette"`)
+	mustContain(t, rec.Body.String(), "lib/util.go", `id="L3"`, `data-line="3"`, "func Util() {}", `data-path="lib/util.go"`, `id="palette"`, `id="help-hint"`, `id="back-to-pr"`, `back_to_pr`)
 }
 
 func TestDiffCellsCarryNavigationAnchors(t *testing.T) {
