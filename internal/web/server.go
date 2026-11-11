@@ -97,6 +97,9 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, cs .
 // renderPage renders with page's per-page data; the CSRF token, Theme,
 // hotkeys and View Mode are filled in.
 func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, status int, page views.Page, cs ...component) {
+	if r.Context().Err() != nil {
+		return // the browser went away; there is no one to render for
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	page.CSRFToken = s.csrfToken
@@ -134,6 +137,8 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, review.ErrInvalidComparison), errors.Is(err, review.ErrInvalidReaction),
 		errors.Is(err, review.ErrInvalidEvent), errors.Is(err, review.ErrBadPath), errors.Is(err, errBadRequest):
 		status = http.StatusBadRequest
+	case errors.Is(err, context.Canceled) && r.Context().Err() != nil:
+		return // the browser went away; there is no one to tell
 	default:
 		slog.Error("request failed", "path", r.URL.Path, "err", err)
 	}

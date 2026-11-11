@@ -98,7 +98,11 @@ func (f *Fake) Commits(_ context.Context, ref domain.PRRef) ([]domain.Commit, er
 	return f.CommitsOf[ref], nil
 }
 
-func (f *Fake) Dashboard(context.Context) (Dashboard, error) {
+func (f *Fake) Dashboard(ctx context.Context) (Dashboard, error) {
+	// Like a real request, a cancelled one fails.
+	if err := ctx.Err(); err != nil {
+		return Dashboard{}, err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.Dash, nil

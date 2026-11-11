@@ -190,3 +190,30 @@ func TestFailedGitHubRequestsAreLogged(t *testing.T) {
 		t.Errorf("a successful request was logged:\n%s", out)
 	}
 }
+
+func TestCancelledRequestsAreNotGitHubFailures(t *testing.T) {
+	var logs bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	col, _, clk := newCollector(t)
+	client := &http.Client{Transport: metrics.Transport(roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		<-r.Context().Done()
+		return nil, r.Context().Err()
+	}), col)}
+	ctx, cancel := context.WithCancel(context.Background())
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://api.github.test/search/issues", nil)
+	go cancel()
+	client.Do(req)
+
+	got, _ := col.Since(context.Background(), clk.now.Add(-time.Minute))
+	for _, b := range got {
+		if b.Name == metrics.GitHubErrors {
+			t.Errorf("a cancelled request counted as a failure: %+v", got)
+		}
+	}
+	if strings.Contains(logs.String(), "GitHub request failed") {
+		t.Errorf("a cancelled request was logged as failed:\n%s", logs.String())
+	}
+}

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/review"
@@ -47,9 +49,16 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 	s.renderPage(w, r, http.StatusOK, views.Page{KeyHelp: true}, views.Dashboard(d, cached))
 }
 
+// dashboardFetchTimeout bounds a Dashboard fetch that outlives its page.
+const dashboardFetchTimeout = 30 * time.Second
+
 // dashboardLists fetches the Dashboard's GitHub lists for the page to swap in.
+// The fetch finishes even if the browser leaves first: GitHub's search is
+// slow, and the stored result makes the next visit instant.
 func (s *Server) dashboardLists(w http.ResponseWriter, r *http.Request) {
-	d, err := s.review.Dashboard(r.Context())
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), dashboardFetchTimeout)
+	defer cancel()
+	d, err := s.review.Dashboard(ctx)
 	if err != nil {
 		s.fail(w, r, err)
 		return

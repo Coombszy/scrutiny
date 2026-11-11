@@ -4,6 +4,7 @@ package metrics
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"maps"
 	"net/http"
@@ -237,6 +238,10 @@ func (t roundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	start := time.Now()
 	resp, err := t.base.RoundTrip(r)
 	switch {
+	case err != nil && errors.Is(err, context.Canceled):
+		// The caller gave up (e.g. the browser left the page): not GitHub's
+		// failure. Timeouts (DeadlineExceeded) still count.
+		slog.Debug("GitHub request cancelled", "method", r.Method, "path", r.URL.RequestURI())
 	case err != nil:
 		t.c.Inc(GitHubErrors)
 		slog.Warn("GitHub request failed", "method", r.Method, "path", r.URL.RequestURI(),

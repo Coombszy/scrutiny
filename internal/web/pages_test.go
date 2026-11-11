@@ -1,6 +1,9 @@
 package web_test
 
 import (
+	"bytes"
+	"context"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -243,5 +246,26 @@ func TestPRPathsWithTraversalOrInvalidNamesAre404(t *testing.T) {
 		if rec := a.do(t, http.MethodGet, path, nil); rec.Code != http.StatusNotFound && rec.Code != http.StatusTemporaryRedirect {
 			t.Errorf("%s: status %d, want 404", path, rec.Code)
 		}
+	}
+}
+
+func TestDashboardListsFinishFetchingWhenTheBrowserGivesUp(t *testing.T) {
+	var logs bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	a := newApp(t)
+	a.host.Dash = codehost.Dashboard{Authored: []domain.PRSummary{{Ref: ref, Title: "My work"}}}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // the browser has already gone
+	req := httptest.NewRequest(http.MethodGet, "/dashboard/lists", nil).WithContext(ctx)
+	req.Host = "127.0.0.1:7878"
+	a.handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	// The fetch still completed, so the next visit shows the lists at once.
+	mustContain(t, a.do(t, http.MethodGet, "/", nil).Body.String(), "My work")
+	if strings.Contains(logs.String(), "ERROR") {
+		t.Errorf("logged an error for a browser that went away:\n%s", logs.String())
 	}
 }
