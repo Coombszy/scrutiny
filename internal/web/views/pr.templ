@@ -41,11 +41,6 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 		</details>
 		<div class="toolbar">
 			@comparisonPicker(p)
-			if mode == settings.Split {
-				<button hx-post="/settings/view-mode" hx-vals={ `{"mode":"unified"}` }>Unified</button>
-			} else {
-				<button hx-post="/settings/view-mode" hx-vals={ `{"mode":"split"}` }>Split</button>
-			}
 		</div>
 		if p.Review.Pending != nil && p.Review.Pending.Commit != p.Comparison.Head {
 			<p class="notice">
@@ -56,8 +51,14 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 		<div class="files-bar">
 			<span class="muted">{ itoa(len(p.Files)) } files changed</span>
 			<span class="files-bar-actions">
+				if mode == settings.Split {
+					<button hx-post="/settings/view-mode" hx-vals={ `{"mode":"unified"}` }>Unified</button>
+				} else {
+					<button hx-post="/settings/view-mode" hx-vals={ `{"mode":"split"}` }>Split</button>
+				}
 				<span class="comment-nav">
 					<button data-comment-nav="prev" title="Previous comment">↑ Comment</button>
+					<button data-comment-nav="current" title="Go to the selected comment">Current</button>
 					<button data-comment-nav="next" title="Next comment">↓ Comment</button>
 					<label><input type="checkbox" id="nav-include-resolved" autocomplete="off"/> include resolved</label>
 				</span>

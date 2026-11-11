@@ -36,6 +36,7 @@ func DefaultKeys() map[string]string {
 		"command_palette":  "ctrl+j",
 		"next_comment":     "] c",
 		"prev_comment":     "[ c",
+		"current_comment":  "g c",
 		"toggle_view_mode": "s",
 		"refresh":          "r",
 		"help":             "?",

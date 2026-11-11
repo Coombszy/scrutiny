@@ -137,6 +137,21 @@ func TestPRPageListsFilesForLazyLoading(t *testing.T) {
 	)
 }
 
+func TestPRPageFilesBarOrdersViewModeThenCommentNavigation(t *testing.T) {
+	a := newApp(t)
+	body := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	order := []string{`class="files-bar"`, `>Unified</button>`, `data-comment-nav="prev"`, `data-comment-nav="current"`, `data-comment-nav="next"`}
+	last := -1
+	for _, s := range order {
+		i := strings.Index(body, s)
+		if i <= last {
+			t.Fatalf("%s is missing or out of order in the files bar", s)
+		}
+		last = i
+	}
+	mustContain(t, body, `current_comment`, `g c`) // its default hotkey, in data-keys
+}
+
 func TestPRPageUnknownPRAndHostAre404(t *testing.T) {
 	a := newApp(t)
 	for _, path := range []string{"/github.com/o/r/pull/8", "/gitlab.com/o/r/pull/7", "/github.com/o/r/pull/x"} {

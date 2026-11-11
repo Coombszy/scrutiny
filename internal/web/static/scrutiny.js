@@ -118,7 +118,10 @@ window.Scrutiny = { actions: {} };
     if (e.target.closest("[data-remove-row]")) e.target.closest("tr")?.remove();
     if (e.target.closest("[data-reload]")) location.reload();
     const nav = e.target.closest("[data-comment-nav]");
-    if (nav) Scrutiny.busy(navigate(nav.dataset.commentNav === "next" ? 1 : -1));
+    if (nav) {
+      const dir = nav.dataset.commentNav;
+      Scrutiny.busy(dir === "current" ? goToCurrent() : navigate(dir === "next" ? 1 : -1));
+    }
     const toggle = e.target.closest("[data-full-toggle]");
     if (toggle) Scrutiny.busy(toggleFullFile(toggle));
     const jump = e.target.closest("[data-jump-thread]");
@@ -158,9 +161,20 @@ window.Scrutiny = { actions: {} };
     if (!thread) return toast("That comment is not shown in this Comparison.");
     thread.closest(".file")?.classList.add("peek");
     thread.querySelector("details")?.setAttribute("open", "");
-    document.querySelectorAll(".thread.current").forEach((t) => t.classList.remove("current"));
-    thread.classList.add("current");
+    select(thread);
     window.scrollTo({ top: window.scrollY + thread.getBoundingClientRect().top - 80, behavior: "smooth" });
+  }
+
+  // select marks thread as the selected comment, which Current returns to,
+  // and keeps it in the URL (?comment=) so a reload, such as Refresh or
+  // toggling the View Mode, selects it again.
+  function select(thread) {
+    document.querySelectorAll(".thread.current").forEach((t) => t.classList.remove("current"));
+    thread?.classList.add("current");
+    const url = new URL(location.href);
+    if (thread) url.searchParams.set("comment", thread.id.replace(/^thread-/, ""));
+    else url.searchParams.delete("comment");
+    history.replaceState(history.state, "", url);
   }
 
   // Live updates arrive as out-of-band HTML over an event stream, held open
@@ -241,22 +255,40 @@ window.Scrutiny = { actions: {} };
   // Threads in Viewed (collapsed) files are skipped.
   async function loadThreadFiles(includeResolved) {
     const attr = includeResolved ? "threads" : "unresolved";
-    const loads = [...document.querySelectorAll(".file:not(.viewed)")]
-      .filter((f) => Number(f.dataset[attr] || 0) > 0)
-      .map((f) => {
-        const lazy = f.querySelector(".lazy-diff");
-        if (lazy) return htmx.ajax("GET", lazy.getAttribute("hx-get"), { target: lazy, swap: "outerHTML" });
-        const load = f.querySelector(".file-body > .note button[hx-get]");
-        if (load) return htmx.ajax("GET", load.getAttribute("hx-get"), { target: f.querySelector(".file-body"), swap: "innerHTML" });
-      })
-      .filter(Boolean);
-    await Promise.all(loads);
+    const files = [...document.querySelectorAll(".file:not(.viewed)")].filter((f) => Number(f.dataset[attr] || 0) > 0);
+    await Promise.all(files.map(loadDiff));
+  }
+
+  // loadDiff loads a file's diff if it is not on the page yet.
+  function loadDiff(f) {
+    const lazy = f.querySelector(".lazy-diff");
+    if (lazy) return htmx.ajax("GET", lazy.getAttribute("hx-get"), { target: lazy, swap: "outerHTML" });
+    const load = f.querySelector(".file-body > .note button[hx-get]");
+    if (load) return htmx.ajax("GET", load.getAttribute("hx-get"), { target: f.querySelector(".file-body"), swap: "innerHTML" });
+  }
+
+  // restoreSelection selects the comment named in the URL again after a
+  // reload, loading the diffs with threads to find it; it leaves the scroll
+  // where the browser put it back. A comment no longer shown is dropped.
+  async function restoreSelection() {
+    const id = new URL(location.href).searchParams.get("comment");
+    if (!id) return;
+    const find = () => document.getElementById("thread-" + id);
+    if (!find()) await Promise.all([...document.querySelectorAll(".file")].filter((f) => Number(f.dataset.threads || 0) > 0).map(loadDiff));
+    const thread = find();
+    if (thread) {
+      thread.closest(".file.viewed")?.classList.add("peek");
+      thread.querySelector("details")?.setAttribute("open", "");
+    }
+    select(thread);
   }
 
   // Only the PR page has comments to step through and a View Mode.
   if (document.querySelector(".comment-nav")) {
     Scrutiny.actions.next_comment = () => Scrutiny.busy(navigate(1));
     Scrutiny.actions.prev_comment = () => Scrutiny.busy(navigate(-1));
+    Scrutiny.actions.current_comment = () => Scrutiny.busy(goToCurrent());
+    document.addEventListener("DOMContentLoaded", () => Scrutiny.busy(restoreSelection()));
     Scrutiny.actions.toggle_view_mode = () =>
       htmx.ajax("POST", "/settings/view-mode", {
         values: { mode: document.body.dataset.viewMode === "split" ? "unified" : "split" },
@@ -285,8 +317,17 @@ window.Scrutiny = { actions: {} };
         : [...threads].reverse().find((t) => t.getBoundingClientRect().top - offset < -1) ?? threads.at(-1);
     target.querySelector("details")?.setAttribute("open", "");
     window.scrollTo({ top: window.scrollY + target.getBoundingClientRect().top - offset, behavior: "smooth" });
-    document.querySelectorAll(".thread.current").forEach((t) => t.classList.remove("current"));
-    target.classList.add("current");
+    select(target);
+  }
+
+  // goToCurrent scrolls back to the comment ↑/↓ or a jump last selected,
+  // e.g. after scrolling away to read code; with none, it selects the next.
+  async function goToCurrent() {
+    const thread = document.querySelector(".thread.current");
+    if (!thread) return navigate(1);
+    thread.closest(".file")?.classList.add("peek");
+    thread.querySelector("details")?.setAttribute("open", "");
+    window.scrollTo({ top: window.scrollY + thread.getBoundingClientRect().top - 80, behavior: "smooth" });
   }
 })();
 
@@ -618,6 +659,7 @@ window.Scrutiny = { actions: {} };
     command_palette: "Command palette",
     next_comment: "Next comment",
     prev_comment: "Previous comment",
+    current_comment: "Go to the selected comment",
     toggle_view_mode: "Toggle split/unified diff",
     refresh: "Refresh",
     help: "Show keyboard shortcuts",
