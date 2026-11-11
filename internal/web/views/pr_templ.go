@@ -115,7 +115,7 @@ func PR(p review.PRPage, mode settings.ViewMode) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var6 = []any{"badge", "state-" + string(p.PR.State)}
+				var templ_7745c5c3_Var6 = []any{"badge", "state-" + prStateLabel(p.PR)}
 				templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_ElementWriter, templ_7745c5c3_Var6...)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -148,7 +148,7 @@ func PR(p review.PRPage, mode settings.ViewMode) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var8 string
-			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(string(p.PR.State))
+			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(prStateLabel(p.PR))
 			if templ_7745c5c3_Err != nil {
 				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/pr.templ`, Line: 22, Col: 79}
 			}

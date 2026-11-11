@@ -137,6 +137,15 @@ func TestPRPageListsFilesForLazyLoading(t *testing.T) {
 	)
 }
 
+func TestPRPageBadgesADraftAsDraft(t *testing.T) {
+	a := newApp(t)
+	pr := a.host.PRs[ref]
+	pr.Draft = true
+	a.host.PRs[ref] = pr
+	body := a.do(t, http.MethodGet, "/github.com/o/r/pull/7", nil).Body.String()
+	mustContain(t, body, `<span class="badge state-draft">draft</span>`)
+}
+
 func TestPRPageFilesBarOrdersViewModeThenCommentNavigation(t *testing.T) {
 	a := newApp(t)
 	body := a.do(t, http.MethodGet, prPath, nil).Body.String()

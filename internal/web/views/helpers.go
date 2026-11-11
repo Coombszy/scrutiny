@@ -62,6 +62,14 @@ func fileID(i int) string { return "file-" + strconv.Itoa(i) }
 
 func itoa(n int) string { return strconv.Itoa(n) }
 
+// prStateLabel is the PR's state badge text: an open Draft reads "draft".
+func prStateLabel(pr domain.PullRequest) string {
+	if pr.State == domain.Open && pr.Draft {
+		return "draft"
+	}
+	return string(pr.State)
+}
+
 // ThreadAnchor is where a new Review Thread is being added.
 type ThreadAnchor struct {
 	Base, Head, Path string

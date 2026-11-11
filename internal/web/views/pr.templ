@@ -19,7 +19,7 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 				<h1>{ p.PR.Title } <span class="muted">#{ itoa(p.PR.Ref.Number) }</span></h1>
 			</div>
 			<p class="muted">
-				<span class={ "badge", "state-" + string(p.PR.State) }>{ string(p.PR.State) }</span>
+				<span class={ "badge", "state-" + prStateLabel(p.PR) }>{ prStateLabel(p.PR) }</span>
 				{ p.PR.Author } wants to merge <code>{ p.PR.HeadBranch }</code> into <code>{ p.PR.BaseBranch }</code>
 				· <a href={ templ.SafeURL(p.PR.URL) }>GitHub</a>
 			</p>
