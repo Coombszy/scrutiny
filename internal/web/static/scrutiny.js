@@ -63,6 +63,63 @@ window.Scrutiny = { actions: {} };
   });
 })();
 
+// Scrutiny.pin scrolls el to offset px below the sticky top bar and holds
+// it there while the page settles. Diffs load lazily as they come into view,
+// including just above the target where the top bar covers them, and each
+// would otherwise push the target out of place; so would the browser's own
+// late jump to a #fragment, which it undoes for its first second. It lets go
+// once nothing has moved for a moment, or as soon as the user scrolls or
+// clicks.
+(() => {
+  "use strict";
+  let release = null;
+  Scrutiny.barBottom = () => document.querySelector(".topbar")?.getBoundingClientRect().bottom ?? 0;
+  Scrutiny.pin = (el, offset = 0) => {
+    release?.();
+    const place = () => {
+      if (!el.isConnected) return stop();
+      const off = el.getBoundingClientRect().top - Scrutiny.barBottom() - offset;
+      if (Math.abs(off) > 1) window.scrollBy(0, off);
+      clearTimeout(quiet);
+      quiet = setTimeout(stop, 1500);
+    };
+    const resize = new ResizeObserver(place);
+    const user = ["wheel", "touchstart", "pointerdown", "keydown"];
+    const started = Date.now();
+    const scrolled = () => Date.now() - started < 1000 && place();
+    let quiet;
+    const giveUp = setTimeout(stop, 8000);
+    function stop() {
+      resize.disconnect();
+      clearTimeout(quiet);
+      clearTimeout(giveUp);
+      for (const t of user) removeEventListener(t, stop, true);
+      removeEventListener("scroll", scrolled);
+      release = null;
+    }
+    release = stop;
+    for (const t of user) addEventListener(t, stop, { capture: true, passive: true });
+    addEventListener("scroll", scrolled, { passive: true });
+    resize.observe(document.body);
+    place();
+  };
+})();
+
+// A link to a line (…#L148) puts it in the middle of the page, held there
+// while the page settles, rather than at the top where the browser leaves
+// it under the sticky top bar. The browser's own jump comes first, so this
+// runs once the page has loaded, and again when the hash changes.
+(() => {
+  "use strict";
+  function centre() {
+    const n = location.hash.match(/^#L(\d+)$/)?.[1];
+    const row = n && document.getElementById("L" + n);
+    if (row) Scrutiny.pin(row, Math.max(0, (innerHeight - Scrutiny.barBottom() - row.offsetHeight) / 2));
+  }
+  addEventListener("load", () => requestAnimationFrame(centre));
+  addEventListener("hashchange", centre);
+})();
+
 (() => {
   "use strict";
 
@@ -138,7 +195,7 @@ window.Scrutiny = { actions: {} };
     const file = button.closest(".file");
     const full = button.getAttribute("aria-pressed") !== "true";
     file.classList.add("peek"); // show it without changing its Viewed state
-    await htmx.ajax("GET", file.dataset.fileUrl + (full ? "&full=1" : ""), { target: file.querySelector(".file-body"), swap: "innerHTML" });
+    await htmx.ajax("GET", file.dataset.fileUrl + (full ? "&full=1" : ""), { source: file.querySelector(".file-body"), target: file.querySelector(".file-body"), swap: "innerHTML" });
     button.setAttribute("aria-pressed", String(full));
     button.textContent = full ? "Changes only" : "Full file";
   }
@@ -153,8 +210,8 @@ window.Scrutiny = { actions: {} };
         file.classList.add("peek");
         const lazy = file.querySelector(".lazy-diff");
         const load = file.querySelector(".file-body > .note button[hx-get]");
-        if (lazy) await htmx.ajax("GET", lazy.getAttribute("hx-get"), { target: lazy, swap: "outerHTML" });
-        else if (load) await htmx.ajax("GET", load.getAttribute("hx-get"), { target: file.querySelector(".file-body"), swap: "innerHTML" });
+        if (lazy) await htmx.ajax("GET", lazy.getAttribute("hx-get"), { source: lazy, target: lazy, swap: "outerHTML" });
+        else if (load) await htmx.ajax("GET", load.getAttribute("hx-get"), { source: file.querySelector(".file-body"), target: file.querySelector(".file-body"), swap: "innerHTML" });
       }
       thread = document.getElementById("thread-" + id);
     }
@@ -162,7 +219,7 @@ window.Scrutiny = { actions: {} };
     thread.closest(".file")?.classList.add("peek");
     thread.querySelector("details")?.setAttribute("open", "");
     select(thread);
-    window.scrollTo({ top: window.scrollY + thread.getBoundingClientRect().top - 80, behavior: "smooth" });
+    Scrutiny.pin(thread, 40);
   }
 
   // select marks thread as the selected comment, which Current returns to,
@@ -259,12 +316,16 @@ window.Scrutiny = { actions: {} };
     await Promise.all(files.map(loadDiff));
   }
 
-  // loadDiff loads a file's diff if it is not on the page yet.
+  // loadDiff loads a file's diff if it is not on the page yet. Like every
+  // htmx.ajax here it names its own source: without one htmx uses <body> for
+  // all of them, and a request made while another is in flight is queued
+  // with only the last kept, its promise resolving at once with nothing
+  // loaded.
   function loadDiff(f) {
     const lazy = f.querySelector(".lazy-diff");
-    if (lazy) return htmx.ajax("GET", lazy.getAttribute("hx-get"), { target: lazy, swap: "outerHTML" });
+    if (lazy) return htmx.ajax("GET", lazy.getAttribute("hx-get"), { source: lazy, target: lazy, swap: "outerHTML" });
     const load = f.querySelector(".file-body > .note button[hx-get]");
-    if (load) return htmx.ajax("GET", load.getAttribute("hx-get"), { target: f.querySelector(".file-body"), swap: "innerHTML" });
+    if (load) return htmx.ajax("GET", load.getAttribute("hx-get"), { source: f.querySelector(".file-body"), target: f.querySelector(".file-body"), swap: "innerHTML" });
   }
 
   // restoreSelection selects the comment named in the URL again after a
@@ -283,12 +344,121 @@ window.Scrutiny = { actions: {} };
     select(thread);
   }
 
+  // A reload (Refresh, toggling the View Mode, the browser's own) puts the
+  // page back where it was. Diffs load lazily, so a reloaded page is shorter
+  // than the one left and a pixel offset would land elsewhere; instead the
+  // first thing in view (a diff line, a thread or a file) is noted with its
+  // distance below the top bar, and put back there once the diffs opened by
+  // hand are open again. Lines are found by number, so they survive a
+  // switch between split and unified.
+  const viewKey = "scrutiny:view:" + location.pathname;
+  const barBottom = Scrutiny.barBottom;
+  const fileKey = (f) => f.dataset.path ?? "";
+
+  // lineNumbers reads a diff row's old and new line numbers (0 for none):
+  // both views put the old one in the first .ln cell and the new in the
+  // second.
+  function lineNumbers(tr) {
+    const cells = tr.querySelectorAll(":scope > td.ln");
+    const num = (td) => Number(td?.textContent.replace(/\D/g, "")) || 0;
+    return { old: num(cells[0]), new: num(cells[1]) };
+  }
+
+  function captureAnchor() {
+    const bar = barBottom();
+    for (const file of document.querySelectorAll(".file")) {
+      const box = file.getBoundingClientRect();
+      if (box.bottom <= bar) continue;
+      for (const el of file.querySelectorAll("tr, .thread[id]")) {
+        const r = el.getBoundingClientRect();
+        if (r.bottom <= bar || r.height === 0 || el.classList.contains("thread-row")) continue;
+        if (el.matches(".thread")) return { path: fileKey(file), thread: el.id, offset: r.top - bar };
+        const n = lineNumbers(el);
+        if (n.old || n.new) return { path: fileKey(file), old: n.old, new: n.new, offset: r.top - bar };
+      }
+      return { path: fileKey(file), offset: box.top - bar };
+    }
+    return null;
+  }
+
+  // findAnchor finds the noted element again, and the offset to put it at;
+  // a line no longer shown (e.g. from expanded context) falls back to the
+  // top of its file.
+  function findAnchor(a) {
+    if (a.thread) {
+      const thread = document.getElementById(a.thread);
+      if (thread) return [thread, a.offset];
+    }
+    const file = [...document.querySelectorAll(".file")].find((f) => fileKey(f) === a.path);
+    if (!file) return [null, 0];
+    if (a.old || a.new) {
+      const row = [...file.querySelectorAll("tr")].find((tr) => {
+        const n = lineNumbers(tr);
+        return a.new ? n.new === a.new : n.old === a.old;
+      });
+      return row ? [row, a.offset] : [file, 0];
+    }
+    return [file, a.offset];
+  }
+
+  function captureView() {
+    const files = [...document.querySelectorAll(".file[data-path]")];
+    const paths = (test) => files.filter(test).map(fileKey);
+    return {
+      y: scrollY,
+      anchor: captureAnchor(),
+      conversation: !!document.querySelector(".conversation-panel")?.open,
+      peek: paths((f) => f.classList.contains("peek")),
+      full: paths((f) => f.querySelector('[data-full-toggle][aria-pressed="true"]')),
+      loaded: paths((f) => !!f.querySelector(".file-body table")),
+    };
+  }
+
+  async function restoreView() {
+    let saved = null;
+    try {
+      saved = JSON.parse(sessionStorage.getItem(viewKey));
+      sessionStorage.removeItem(viewKey);
+    } catch {}
+    const nav = performance.getEntriesByType("navigation")[0]?.type;
+    if (nav !== "reload" && nav !== "back_forward") saved = null;
+    await restoreSelection();
+    if (!saved) return;
+
+    if (saved.conversation) document.querySelector(".conversation-panel")?.setAttribute("open", "");
+    const byPath = new Map([...document.querySelectorAll(".file[data-path]")].map((f) => [fileKey(f), f]));
+    for (const p of saved.peek) byPath.get(p)?.classList.add("peek");
+    // Re-open what was opened by hand, and the anchor's own diff; lazy
+    // diffs elsewhere load as they come into view, as before.
+    const anchorFile = byPath.get(saved.anchor?.path);
+    const loads = [];
+    for (const p of saved.full) {
+      const button = byPath.get(p)?.querySelector("[data-full-toggle]");
+      if (button) loads.push(toggleFullFile(button));
+    }
+    for (const p of saved.loaded) {
+      const f = byPath.get(p);
+      if (f && !saved.full.includes(p) && (f === anchorFile || f.querySelector(".file-body > .note button[hx-get]"))) loads.push(loadDiff(f));
+    }
+    await Promise.all(loads);
+
+    const [el, offset] = saved.anchor ? findAnchor(saved.anchor) : [null, 0];
+    if (el) Scrutiny.pin(el, offset);
+    else window.scrollTo(0, saved.y);
+  }
+
   // Only the PR page has comments to step through and a View Mode.
   if (document.querySelector(".comment-nav")) {
     Scrutiny.actions.next_comment = () => Scrutiny.busy(navigate(1));
     Scrutiny.actions.prev_comment = () => Scrutiny.busy(navigate(-1));
     Scrutiny.actions.current_comment = () => Scrutiny.busy(goToCurrent());
-    document.addEventListener("DOMContentLoaded", () => Scrutiny.busy(restoreSelection()));
+    history.scrollRestoration = "manual"; // restoreView does it
+    addEventListener("pagehide", () => {
+      try {
+        sessionStorage.setItem(viewKey, JSON.stringify(captureView()));
+      } catch {}
+    });
+    addEventListener("load", () => Scrutiny.busy(restoreView()));
     Scrutiny.actions.toggle_view_mode = () =>
       htmx.ajax("POST", "/settings/view-mode", {
         values: { mode: document.body.dataset.viewMode === "split" ? "unified" : "split" },
@@ -316,8 +486,8 @@ window.Scrutiny = { actions: {} };
         ? threads.find((_, i) => tops[i] > 1) ?? threads[0]
         : [...threads].reverse().find((t) => t.getBoundingClientRect().top - offset < -1) ?? threads.at(-1);
     target.querySelector("details")?.setAttribute("open", "");
-    window.scrollTo({ top: window.scrollY + target.getBoundingClientRect().top - offset, behavior: "smooth" });
     select(target);
+    Scrutiny.pin(target, 40);
   }
 
   // goToCurrent scrolls back to the comment ↑/↓ or a jump last selected,
@@ -327,7 +497,7 @@ window.Scrutiny = { actions: {} };
     if (!thread) return navigate(1);
     thread.closest(".file")?.classList.add("peek");
     thread.querySelector("details")?.setAttribute("open", "");
-    window.scrollTo({ top: window.scrollY + thread.getBoundingClientRect().top - 80, behavior: "smooth" });
+    Scrutiny.pin(thread, 40);
   }
 })();
 
@@ -389,11 +559,11 @@ window.Scrutiny = { actions: {} };
     if (!file) return false;
     file.classList.add("peek"); // show it without changing its Viewed state
     const lazy = file.querySelector(".lazy-diff");
-    if (lazy) await htmx.ajax("GET", lazy.getAttribute("hx-get"), { target: lazy, swap: "outerHTML" });
+    if (lazy) await htmx.ajax("GET", lazy.getAttribute("hx-get"), { source: lazy, target: lazy, swap: "outerHTML" });
     const cell = file.querySelector(`td.code[data-line="${line}"]`);
     if (!cell) return false;
-    cell.scrollIntoView({ block: "center" });
     const row = cell.closest("tr");
+    Scrutiny.pin(row, Math.max(0, (innerHeight - Scrutiny.barBottom() - row.offsetHeight) / 2));
     row.classList.remove("flash");
     void row.offsetWidth;
     row.classList.add("flash");
@@ -508,7 +678,7 @@ window.Scrutiny = { actions: {} };
 
   async function revealFile(path) {
     const file = [...document.querySelectorAll(".file[data-path]")].find((f) => f.dataset.path === path);
-    file?.scrollIntoView({ block: "start" });
+    if (file) Scrutiny.pin(file, 0);
     return !!file;
   }
 
@@ -1091,7 +1261,7 @@ window.Scrutiny = { actions: {} };
     const end = range?.end ?? anchor(last);
     let url = `${last.closest("table").dataset.newThread}&side=${end.side}&line=${end.line}`;
     if (range) url += `&start_side=${range.start.side}&start_line=${range.start.line}`;
-    htmx.ajax("GET", url, { target: row, swap: "afterend" });
+    htmx.ajax("GET", url, { source: row, target: row, swap: "afterend" });
   }
 
   // Mouse and touch open the form on release, a click being a drag that
