@@ -31,7 +31,7 @@ func TestOwnCommentsOfferEditAndDelete(t *testing.T) {
 	body := a.do(t, http.MethodGet, fileURL(), nil).Body.String()
 	mustContain(t, body,
 		`hx-post="/github.com/o/r/pull/7/comments/C2/edit"`, `hx-post="/github.com/o/r/pull/7/comments/C2/delete"`,
-		`hx-target="closest .thread"`, "data-edit-comment", "hx-confirm=", ">Because</textarea>",
+		`hx-target="closest .thread"`, "data-edit-comment", "hx-confirm=", `data-confirm-label="Delete"`, ">Because</textarea>",
 	)
 	if strings.Contains(body, "comments/C1/") {
 		t.Error("offers to change someone else's comment")

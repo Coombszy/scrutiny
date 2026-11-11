@@ -48,7 +48,7 @@ func TestOfflinePageShowsTheBannerAndRefusesWrites(t *testing.T) {
 func TestRejectedCredentialsOpenTheLoginDialog(t *testing.T) {
 	a := newApp(t)
 	body := a.do(t, http.MethodGet, prPath, nil).Body.String()
-	mustContain(t, body, `id="auth-failed"`)
+	mustContain(t, body, `id="auth-failed"`, `id="confirm"`)
 	if strings.Contains(body, "data-open-on-load") {
 		t.Error("login dialog opens while the credentials are accepted")
 	}

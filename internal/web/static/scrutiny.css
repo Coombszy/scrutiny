@@ -322,6 +322,11 @@ kbd { font-family: var(--mono); font-size: var(--fs-sm); background: var(--bg2);
 .auth-failed .close { border: 0; background: none; font-size: var(--fs-xl); line-height: 1; padding: 0 .3rem; }
 .auth-failed pre { background: var(--bg1); padding: .5rem .75rem; border-radius: 4px; user-select: all; }
 .auth-failed .actions { justify-content: flex-end; }
+/* Scrutiny.confirm, which also asks hx-confirm's questions */
+.confirm { width: min(26rem, calc(100vw - 32px)); }
+.confirm p { margin: 0; }
+.confirm .actions { justify-content: flex-end; }
+.confirm .confirm-ok.danger { background: var(--red); color: var(--bg0); border-color: var(--red); font-weight: 600; }
 .keys { width: 100%; border-collapse: collapse; }
 .keys td { padding: .3rem .2rem; border-bottom: 1px solid var(--bg1); }
 .keys td:first-child { white-space: nowrap; width: 40%; }

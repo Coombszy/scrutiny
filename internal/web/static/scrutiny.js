@@ -74,6 +74,30 @@ window.Scrutiny = { actions: {} };
     document.body.append(el);
     setTimeout(() => el.remove(), 6000);
   }
+  // Scrutiny.confirm asks a question in the confirm dialog rather than the
+  // browser's own, resolving true if the user chose OK. opts.label names
+  // the OK button and opts.danger colours it as destructive.
+  const confirmDialog = document.getElementById("confirm");
+  Scrutiny.confirm = (message, opts = {}) =>
+    new Promise((resolve) => {
+      const ok = confirmDialog.querySelector(".confirm-ok");
+      confirmDialog.querySelector(".confirm-message").textContent = message;
+      ok.textContent = opts.label || "OK";
+      ok.classList.toggle("danger", !!opts.danger);
+      confirmDialog.returnValue = "";
+      confirmDialog.addEventListener("close", () => resolve(confirmDialog.returnValue === "ok"), { once: true });
+      confirmDialog.showModal();
+    });
+  // hx-confirm questions go through it too; data-confirm-label names the
+  // OK button, and a .danger element's is coloured as destructive.
+  document.addEventListener("htmx:confirm", (e) => {
+    const { question, elt, issueRequest } = e.detail;
+    if (!question) return;
+    e.preventDefault();
+    Scrutiny.confirm(question, { label: elt.dataset.confirmLabel, danger: elt.classList.contains("danger") })
+      .then((yes) => yes && issueRequest(true));
+  });
+
   // GitHub rejecting the credentials gets the dialog rather than a toast:
   // it needs the user to log in again, not just to notice.
   const authFailed = document.getElementById("auth-failed");

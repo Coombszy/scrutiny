@@ -209,7 +209,7 @@ func Layout(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<dialog id=\"confirm\" class=\"confirm\"><form method=\"dialog\"><p class=\"confirm-message\"></p><div class=\"actions\"><button value=\"cancel\" autofocus>Cancel</button> <button value=\"ok\" class=\"confirm-ok\">OK</button></div></form></dialog></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

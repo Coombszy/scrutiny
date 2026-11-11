@@ -65,6 +65,15 @@ templ Layout(title string) {
 				<div class="palette-results"><ul class="results"></ul></div>
 			</dialog>
 			@AuthDialog(pageFrom(ctx).AuthFailed)
+			<dialog id="confirm" class="confirm">
+				<form method="dialog">
+					<p class="confirm-message"></p>
+					<div class="actions">
+						<button value="cancel" autofocus>Cancel</button>
+						<button value="ok" class="confirm-ok">OK</button>
+					</div>
+				</form>
+			</dialog>
 		</body>
 	</html>
 }
