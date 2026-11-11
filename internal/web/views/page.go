@@ -41,6 +41,7 @@ var taglines = []string{
 	"UI/UX is Dead.",
 	"Do GitHub even test their own product.",
 	"Who wins, This clanked tool or a multi-million dollar company?",
+	"It's a Damn Mutiny!",
 }
 
 type pageKey struct{}
