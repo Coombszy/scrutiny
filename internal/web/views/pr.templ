@@ -115,7 +115,7 @@ templ fileSection(p review.PRPage, i int, f review.FileEntry) {
 				<span class="path">{ f.Path }</span>
 			}
 			if f.Threads > 0 {
-				<span class="badge" title="Unresolved / all Review Threads">💬 { itoa(f.Unresolved) }/{ itoa(f.Threads) }</span>
+				<span class="badge" title="Review Threads on this file">💬 { itoa(f.Threads - f.Unresolved) } Resolved { itoa(f.Unresolved) } Unresolved</span>
 			}
 			if f.Viewed == "DISMISSED" {
 				<span class="badge">Changed since viewed</span>
