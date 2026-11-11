@@ -115,9 +115,17 @@ button.primary:hover { filter: brightness(1.1); background: var(--green); }
 .conversation-panel > summary { cursor: pointer; color: var(--fg-dim); }
 #conversation { max-width: 60rem; }
 
-.file.viewed .file-body { display: none; }
-/* A Viewed file opened by navigation, without un-marking it. */
-.file.viewed.peek .file-body { display: block; }
+/* Viewed files start collapsed; the arrow, or navigating into one, opens it without un-marking it. */
+.file.collapsed .file-body { display: none; }
+.file-collapse { flex: none; background: none; border: 0; padding: .2rem .25rem; cursor: pointer; }
+/* Right when collapsed, down when open, like a thread's. */
+.file-collapse::before {
+  content: ""; display: block; width: .45rem; height: .45rem;
+  border-right: 2px solid var(--fg-dim); border-bottom: 2px solid var(--fg-dim);
+  transform: rotate(45deg); margin-top: -.2rem; transition: transform .12s;
+}
+.file.collapsed .file-collapse::before { transform: rotate(-45deg); margin-top: 0; }
+.file-collapse:hover::before { border-color: var(--fg); }
 .viewed-toggle { display: flex; gap: .3rem; align-items: center; font-size: var(--fs-sm); color: var(--fg-dim); }
 
 .diff td.ln { position: relative; }

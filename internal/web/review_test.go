@@ -39,8 +39,11 @@ func TestPRPageShowsReviewState(t *testing.T) {
 		`data-threads="1"`, // parser.go
 		`hx-post="/github.com/o/r/pull/7/viewed"`,
 	)
-	if !strings.Contains(body, `class="file viewed"`) {
-		t.Error("viewed go.sum is not marked viewed")
+	if !strings.Contains(body, `class="file viewed collapsed"`) {
+		t.Error("viewed go.sum is not marked viewed and collapsed")
+	}
+	if !strings.Contains(body, `data-file-collapse aria-expanded="false"`) {
+		t.Error("viewed go.sum's collapse arrow is not shown collapsed")
 	}
 	if h := rec.Header().Get("Content-Security-Policy"); !strings.Contains(h, "script-src 'self'") {
 		t.Errorf("CSP = %q", h)

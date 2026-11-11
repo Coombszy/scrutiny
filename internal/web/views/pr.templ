@@ -105,8 +105,9 @@ templ comparisonPicker(p review.PRPage) {
 }
 
 templ fileSection(p review.PRPage, i int, f review.FileEntry) {
-	<section class={ "file", templ.KV("viewed", f.Viewed == "VIEWED") } id={ fileID(i) } data-path={ f.Path } data-file-url={ FileURL(p.PR.Ref, p.Comparison, f.FileChange) } data-threads={ itoa(f.Threads) } data-unresolved={ itoa(f.Unresolved) }>
+	<section class={ "file", templ.KV("viewed collapsed", f.Viewed == "VIEWED") } id={ fileID(i) } data-path={ f.Path } data-file-url={ FileURL(p.PR.Ref, p.Comparison, f.FileChange) } data-threads={ itoa(f.Threads) } data-unresolved={ itoa(f.Unresolved) }>
 		<header class="file-header">
+			<button type="button" class="file-collapse" data-file-collapse aria-expanded={ boolString(f.Viewed != "VIEWED") } title="Collapse or expand the file"></button>
 			<span class={ "badge", "status-" + string(f.Status) }>{ string(f.Status) }</span>
 			if f.Path != f.OldPath {
 				<span class="path">{ f.OldPath + " → " + f.Path }</span>

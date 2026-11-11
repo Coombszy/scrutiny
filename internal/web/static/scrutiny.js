@@ -185,6 +185,11 @@ window.Scrutiny = { actions: {} };
       const dir = nav.dataset.commentNav;
       Scrutiny.busy(dir === "current" ? goToCurrent() : navigate(dir === "next" ? 1 : -1));
     }
+    const collapse = e.target.closest("[data-file-collapse]");
+    if (collapse) {
+      const file = collapse.closest(".file");
+      setCollapsed(file, !file.classList.contains("collapsed"));
+    }
     const toggle = e.target.closest("[data-full-toggle]");
     if (toggle) Scrutiny.busy(toggleFullFile(toggle));
     const jump = e.target.closest("[data-jump-thread]");
@@ -195,25 +200,34 @@ window.Scrutiny = { actions: {} };
     }
   });
 
+  // setCollapsed folds or opens a file's diff. It is separate from Viewed:
+  // ticking Viewed collapses a file, but it can be opened (by hand, or by
+  // going to a comment or line in it) and stay Viewed.
+  function setCollapsed(file, collapsed) {
+    if (!file) return;
+    file.classList.toggle("collapsed", collapsed);
+    file.querySelector("[data-file-collapse]")?.setAttribute("aria-expanded", String(!collapsed));
+  }
+  Scrutiny.setCollapsed = setCollapsed;
+
   // toggleFullFile re-renders a file's diff with every line, or only the
   // changes again.
   async function toggleFullFile(button) {
     const file = button.closest(".file");
     const full = button.getAttribute("aria-pressed") !== "true";
-    file.classList.add("peek"); // show it without changing its Viewed state
+    setCollapsed(file, false);
     await htmx.ajax("GET", file.dataset.fileUrl + (full ? "&full=1" : ""), { source: file.querySelector(".file-body"), target: file.querySelector(".file-body"), swap: "innerHTML" });
     button.setAttribute("aria-pressed", String(full));
     button.textContent = full ? "Changes only" : "Full file";
   }
 
-  // jumpToThread scrolls to a thread, first loading (and un-collapsing) its
-  // file's diff if the thread is not on the page yet.
+  // jumpToThread scrolls to a thread, first loading its file's diff if the
+  // thread is not on the page yet, and opens the file if it is collapsed.
   async function jumpToThread(id, path) {
     let thread = document.getElementById("thread-" + id);
     if (!thread) {
       const file = [...document.querySelectorAll(".file[data-path]")].find((f) => f.dataset.path === path);
       if (file) {
-        file.classList.add("peek");
         const lazy = file.querySelector(".lazy-diff");
         const load = file.querySelector(".file-body > .note button[hx-get]");
         if (lazy) await htmx.ajax("GET", lazy.getAttribute("hx-get"), { source: lazy, target: lazy, swap: "outerHTML" });
@@ -222,7 +236,7 @@ window.Scrutiny = { actions: {} };
       thread = document.getElementById("thread-" + id);
     }
     if (!thread) return toast("That comment is not shown in this Comparison.");
-    thread.closest(".file")?.classList.add("peek");
+    setCollapsed(thread.closest(".file"), false);
     thread.querySelector("details")?.setAttribute("open", "");
     select(thread);
     Scrutiny.pin(thread, 40);
@@ -327,21 +341,23 @@ window.Scrutiny = { actions: {} };
     }
   });
 
-  // Viewed files collapse straight away; the checkbox posts via htmx.
+  // Ticking Viewed collapses the file straight away, and unticking opens
+  // it; the checkbox posts via htmx.
   document.addEventListener("change", (e) => {
     if (e.target.matches(".viewed-toggle input")) {
       const file = e.target.closest(".file");
       file?.classList.toggle("viewed", e.target.checked);
-      file?.classList.remove("peek");
+      setCollapsed(file, e.target.checked);
     }
   });
 
   // Next/previous comment. Files load lazily (or, when large or generated,
   // on demand), so files with threads that have not loaded are loaded first.
-  // Threads in Viewed (collapsed) files are skipped.
+  // Collapsed (e.g. Viewed) files are included: going to a comment in one
+  // opens it.
   async function loadThreadFiles(includeResolved) {
     const attr = includeResolved ? "threads" : "unresolved";
-    const files = [...document.querySelectorAll(".file:not(.viewed)")].filter((f) => Number(f.dataset[attr] || 0) > 0);
+    const files = [...document.querySelectorAll(".file")].filter((f) => Number(f.dataset[attr] || 0) > 0);
     await Promise.all(files.map(loadDiff));
   }
 
@@ -452,7 +468,8 @@ window.Scrutiny = { actions: {} };
 
     if (saved.conversation) document.querySelector(".conversation-panel")?.setAttribute("open", "");
     // Viewed files opened for a look are not reopened: they, like resolved
-    // threads, start collapsed on every load.
+    // threads, start collapsed on every load, and files collapsed by hand
+    // start open.
     const byPath = new Map([...document.querySelectorAll(".file[data-path]")].map((f) => [fileKey(f), f]));
     // Re-open what was opened by hand, and the anchor's own diff; lazy
     // diffs elsewhere load as they come into view, as before.
@@ -461,7 +478,7 @@ window.Scrutiny = { actions: {} };
     for (const p of saved.full) {
       const f = byPath.get(p);
       const button = f?.querySelector("[data-full-toggle]");
-      if (button && !f.classList.contains("viewed")) loads.push(toggleFullFile(button)); // it would un-collapse a Viewed file
+      if (button && !f.classList.contains("collapsed")) loads.push(toggleFullFile(button)); // it would open a collapsed file
     }
     for (const p of saved.loaded) {
       const f = byPath.get(p);
@@ -502,16 +519,20 @@ window.Scrutiny = { actions: {} };
   async function navigate(direction) {
     const includeResolved = document.getElementById("nav-include-resolved")?.checked;
     await loadThreadFiles(includeResolved);
+    // A thread in a collapsed file is not laid out, so it stands at its
+    // file's header.
+    const at = (t) => (t.getClientRects().length > 0 ? t : t.closest(".file.collapsed"));
     const threads = [...document.querySelectorAll(".thread:not(.new)")].filter(
-      (t) => (includeResolved || t.dataset.resolved === "false") && t.getClientRects().length > 0,
+      (t) => (includeResolved || t.dataset.resolved === "false") && at(t),
     );
     if (threads.length === 0) return toast("No more comments.");
     const offset = 80; // below the sticky top bar
-    const tops = threads.map((t) => t.getBoundingClientRect().top - offset);
+    const tops = threads.map((t) => at(t).getBoundingClientRect().top - offset);
     const target =
       direction > 0
         ? threads.find((_, i) => tops[i] > 1) ?? threads[0]
-        : [...threads].reverse().find((t) => t.getBoundingClientRect().top - offset < -1) ?? threads.at(-1);
+        : threads.findLast((_, i) => tops[i] < -1) ?? threads.at(-1);
+    setCollapsed(target.closest(".file"), false);
     target.querySelector("details")?.setAttribute("open", "");
     select(target);
     Scrutiny.pin(target, 40);
@@ -522,7 +543,7 @@ window.Scrutiny = { actions: {} };
   async function goToCurrent() {
     const thread = document.querySelector(".thread.current");
     if (!thread) return navigate(1);
-    thread.closest(".file")?.classList.add("peek");
+    setCollapsed(thread.closest(".file"), false);
     thread.querySelector("details")?.setAttribute("open", "");
     Scrutiny.pin(thread, 40);
   }
@@ -584,7 +605,7 @@ window.Scrutiny = { actions: {} };
   async function reveal(path, line) {
     const file = [...document.querySelectorAll(".file[data-path]")].find((f) => f.dataset.path === path);
     if (!file) return false;
-    file.classList.add("peek"); // show it without changing its Viewed state
+    Scrutiny.setCollapsed(file, false); // open it without changing its Viewed state
     const lazy = file.querySelector(".lazy-diff");
     if (lazy) await htmx.ajax("GET", lazy.getAttribute("hx-get"), { source: lazy, target: lazy, swap: "outerHTML" });
     const cell = file.querySelector(`td.code[data-line="${line}"]`);
