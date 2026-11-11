@@ -39,3 +39,7 @@ run-live *args:
     # air's proxy (which reloads the browser) takes the port; Scrutiny runs on the next one.
     app=$((port + 1))
     exec go tool air --proxy.proxy_port "$port" --proxy.app_port "$app" -- serve -dev -port "$app"
+
+# Serve the UI over in-memory fakes with a demo PR (no GitHub), on an address (default 127.0.0.1:7980)
+run-fake addr="127.0.0.1:7980": generate
+    go run ./cmd/fakeserve -addr {{addr}}
