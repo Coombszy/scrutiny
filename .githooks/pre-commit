@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Block commits if TruffleHog finds a secret in the staged changes or anywhere in the git history.
+# Mark a false positive with a `trufflehog:ignore` comment on its line; bypass entirely with `git commit --no-verify`.
+set -euo pipefail
+
+if ! command -v trufflehog >/dev/null 2>&1; then
+    echo "pre-commit: trufflehog is not installed (https://github.com/trufflesecurity/trufflehog)" >&2
+    exit 1
+fi
+
+echo "Running pre-commit..."
+
+# Run a TruffleHog scan quietly; print its output only if it finds something (or fails).
+scan() {
+    local out
+    if ! out=$(trufflehog "$@" --no-update --fail --results=verified,unverified,unknown 2>&1); then
+        printf '%s\n' "$out" >&2
+        return 1
+    fi
+}
+
+# Staged changes: copy the index's version of each changed file (what is being committed, not the working tree's).
+staged=$(mktemp -d)
+trap 'rm -rf "$staged"' EXIT
+git diff --cached --name-only --diff-filter=ACMR -z | git checkout-index --prefix="$staged/" -z --stdin
+
+if [ -n "$(ls -A "$staged")" ] && ! scan filesystem "$staged"; then
+    echo "pre-commit: possible secret in staged changes (paths above are under a temporary copy of the repo)" >&2
+    exit 1
+fi
+
+# Whole history, every branch: catches anything that got in before the hook was enabled or via --no-verify.
+if ! scan git "file://$(git rev-parse --show-toplevel)"; then
+    echo "pre-commit: possible secret in git history; rotate it, then remove it with git filter-repo" >&2
+    exit 1
+fi

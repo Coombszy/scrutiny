@@ -1,3 +1,6 @@
+# Every just command points git at the repo's hooks (.githooks): TruffleHog scans staged changes and the whole history on commit
+_hooks := `git config core.hooksPath .githooks 2>/dev/null || true`
+
 # List recipes
 default:
     @just --list
