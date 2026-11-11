@@ -71,10 +71,13 @@ func (g Gap) Reveal(dir Direction, step int) (shown Gap, rest *Gap, restBefore b
 
 // DiffLine is one highlighted diff line.
 type DiffLine struct {
-	Kind    domain.LineKind
-	OldNo   int
-	NewNo   int
-	Tokens  []highlight.Token
+	Kind   domain.LineKind
+	OldNo  int
+	NewNo  int
+	Tokens []highlight.Token
+	// Changed marks, token by token, what differs from the line this one
+	// replaces (or is replaced by); nil when nothing is marked.
+	Changed []bool
 	Threads []domain.ReviewThread // anchored to this line
 }
 
@@ -150,6 +153,7 @@ func (s *Service) FileDiff(ctx context.Context, ref domain.PRRef, base, head dom
 			}
 			dh.Lines[j] = DiffLine{Kind: l.Kind, OldNo: l.OldNo, NewNo: l.NewNo, Tokens: tokens}
 		}
+		markChanges(dh.Lines)
 		out.Hunks[i] = dh
 	}
 	// Only files on both sides have unchanged lines to reveal.

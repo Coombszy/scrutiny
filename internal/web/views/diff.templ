@@ -77,7 +77,7 @@ templ DiffRows(c DiffContext, lines []review.DiffLine) {
 					if l.Kind != domain.Delete {
 						data-line={ itoa(l.NewNo) }
 					}
-				>@tokens(l.Tokens)</td>
+				>@lineTokens(l)</td>
 			</tr>
 			@ThreadRows(c.PR, l.Threads, 3)
 		}
@@ -91,7 +91,7 @@ templ DiffRows(c DiffContext, lines []review.DiffLine) {
 						}
 						{ lineNo(row.Left.OldNo) }
 					</td>
-					<td class={ "code", kindClass(row.Left.Kind) }>@tokens(row.Left.Tokens)</td>
+					<td class={ "code", kindClass(row.Left.Kind) }>@lineTokens(*row.Left)</td>
 				} else {
 					<td class="ln empty"></td>
 					<td class="code empty"></td>
@@ -101,7 +101,7 @@ templ DiffRows(c DiffContext, lines []review.DiffLine) {
 						@addComment(c, domain.Right, row.Right.NewNo, 0)
 						{ lineNo(row.Right.NewNo) }
 					</td>
-					<td class={ "code", kindClass(row.Right.Kind) } data-line={ itoa(row.Right.NewNo) }>@tokens(row.Right.Tokens)</td>
+					<td class={ "code", kindClass(row.Right.Kind) } data-line={ itoa(row.Right.NewNo) }>@lineTokens(*row.Right)</td>
 				} else {
 					<td class="ln empty"></td>
 					<td class="code empty"></td>
@@ -194,6 +194,22 @@ templ addComment(c DiffContext, side domain.DiffSide, line, oldLine int) {
 				data-old-line={ itoa(oldLine) }
 			}
 		>+</button>
+	}
+}
+
+// lineTokens renders a diff line's tokens, wrapping the parts that differ
+// from the line it replaces (or is replaced by) in a "chg" span.
+templ lineTokens(l review.DiffLine) {
+	if l.Changed == nil {
+		@tokens(l.Tokens)
+	} else {
+		for i, t := range l.Tokens {
+			if l.Changed[i] {
+				<span class="chg">@tokens([]highlight.Token{t})</span>
+			} else {
+				@tokens([]highlight.Token{t})
+			}
+		}
 	}
 }
 

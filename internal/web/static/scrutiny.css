@@ -405,3 +405,7 @@ kbd { font-family: var(--mono); font-size: var(--fs-sm); background: var(--bg2);
 .commit-picker-list li { display: flex; flex-direction: column; gap: .05rem; padding: .3rem .6rem; border-radius: 4px; cursor: pointer; }
 .commit-picker-list li:hover, .commit-picker-list li.active { background: var(--bg2); }
 .commit-picker-list li[aria-selected="true"] { box-shadow: inset 2px 0 0 var(--yellow); }
+
+/* The words that changed within a modified line */
+.diff .del .chg, .diff td.del .chg { background: rgba(251, 73, 52, .38); border-radius: 2px; }
+.diff .add .chg, .diff td.add .chg { background: rgba(184, 187, 38, .40); border-radius: 2px; }

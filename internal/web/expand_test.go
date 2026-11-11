@@ -118,3 +118,25 @@ func TestGapControlsSitOnTheHunkHeader(t *testing.T) {
 		t.Error("a fully opened gap kept its hunk header")
 	}
 }
+
+func TestChangedWordsAreHighlightedInTheDiff(t *testing.T) {
+	a := newApp(t)
+	a.repos.Diffs[repostore.Pair{From: mb, To: c2}]["parser.go"] = domain.FileDiff{Hunks: []domain.Hunk{{
+		OldStart: 1, OldLines: 1, NewStart: 1, NewLines: 1,
+		Lines: []domain.Line{
+			{Kind: domain.Delete, OldNo: 1, Text: "var limit = 10"},
+			{Kind: domain.Add, NewNo: 1, Text: "var limit = 20"},
+		},
+	}}}
+	a.do(t, http.MethodGet, prPath, nil)
+	for _, mode := range []settings.ViewMode{settings.Split, settings.Unified} {
+		cfg := settings.Defaults()
+		cfg.ViewMode = mode
+		a.settings.Save(cfg)
+		body := a.do(t, http.MethodGet, fileURL(), nil).Body.String()
+		mustContain(t, body, `<span class="chg">10</span>`, `<span class="chg">20</span>`)
+		if strings.Contains(body, `<span class="chg">var`) {
+			t.Errorf("%s: unchanged words marked", mode)
+		}
+	}
+}

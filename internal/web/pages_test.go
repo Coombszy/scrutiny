@@ -180,13 +180,14 @@ func TestFileFragmentRendersTheConfiguredViewMode(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
-	mustContain(t, rec.Body.String(), `class="diff split"`, "var renewed = 1", "@@ -1,2 +1,3 @@")
+	// "var old = 1" became "var renewed = 1": the changed word is marked.
+	mustContain(t, rec.Body.String(), `class="diff split"`, `var <span class="chg">renewed</span> = 1`, "@@ -1,2 +1,3 @@")
 
 	cfg := settings.Defaults()
 	cfg.ViewMode = settings.Unified
 	a.settings.Save(cfg)
 	rec = a.do(t, http.MethodGet, fileURL(), nil)
-	mustContain(t, rec.Body.String(), `class="diff unified"`, "var old = 1")
+	mustContain(t, rec.Body.String(), `class="diff unified"`, `var <span class="chg">old</span> = 1`)
 }
 
 func TestToggleViewModeWritesSettings(t *testing.T) {
