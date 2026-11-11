@@ -1,8 +1,10 @@
 package views
 
 import (
+	"strconv"
 	"strings"
 
+	"github.com/Coombszy/scrutiny/internal/navigator"
 	"github.com/Coombszy/scrutiny/internal/servers"
 )
 
@@ -56,5 +58,59 @@ templ ServerRow(st servers.Status) {
 				<pre class="install-error">{ st.Job.Err }</pre>
 			}
 		</div>
+		if st.Installed != nil {
+			@serverLogDetails(st)
+		}
 	</div>
+}
+
+// serverLogDetails folds away an installed server's recent log, loaded when
+// opened; it starts open when the log has errors.
+templ serverLogDetails(st servers.Status) {
+	<details class="server-log" open?={ st.LogErrors > 0 }>
+		<summary>
+			Logs
+			if st.LogErrors > 0 {
+				<span class="log-errors">· { plural(st.LogErrors, "error") }</span>
+			}
+		</summary>
+		<div
+			class="server-log-body"
+			hx-get={ "/settings/servers/" + st.Name + "/log" }
+			if st.LogErrors > 0 {
+				hx-trigger="load"
+			} else {
+				hx-trigger="toggle from:closest details once"
+			}
+			hx-swap="outerHTML"
+		></div>
+	</details>
+}
+
+// ServerLog is an installed server's recent log, newest last.
+templ ServerLog(name string, entries []navigator.LogEntry) {
+	<div class="server-log-body">
+		if len(entries) == 0 {
+			<p class="muted">No output yet: the log fills once the server runs for a pull request.</p>
+		} else {
+			<ol class="server-log-lines">
+				for _, e := range entries {
+					<li class={ "log-" + string(e.Level) }>
+						<time datetime={ e.Time.Format("2006-01-02T15:04:05Z07:00") }>{ e.Time.Format("15:04:05") }</time>
+						<span class="log-source">{ e.Source }</span>
+						<span class="log-text">{ e.Text }</span>
+					</li>
+				}
+			</ol>
+		}
+		<button hx-get={ "/settings/servers/" + name + "/log" } hx-target="closest .server-log-body" hx-swap="outerHTML">Refresh</button>
+	</div>
+}
+
+// plural is n and noun, plural unless n is 1.
+func plural(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return strconv.Itoa(n) + " " + noun + "s"
 }

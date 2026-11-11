@@ -465,6 +465,7 @@ func lspTooltip(langs []review.LanguageStatus) string {
 		return "No Language Server is needed for this pull request's files"
 	}
 	lines := make([]string, len(langs))
+	hint := false
 	for i, l := range langs {
 		name := languageName(l.Language)
 		if l.Unavailable {
@@ -489,8 +490,34 @@ func lspTooltip(langs []review.LanguageStatus) string {
 			doing = "not running (starts when needed)"
 		}
 		lines[i] = name + " · " + server + ": " + doing
+		if l.LastProblem != "" && l.LastProblem != l.Err && (l.Phase == navigator.Failed || l.Busy()) {
+			lines[i] += "\n  last message: " + truncate(firstLine(l.LastProblem), 160)
+		}
+		if l.Phase == navigator.Failed || (l.Busy() && l.LastProblem != "") {
+			hint = true
+		}
+	}
+	if hint {
+		lines = append(lines, "Click for Settings › Language Servers and their logs")
 	}
 	return strings.Join(lines, "\n")
+}
+
+// firstLine is s up to its first line break.
+func firstLine(s string) string {
+	if i := strings.IndexAny(s, "\r\n"); i >= 0 {
+		return s[:i]
+	}
+	return s
+}
+
+// truncate shortens s to at most n runes, marking the cut.
+func truncate(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n-1]) + "…"
 }
 
 // languageName is a language id as people write it.

@@ -4,6 +4,7 @@
 package lsp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,6 +28,7 @@ type Manager struct {
 	mu        sync.Mutex
 	servers   map[navigator.Workspace]*server
 	failures  map[navigator.Workspace]navigator.ServerState // the last failed start, until the next try
+	logs      map[string]*logRing                           // by executable path
 	onState   func(navigator.Workspace, navigator.ServerState)
 	done      chan struct{}
 	closeOnce sync.Once
@@ -38,7 +41,8 @@ var _ navigator.Navigator = (*Manager)(nil)
 // are picked up, and stops servers unused for idle.
 func NewManager(command func(language string) []string, idle time.Duration) *Manager {
 	m := &Manager{command: command, idle: idle, servers: map[navigator.Workspace]*server{},
-		failures: map[navigator.Workspace]navigator.ServerState{}, done: make(chan struct{})}
+		failures: map[navigator.Workspace]navigator.ServerState{}, logs: map[string]*logRing{},
+		done: make(chan struct{})}
 	go m.reap()
 	return m
 }
@@ -57,6 +61,28 @@ func (m *Manager) OnState(fn func(navigator.Workspace, navigator.ServerState)) {
 }
 
 func (m *Manager) Available(language string) bool { return len(m.command(language)) > 0 }
+
+// Log returns the recent output of the Language Server at executable (an
+// argv[0] as launched), and Scrutiny's account of running it, oldest first.
+func (m *Manager) Log(executable string) []navigator.LogEntry {
+	m.mu.Lock()
+	r := m.logs[executable]
+	m.mu.Unlock()
+	if r == nil {
+		return nil
+	}
+	return r.list()
+}
+
+// logFor returns executable's log, creating it; m.mu must be held.
+func (m *Manager) logFor(executable string) *logRing {
+	r := m.logs[executable]
+	if r == nil {
+		r = newLogRing()
+		m.logs[executable] = r
+	}
+	return r
+}
 
 // State reports the Workspace's server: running, failed to start, or
 // stopped (it starts on the next query).
@@ -78,25 +104,42 @@ func (m *Manager) State(ws navigator.Workspace) navigator.ServerState {
 	return st
 }
 
+// warmTimeout bounds how long a server may take to answer the warm-up.
+const warmTimeout = 5 * time.Minute
+
 // Warm starts the Workspace's server without waiting for it, then asks it a
-// trivial symbol query: answering marks it Ready even if it never reports
-// its indexing progress.
+// trivial symbol query: answering, even with an error, marks it Ready even
+// if it never reports its indexing progress. A server with no symbol search
+// is Ready once its own progress reports, if any, end.
 func (m *Manager) Warm(_ context.Context, ws navigator.Workspace) error {
 	if !m.Available(ws.Language) {
 		return fmt.Errorf("%w for %s", navigator.ErrNoServer, ws.Language)
 	}
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), warmTimeout)
 		defer cancel()
 		s, err := m.server(ctx, ws)
 		if err != nil {
 			return
 		}
 		defer s.release()
-		var found json.RawMessage
-		if s.conn.call(ctx, "workspace/symbol", map[string]string{"query": "scrutiny-warm-up"}, &found) == nil {
-			s.answered()
+		if !s.symbols {
+			s.settle()
+			return
 		}
+		var found json.RawMessage
+		err = s.conn.call(ctx, "workspace/symbol", map[string]string{"query": "scrutiny-warm-up"}, &found)
+		var rpcErr *rpcError
+		switch {
+		case err == nil:
+			s.answered()
+		case errors.As(err, &rpcErr):
+			s.log.add(navigator.LogWarn, "scrutiny", "warm-up symbol search: "+err.Error())
+			s.answered()
+		case errors.Is(err, context.DeadlineExceeded):
+			s.fail(fmt.Sprintf("no answer to a symbol search within %s", warmTimeout))
+		}
+		// Otherwise the connection closed: the process exit reports why.
 	}()
 	return nil
 }
@@ -195,7 +238,7 @@ func (m *Manager) server(ctx context.Context, ws navigator.Workspace) (*server, 
 			m.mu.Unlock()
 			return nil, fmt.Errorf("%w for %s", navigator.ErrNoServer, ws.Language)
 		}
-		s = newServer(ws, argv)
+		s = newServer(ws, argv, m.logFor(argv[0]))
 		s.notify = func(st navigator.ServerState) { m.notify(s, st) }
 		s.onExit = func() { m.forget(s) }
 		m.servers[ws] = s
@@ -237,14 +280,19 @@ func (m *Manager) notify(s *server, st navigator.ServerState) {
 }
 
 // forget drops s once its process has exited, so the next query starts a
-// fresh server.
+// fresh server. An exit nobody asked for leaves s Failed until then.
 func (m *Manager) forget(s *server) {
+	<-s.ready // a launch that fails waits for the exit, not the other way round
+	failed := s.exitedUnexpectedly()
 	m.mu.Lock()
 	if m.servers[s.ws] == s {
 		delete(m.servers, s.ws)
+		if failed {
+			m.failures[s.ws] = s.state()
+		}
 	}
 	m.mu.Unlock()
-	if s.state().Phase != navigator.Failed {
+	if !failed && s.state().Phase != navigator.Failed {
 		s.setPhase(navigator.Stopped)
 	}
 }
@@ -284,10 +332,14 @@ type server struct {
 	exited   chan struct{} // closed once the process has been waited for
 	waitOnce sync.Once
 
-	ready chan struct{} // closed once initialised (or failed: see err)
-	err   error
-	cmd   *exec.Cmd
-	conn  *conn
+	ready   chan struct{} // closed once initialised (or failed: see err)
+	err     error
+	cmd     *exec.Cmd
+	conn    *conn
+	symbols bool // it can search workspace symbols
+
+	log     *logRing
+	started time.Time
 
 	mu       sync.Mutex
 	inUse    int
@@ -296,30 +348,73 @@ type server struct {
 	progress map[string]bool // active $/progress tokens
 	phase    navigator.Phase
 	errText  string
+	stopping bool  // the process is being stopped or killed on purpose
+	exitErr  error // how the process exited, once it has
 }
 
-func newServer(ws navigator.Workspace, argv []string) *server {
-	return &server{ws: ws, argv: argv, ready: make(chan struct{}), exited: make(chan struct{}),
+func newServer(ws navigator.Workspace, argv []string, log *logRing) *server {
+	return &server{ws: ws, argv: argv, log: log, started: time.Now(), ready: make(chan struct{}), exited: make(chan struct{}),
 		lastUsed: time.Now(), opened: map[string]bool{}, progress: map[string]bool{}}
 }
 
 // wait reaps the process once, however many callers ask.
 func (s *server) wait() {
 	s.waitOnce.Do(func() {
-		_ = s.cmd.Wait()
+		err := s.cmd.Wait()
+		s.mu.Lock()
+		s.exitErr = err
+		stopping := s.stopping
+		s.mu.Unlock()
+		if !stopping {
+			s.log.add(navigator.LogError, "scrutiny", "exited unexpectedly: "+exitStatus(err))
+		}
 		close(s.exited)
 	})
 }
 
+// exitStatus describes how a process exited.
+func exitStatus(err error) string {
+	if err == nil {
+		return "exit status 0"
+	}
+	return err.Error()
+}
+
+// exitedUnexpectedly reports whether the process exited after starting
+// without being asked to, and if so marks s Failed.
+func (s *server) exitedUnexpectedly() bool {
+	s.mu.Lock()
+	unexpected := !s.stopping && s.phase != navigator.Starting && s.phase != navigator.Failed
+	err := s.exitErr
+	s.mu.Unlock()
+	if unexpected {
+		s.fail("exited unexpectedly: " + exitStatus(err))
+	}
+	return unexpected
+}
+
+// fail marks s Failed because of why.
+func (s *server) fail(why string) {
+	s.mu.Lock()
+	s.errText = why
+	s.mu.Unlock()
+	s.setPhase(navigator.Failed)
+}
+
 func (s *server) start() {
 	defer close(s.ready)
+	s.log.add(navigator.LogInfo, "scrutiny", fmt.Sprintf("starting %s for %s", strings.Join(s.argv, " "), s.ws.Root))
 	s.setPhase(navigator.Starting)
 	if err := s.launch(); err != nil {
-		s.err = fmt.Errorf("start %s: %w", s.argv[0], err)
 		s.mu.Lock()
-		s.errText = s.err.Error()
+		exitErr, stopping := s.exitErr, s.stopping
 		s.mu.Unlock()
-		s.setPhase(navigator.Failed)
+		if exitErr != nil && !stopping {
+			err = fmt.Errorf("%w (%s)", err, exitErr)
+		}
+		s.err = fmt.Errorf("start %s: %w", s.argv[0], err)
+		s.log.add(navigator.LogError, "scrutiny", s.err.Error())
+		s.fail(s.err.Error())
 		return
 	}
 	s.setPhase(navigator.Indexing)
@@ -328,6 +423,11 @@ func (s *server) start() {
 func (s *server) launch() error {
 	s.cmd = exec.Command(s.argv[0], s.argv[1:]...)
 	s.cmd.Dir = s.ws.Root
+	// stderr is the server's log. Wait copies it to the end, but no longer
+	// than WaitDelay after exit, should a child hold it open.
+	stderr := &lineWriter{line: func(text string) { s.log.add(navigator.LogDebug, "stderr", text) }}
+	s.cmd.Stderr = stderr
+	s.cmd.WaitDelay = 2 * time.Second
 	stdin, err := s.cmd.StdinPipe()
 	if err != nil {
 		return err
@@ -351,6 +451,7 @@ func (s *server) launch() error {
 	// the reader.
 	go func() {
 		s.wait()
+		stderr.flush()
 		if s.onExit != nil {
 			s.onExit()
 		}
@@ -370,21 +471,64 @@ func (s *server) launch() error {
 			"textDocument": map[string]any{"definition": map[string]any{}, "references": map[string]any{}, "synchronization": map[string]any{}},
 		},
 	}
-	if err := s.conn.call(ctx, "initialize", init, nil); err != nil {
-		s.kill()
-		<-s.exited
-		return err
+	var result struct {
+		Capabilities struct {
+			WorkspaceSymbolProvider json.RawMessage `json:"workspaceSymbolProvider"`
+		} `json:"capabilities"`
+	}
+	if err := s.conn.call(ctx, "initialize", init, &result); err != nil {
+		return s.abort(err)
+	}
+	// true or an options object; absent, null or false when it has none.
+	switch p := string(result.Capabilities.WorkspaceSymbolProvider); p {
+	case "", "null", "false":
+	default:
+		s.symbols = true
+	}
+	if !s.symbols {
+		s.log.add(navigator.LogInfo, "scrutiny", "the server cannot search workspace symbols")
 	}
 	if err := s.conn.notify("initialized", struct{}{}); err != nil {
-		s.kill()
-		<-s.exited
-		return err
+		return s.abort(err)
 	}
 	return nil
 }
 
+// messageLevels maps an LSP MessageType to a LogLevel.
+var messageLevels = map[int]navigator.LogLevel{1: navigator.LogError, 2: navigator.LogWarn, 3: navigator.LogInfo}
+
+// abort ends a launch that failed with err. Unless it timed out, the
+// connection closed because the process is exiting: give it a moment, so
+// its own exit status is what gets reported.
+func (s *server) abort(err error) error {
+	if !errors.Is(err, context.DeadlineExceeded) {
+		select {
+		case <-s.exited:
+		case <-time.After(time.Second):
+		}
+	}
+	s.kill()
+	<-s.exited
+	return err
+}
+
 func (s *server) handleNotification(method string, params json.RawMessage) {
-	if method != "$/progress" {
+	switch method {
+	case "window/logMessage", "window/showMessage":
+		var p struct {
+			Type    int    `json:"type"`
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(params, &p) == nil {
+			level, ok := messageLevels[p.Type]
+			if !ok {
+				level = navigator.LogDebug
+			}
+			s.log.add(level, "server", p.Message)
+		}
+		return
+	case "$/progress":
+	default:
 		return
 	}
 	var p progressParams
@@ -437,9 +581,10 @@ func (s *server) setPhase(p navigator.Phase) {
 }
 
 func (s *server) state() navigator.ServerState {
+	problem := s.log.lastProblem(s.started)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return navigator.ServerState{Phase: s.phase, Server: filepath.Base(s.argv[0]), Err: s.errText}
+	return navigator.ServerState{Phase: s.phase, Server: filepath.Base(s.argv[0]), Err: s.errText, LastProblem: problem}
 }
 
 // answered marks the server Ready: it has answered a query.
@@ -448,6 +593,17 @@ func (s *server) answered() {
 	clear(s.progress)
 	s.mu.Unlock()
 	s.setPhase(navigator.Ready)
+}
+
+// settle marks a server that cannot be asked anything to warm it up Ready,
+// unless it is reporting progress: the progress ending then does.
+func (s *server) settle() {
+	s.mu.Lock()
+	active := len(s.progress) > 0
+	s.mu.Unlock()
+	if !active {
+		s.setPhase(navigator.Ready)
+	}
 }
 
 func (s *server) acquire() {
@@ -498,6 +654,9 @@ const drainTimeout = 30 * time.Second
 // stop lets in-flight queries finish, asks the server to shut down, and
 // kills it if it does not exit.
 func (s *server) stop() {
+	s.mu.Lock()
+	s.stopping = true
+	s.mu.Unlock()
 	<-s.ready
 	for deadline := time.Now().Add(drainTimeout); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
 		s.mu.Lock()
@@ -516,6 +675,7 @@ func (s *server) stop() {
 		select {
 		case <-s.exited:
 		case <-time.After(2 * time.Second):
+			s.log.add(navigator.LogWarn, "scrutiny", "killed: it did not exit after shutdown")
 			s.kill()
 			<-s.exited
 		}
@@ -523,8 +683,56 @@ func (s *server) stop() {
 	slog.Debug("language server stopped", "root", s.ws.Root, "language", s.ws.Language)
 }
 
+// kill ends the process, unless it has already exited; its exit is not
+// then a failure of its own.
 func (s *server) kill() {
+	select {
+	case <-s.exited:
+		return
+	default:
+	}
+	s.mu.Lock()
+	s.stopping = true
+	s.mu.Unlock()
 	if s.cmd != nil && s.cmd.Process != nil {
 		_ = s.cmd.Process.Kill()
+	}
+}
+
+// lineWriter passes each line written to it to line.
+type lineWriter struct {
+	mu   sync.Mutex
+	buf  []byte
+	line func(string)
+}
+
+func (w *lineWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.buf = append(w.buf, p...)
+	for {
+		i := bytes.IndexByte(w.buf, '\n')
+		if i < 0 {
+			break
+		}
+		if text := strings.TrimRight(string(w.buf[:i]), "\r"); text != "" {
+			w.line(text)
+		}
+		w.buf = w.buf[i+1:]
+	}
+	if len(w.buf) > logLineMax { // a very long line: pass it on in pieces
+		w.line(string(w.buf))
+		w.buf = nil
+	}
+	return len(p), nil
+}
+
+// flush passes on a last line with no newline.
+func (w *lineWriter) flush() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if len(w.buf) > 0 {
+		w.line(string(w.buf))
+		w.buf = nil
 	}
 }

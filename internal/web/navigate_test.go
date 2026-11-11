@@ -107,7 +107,7 @@ func TestTheLSPIconShowsWhatTheLanguageServersAreDoing(t *testing.T) {
 	a := newApp(t)
 	page := a.do(t, http.MethodGet, prPath, nil).Body.String()
 	icon := page[strings.Index(page, `id="lsp-status"`):]
-	icon = icon[:strings.Index(icon, "</span>")]
+	icon = icon[:strings.Index(icon, "</a>")]
 	// Opening the PR warmed gopls for its Go files; the fake reports it starting.
 	mustContain(t, icon, "lsp-busy", "Go · go-server: starting…")
 
@@ -131,4 +131,25 @@ func TestLSPStatusChangesArePushedToThePage(t *testing.T) {
 	views.LiveUpdate(ref, review.Update{Languages: langs}).Render(context.Background(), &html)
 	mustContain(t, html.String(), `id="lsp-status"`, `hx-swap-oob="true"`, "lsp-busy",
 		"Go · gopls: indexing…", "Rust: no Language Server installed")
+}
+
+func TestTheLSPIconPointsAtTheLogsWhenAServerIsInTrouble(t *testing.T) {
+	render := func(st navigator.ServerState) string {
+		var html strings.Builder
+		views.LSPStatus([]review.LanguageStatus{{Language: "json", ServerState: st}}, false).Render(context.Background(), &html)
+		return html.String()
+	}
+	stuck := render(navigator.ServerState{Phase: navigator.Indexing, Server: "vscode-json-language-server", LastProblem: "schema download failed\nat line 3"})
+	mustContain(t, stuck, `href="/settings#language-servers"`, "indexing…",
+		"last message: schema download failed", "Click for Settings › Language Servers and their logs")
+	if strings.Contains(stuck, "at line 3") {
+		t.Error("the tooltip shows more than the problem's first line")
+	}
+
+	failed := render(navigator.ServerState{Phase: navigator.Failed, Server: "x", Err: "exited unexpectedly: exit status 1"})
+	mustContain(t, failed, "lsp-failed", "failed: exited unexpectedly: exit status 1", "and their logs")
+
+	if ready := render(navigator.ServerState{Phase: navigator.Ready, Server: "x", LastProblem: "old news"}); strings.Contains(ready, "last message") || strings.Contains(ready, "their logs") {
+		t.Errorf("a ready server's tooltip mentions problems: %s", ready)
+	}
 }

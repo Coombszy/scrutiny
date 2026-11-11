@@ -21,6 +21,7 @@ type Fake struct {
 	Refs        map[Query][]Location
 	AllSymbols  []Symbol
 	States      map[Workspace]ServerState
+	Logs        map[string][]LogEntry // by executable path
 	// Calls records the Workspace of every query; Resets every Reset.
 	Calls  []Workspace
 	Resets []Workspace
@@ -35,7 +36,15 @@ func NewFake() *Fake {
 		Definitions: map[Query][]Location{},
 		Refs:        map[Query][]Location{},
 		States:      map[Workspace]ServerState{},
+		Logs:        map[string][]LogEntry{},
 	}
+}
+
+// Log returns the preset log for executable.
+func (f *Fake) Log(executable string) []LogEntry {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.Logs[executable]
 }
 
 func (f *Fake) check(ws Workspace) error {

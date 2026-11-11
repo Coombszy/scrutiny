@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Coombszy/scrutiny/internal/installer"
+	"github.com/Coombszy/scrutiny/internal/navigator"
 )
 
 // launch holds how to start registry packages whose executable needs
@@ -54,10 +55,18 @@ func language(name string) string {
 	return l
 }
 
+// LogSource reads a Language Server's recent log by the executable path it
+// was launched as.
+type LogSource interface {
+	Log(executable string) []navigator.LogEntry
+}
+
 // Service resolves launch commands and runs install jobs.
 type Service struct {
 	inst     installer.Installer
 	lookPath func(string) (string, error)
+	// Logs, if set before use, is where installed servers' logs are read.
+	Logs LogSource
 
 	mu   sync.Mutex
 	jobs map[string]*Job
@@ -119,6 +128,7 @@ type Status struct {
 	Installed *installer.Installed
 	Missing   []string // runtimes it needs that are not on $PATH
 	Job       *Job
+	LogErrors int // errors in its recent log
 }
 
 // List returns the registry's Language Servers matching query (by name or
@@ -179,6 +189,11 @@ func (s *Service) status(p installer.Package, have map[string]installer.Installe
 	st := Status{Package: p, Missing: s.inst.Missing(p)}
 	if in, ok := have[p.Name]; ok {
 		st.Installed = &in
+		for _, e := range s.log(in) {
+			if e.Level == navigator.LogError {
+				st.LogErrors++
+			}
+		}
 	}
 	s.mu.Lock()
 	if j := s.jobs[p.Name]; j != nil {
@@ -187,6 +202,32 @@ func (s *Service) status(p installer.Package, have map[string]installer.Installe
 	}
 	s.mu.Unlock()
 	return st
+}
+
+// Log returns the recent log of installed package name's executables,
+// oldest first; none when it is not installed.
+func (s *Service) Log(name string) ([]navigator.LogEntry, error) {
+	installed, err := s.inst.Installed()
+	if err != nil {
+		return nil, err
+	}
+	i := slices.IndexFunc(installed, func(in installer.Installed) bool { return in.Name == name })
+	if i < 0 {
+		return nil, nil
+	}
+	return s.log(installed[i]), nil
+}
+
+func (s *Service) log(in installer.Installed) []navigator.LogEntry {
+	if s.Logs == nil {
+		return nil
+	}
+	var out []navigator.LogEntry
+	for _, bin := range in.Bin {
+		out = append(out, s.Logs.Log(bin)...)
+	}
+	slices.SortStableFunc(out, func(a, b navigator.LogEntry) int { return a.Time.Compare(b.Time) })
+	return out
 }
 
 // Install starts installing name in the background, unless it already is.

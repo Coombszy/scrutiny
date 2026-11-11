@@ -5,6 +5,7 @@ package navigator
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 // ErrNoServer is returned when no Language Server is available for a
@@ -54,10 +55,33 @@ const (
 
 // ServerState is a Workspace's Language Server's Phase.
 type ServerState struct {
-	Phase  Phase
-	Server string // the server's executable name, e.g. "gopls"
-	Err    string // why it Failed
+	Phase       Phase
+	Server      string // the server's executable name, e.g. "gopls"
+	Err         string // why it Failed
+	LastProblem string // the newest error or warning in its log, if any
 }
+
+// LogLevel is how serious a LogEntry is.
+type LogLevel string
+
+const (
+	LogError LogLevel = "error"
+	LogWarn  LogLevel = "warn"
+	LogInfo  LogLevel = "info"
+	LogDebug LogLevel = "log"
+)
+
+// LogEntry is a line of a Language Server's output, or of Scrutiny's own
+// account of running it.
+type LogEntry struct {
+	Time   time.Time
+	Level  LogLevel
+	Source string // "stderr", "server" (window/logMessage) or "scrutiny"
+	Text   string
+}
+
+// Problem reports whether the entry is an error or a warning.
+func (e LogEntry) Problem() bool { return e.Level == LogError || e.Level == LogWarn }
 
 // Busy reports whether the server is on its way to Ready.
 func (s ServerState) Busy() bool { return s.Phase == Starting || s.Phase == Indexing }

@@ -7,16 +7,17 @@ import (
 
 // LSPStatus is the top bar's Language Server icon: a ring spins round it
 // while a server for the PR starts or indexes, a green tick shows once all
-// are ready, and hovering says what each is doing.
+// are ready, and hovering says what each is doing. It links to the
+// servers' settings and logs.
 templ LSPStatus(langs []review.LanguageStatus, oob bool) {
-	<span
+	<a
+		href="/settings#language-servers"
 		id="lsp-status"
 		class={ "lsp-status", "lsp-" + lspOverall(langs) }
 		if oob {
 			hx-swap-oob="true"
 		}
 		title={ lspTooltip(langs) }
-		role="status"
 		aria-label={ lspTooltip(langs) }
 	>
 		<svg class="lsp-ring" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="12.5"></circle></svg>
@@ -27,7 +28,7 @@ templ LSPStatus(langs []review.LanguageStatus, oob bool) {
 		</svg>
 		<svg class="lsp-badge lsp-tick" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="6"></circle><path d="M3.3 6.2l1.8 1.8 3.6-3.8"></path></svg>
 		<svg class="lsp-badge lsp-cross" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="6"></circle><path d="M4 4l4 4M8 4l-4 4"></path></svg>
-	</span>
+	</a>
 }
 
 // Palette is the Symbol Search dialog (ctrl+k).

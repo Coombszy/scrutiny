@@ -88,6 +88,7 @@ func serve(portOverride int, dev bool) error {
 	serverDir := filepath.Join(dirs.Data, "servers")
 	languageServers := servers.New(mason.New(mason.Options{Dir: serverDir}), exec.LookPath)
 	nav := lsp.NewManager(languageServers.Command, 10*time.Minute)
+	languageServers.Logs = nav
 	defer nav.Close()
 	repos := gitcli.New(filepath.Join(dirs.State, "repos"), filepath.Join(dirs.State, "worktrees"), gitcli.HTTPSCloneURL, gitcli.GHCredentialConfig("github.com")...)
 	svc := review.NewService(review.Deps{

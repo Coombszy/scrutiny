@@ -13,6 +13,7 @@ func (s *Server) routeServers() {
 	s.mux.HandleFunc("GET /settings/servers/list", s.serverList)
 	s.mux.HandleFunc("POST /settings/servers/refresh", s.refreshServers)
 	s.mux.HandleFunc("GET /settings/servers/{name}", s.serverRow)
+	s.mux.HandleFunc("GET /settings/servers/{name}/log", s.serverLog)
 	s.mux.HandleFunc("POST /settings/servers/{name}/install", s.installServer)
 	s.mux.HandleFunc("POST /settings/servers/{name}/remove", s.removeServer)
 }
@@ -67,4 +68,14 @@ func (s *Server) removeServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.serverRow(w, r)
+}
+
+func (s *Server) serverLog(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	entries, err := s.servers.Log(name)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.render(w, r, http.StatusOK, views.ServerLog(name, entries))
 }

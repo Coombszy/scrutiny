@@ -84,9 +84,11 @@ func newApp(t *testing.T) *app {
 	lookPath := func(string) (string, error) { return "", exec.ErrNotFound }
 	a.themesDir = t.TempDir()
 	a.metrics = metrics.NewCollector(metrics.NewMemory(), nil)
+	languageServers := servers.New(a.inst, lookPath)
+	languageServers.Logs = a.nav
 	a.handler = web.NewServer(web.Deps{
 		CSRFToken: token, Review: svc, Settings: a.settings, Hub: a.hub,
-		Servers: servers.New(a.inst, lookPath), ThemesDir: a.themesDir, Metrics: a.metrics,
+		Servers: languageServers, ThemesDir: a.themesDir, Metrics: a.metrics,
 	}).Handler()
 	return a
 }

@@ -263,7 +263,7 @@ details.status-row { display: block; }
 
 /* Language Server status: a ring spins while starting or indexing; a badge
    shows ready (tick) or failed (cross). */
-.lsp-status { position: relative; display: inline-flex; width: 20px; height: 20px; color: var(--fg-dim); cursor: default; }
+.lsp-status { position: relative; display: inline-flex; width: 20px; height: 20px; color: var(--fg-dim); }
 .lsp-icon { width: 20px; height: 20px; }
 .lsp-ring { position: absolute; inset: -4px; width: 28px; height: 28px; fill: none; stroke: var(--yellow); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 20 60; opacity: 0; }
 .lsp-busy .lsp-ring { opacity: 1; animation: spin .9s linear infinite; }
@@ -358,7 +358,7 @@ tr:target td { background: rgba(250, 189, 47, .18); }
   .settings-form label > span:first-child { flex-basis: 100%; }
 }
 .server-list { display: flex; flex-direction: column; max-width: 60rem; }
-.server { display: flex; gap: 1rem; justify-content: space-between; align-items: center; padding: .6rem 0; border-bottom: 1px solid var(--bg1); }
+.server { display: flex; flex-wrap: wrap; gap: 0 1rem; justify-content: space-between; align-items: center; padding: .6rem 0; border-bottom: 1px solid var(--bg1); }
 .server-info { flex: 1 1 auto; min-width: 0; }
 .server-info p { margin: .2rem 0 0; font-size: var(--fs-sm); }
 .server-state { flex: 0 0 auto; max-width: 50%; display: flex; gap: .5rem; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
@@ -368,6 +368,17 @@ tr:target td { background: rgba(250, 189, 47, .18); }
 }
 .requires { color: var(--yellow); }
 .install-error { flex-basis: 100%; white-space: pre-wrap; color: var(--red); font-size: var(--fs-sm); max-height: 12rem; overflow: auto; background: var(--bg1); padding: .4rem; }
+.server-log { flex-basis: 100%; margin-top: .3rem; font-size: var(--fs-sm); }
+.server-log summary { cursor: pointer; color: var(--fg-dim); width: fit-content; }
+.server-log .log-errors { color: var(--red); }
+.server-log-body { display: flex; flex-direction: column; align-items: flex-start; gap: .4rem; margin-top: .4rem; }
+.server-log-lines { list-style: none; margin: 0; padding: .4rem; width: 100%; box-sizing: border-box; max-height: 16rem; overflow: auto; background: var(--bg1); font-family: var(--mono); }
+.server-log-lines li { display: flex; gap: .6rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.server-log-lines time, .log-source { flex: 0 0 auto; color: var(--fg-dim); }
+.log-source { min-width: 4.5rem; }
+.log-text { min-width: 0; }
+.log-error .log-text { color: var(--red); }
+.log-warn .log-text { color: var(--yellow); }
 #refresh-banner:has(#refresh-commits:empty):has(#refresh-comments:empty) { display: none; }
 
 /* Stacks and the Command Palette */

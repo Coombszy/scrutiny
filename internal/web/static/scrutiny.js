@@ -1796,3 +1796,11 @@ window.Scrutiny = { actions: {} };
   // close does not bubble, so it is caught on the way down.
   document.addEventListener("close", inEditor, true);
 })();
+
+// A Language Server's log opens scrolled to its newest lines.
+(() => {
+  "use strict";
+  document.addEventListener("htmx:load", (e) => {
+    for (const list of e.target.querySelectorAll?.(".server-log-lines") ?? []) list.scrollTop = list.scrollHeight;
+  });
+})();

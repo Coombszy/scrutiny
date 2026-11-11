@@ -16,7 +16,8 @@ import (
 
 // LSPStatus is the top bar's Language Server icon: a ring spins round it
 // while a server for the PR starts or indexes, a green tick shows once all
-// are ready, and hovering says what each is doing.
+// are ready, and hovering says what each is doing. It links to the
+// servers' settings and logs.
 func LSPStatus(langs []review.LanguageStatus, oob bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -38,7 +39,7 @@ func LSPStatus(langs []review.LanguageStatus, oob bool) templ.Component {
 			templ_7745c5c3_ElementWriter := templ_7745c5c3_Buffer
 			templ_7745c5c3_Buffer := templ.GetBuffer()
 			var templ_7745c5c3_ElementScripts []templ.ComponentScript
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<span id=\"lsp-status\" class=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<a href=\"/settings#language-servers\" id=\"lsp-status\" class=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -73,20 +74,20 @@ func LSPStatus(langs []review.LanguageStatus, oob bool) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.NewAttributeExpression(lspTooltip(langs)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 18, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 20, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" role=\"status\" aria-label=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" aria-label=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templruntime.NewAttributeExpression(lspTooltip(langs)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 20, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 21, Col: 32}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 			if templ_7745c5c3_Err != nil {
@@ -106,7 +107,7 @@ func LSPStatus(langs []review.LanguageStatus, oob bool) templ.Component {
 			}
 			templ.ReleaseBuffer(templ_7745c5c3_Buffer)
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "><svg class=\"lsp-ring\" viewBox=\"0 0 28 28\" aria-hidden=\"true\"><circle cx=\"14\" cy=\"14\" r=\"12.5\"></circle></svg> <svg class=\"lsp-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1\"></path> <path d=\"M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1\"></path> <circle cx=\"12\" cy=\"12\" r=\"1.6\" fill=\"currentColor\" stroke=\"none\"></circle></svg> <svg class=\"lsp-badge lsp-tick\" viewBox=\"0 0 12 12\" aria-hidden=\"true\"><circle cx=\"6\" cy=\"6\" r=\"6\"></circle><path d=\"M3.3 6.2l1.8 1.8 3.6-3.8\"></path></svg> <svg class=\"lsp-badge lsp-cross\" viewBox=\"0 0 12 12\" aria-hidden=\"true\"><circle cx=\"6\" cy=\"6\" r=\"6\"></circle><path d=\"M4 4l4 4M8 4l-4 4\"></path></svg></span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "><svg class=\"lsp-ring\" viewBox=\"0 0 28 28\" aria-hidden=\"true\"><circle cx=\"14\" cy=\"14\" r=\"12.5\"></circle></svg> <svg class=\"lsp-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1\"></path> <path d=\"M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1\"></path> <circle cx=\"12\" cy=\"12\" r=\"1.6\" fill=\"currentColor\" stroke=\"none\"></circle></svg> <svg class=\"lsp-badge lsp-tick\" viewBox=\"0 0 12 12\" aria-hidden=\"true\"><circle cx=\"6\" cy=\"6\" r=\"6\"></circle><path d=\"M3.3 6.2l1.8 1.8 3.6-3.8\"></path></svg> <svg class=\"lsp-badge lsp-cross\" viewBox=\"0 0 12 12\" aria-hidden=\"true\"><circle cx=\"6\" cy=\"6\" r=\"6\"></circle><path d=\"M4 4l4 4M8 4l-4 4\"></path></svg></a>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -139,7 +140,7 @@ func Palette(pr domain.PRRef) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(pr.Path() + "/symbols").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 35, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 36, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 		if templ_7745c5c3_Err != nil {
@@ -214,7 +215,7 @@ func SymbolResults(pr domain.PRRef, results []review.SearchResult) templ.Compone
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(blobURL(pr, r.Path, r.Line))).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 50, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 51, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 				if templ_7745c5c3_Err != nil {
@@ -227,7 +228,7 @@ func SymbolResults(pr domain.PRRef, results []review.SearchResult) templ.Compone
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templruntime.NewAttributeExpression(r.Path).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 51, Col: 27}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 52, Col: 27}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 				if templ_7745c5c3_Err != nil {
@@ -245,7 +246,7 @@ func SymbolResults(pr domain.PRRef, results []review.SearchResult) templ.Compone
 					var templ_7745c5c3_Var13 string
 					templ_7745c5c3_Var13, templ_7745c5c3_Err = templruntime.NewAttributeExpression(itoa(r.Line)).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 53, Col: 34}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 54, Col: 34}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 					if templ_7745c5c3_Err != nil {
@@ -263,7 +264,7 @@ func SymbolResults(pr domain.PRRef, results []review.SearchResult) templ.Compone
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templruntime.NewAttributeExpression(boolString(r.InPR)).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 55, Col: 40}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 56, Col: 40}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 				if templ_7745c5c3_Err != nil {
@@ -290,7 +291,7 @@ func SymbolResults(pr domain.PRRef, results []review.SearchResult) templ.Compone
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templruntime.NewAttributeExpression(markerTitle(r.Marker)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 57, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 58, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 			if templ_7745c5c3_Err != nil {
@@ -303,7 +304,7 @@ func SymbolResults(pr domain.PRRef, results []review.SearchResult) templ.Compone
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(r.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 58, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 59, Col: 32}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -316,7 +317,7 @@ func SymbolResults(pr domain.PRRef, results []review.SearchResult) templ.Compone
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(r.Kind)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 59, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 60, Col: 32}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
@@ -334,7 +335,7 @@ func SymbolResults(pr domain.PRRef, results []review.SearchResult) templ.Compone
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(r.Path)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 61, Col: 40}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 62, Col: 40}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -347,7 +348,7 @@ func SymbolResults(pr domain.PRRef, results []review.SearchResult) templ.Compone
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(r.Line))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 61, Col: 57}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 62, Col: 57}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
@@ -396,7 +397,7 @@ func ReferencesPanel(pr domain.PRRef, refs []review.Reference) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(usages(len(refs)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 73, Col: 30}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 74, Col: 30}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -454,7 +455,7 @@ func ReferencesPanel(pr domain.PRRef, refs []review.Reference) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(group[0].Path)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 78, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 79, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
@@ -473,7 +474,7 @@ func ReferencesPanel(pr domain.PRRef, refs []review.Reference) templ.Component {
 					var templ_7745c5c3_Var25 string
 					templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(ref.Line))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 81, Col: 47}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 82, Col: 47}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 					if templ_7745c5c3_Err != nil {
@@ -491,7 +492,7 @@ func ReferencesPanel(pr domain.PRRef, refs []review.Reference) templ.Component {
 					var templ_7745c5c3_Var26 string
 					templ_7745c5c3_Var26, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(blobURL(pr, ref.Path, ref.Line))).ResolveURL(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 85, Col: 60}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 86, Col: 60}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
 					if templ_7745c5c3_Err != nil {
@@ -504,7 +505,7 @@ func ReferencesPanel(pr domain.PRRef, refs []review.Reference) templ.Component {
 					var templ_7745c5c3_Var27 string
 					templ_7745c5c3_Var27, templ_7745c5c3_Err = templruntime.NewAttributeExpression(ref.Path).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 86, Col: 31}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 87, Col: 31}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
 					if templ_7745c5c3_Err != nil {
@@ -517,7 +518,7 @@ func ReferencesPanel(pr domain.PRRef, refs []review.Reference) templ.Component {
 					var templ_7745c5c3_Var28 string
 					templ_7745c5c3_Var28, templ_7745c5c3_Err = templruntime.NewAttributeExpression(itoa(ref.Line)).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 87, Col: 37}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 88, Col: 37}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
 					if templ_7745c5c3_Err != nil {
@@ -530,7 +531,7 @@ func ReferencesPanel(pr domain.PRRef, refs []review.Reference) templ.Component {
 					var templ_7745c5c3_Var29 string
 					templ_7745c5c3_Var29, templ_7745c5c3_Err = templruntime.NewAttributeExpression(boolString(ref.InPR)).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 88, Col: 44}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 89, Col: 44}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 					if templ_7745c5c3_Err != nil {
@@ -543,7 +544,7 @@ func ReferencesPanel(pr domain.PRRef, refs []review.Reference) templ.Component {
 					var templ_7745c5c3_Var30 string
 					templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(ref.Line))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 90, Col: 40}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 91, Col: 40}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 					if templ_7745c5c3_Err != nil {
@@ -556,7 +557,7 @@ func ReferencesPanel(pr domain.PRRef, refs []review.Reference) templ.Component {
 					var templ_7745c5c3_Var31 string
 					templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(ref.Text)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 91, Col: 23}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 92, Col: 23}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 					if templ_7745c5c3_Err != nil {
@@ -618,7 +619,7 @@ func FileViewPage(pr domain.PRRef, f review.FileView) templ.Component {
 			var templ_7745c5c3_Var34 string
 			templ_7745c5c3_Var34, templ_7745c5c3_Err = templruntime.NewAttributeExpression(pr.Path() + "/events?head=" + string(f.Head)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 103, Col: 63}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 104, Col: 63}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var34)
 			if templ_7745c5c3_Err != nil {
@@ -631,7 +632,7 @@ func FileViewPage(pr domain.PRRef, f review.FileView) templ.Component {
 			var templ_7745c5c3_Var35 string
 			templ_7745c5c3_Var35, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(pr.Path())).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 105, Col: 56}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 106, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
 			if templ_7745c5c3_Err != nil {
@@ -644,7 +645,7 @@ func FileViewPage(pr domain.PRRef, f review.FileView) templ.Component {
 			var templ_7745c5c3_Var36 string
 			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(pr.String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 105, Col: 76}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 106, Col: 76}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 			if templ_7745c5c3_Err != nil {
@@ -657,7 +658,7 @@ func FileViewPage(pr domain.PRRef, f review.FileView) templ.Component {
 			var templ_7745c5c3_Var37 string
 			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(f.Path)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 106, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 107, Col: 28}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 			if templ_7745c5c3_Err != nil {
@@ -670,7 +671,7 @@ func FileViewPage(pr domain.PRRef, f review.FileView) templ.Component {
 			var templ_7745c5c3_Var38 string
 			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(f.Head.Short())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 108, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 109, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 			if templ_7745c5c3_Err != nil {
@@ -693,7 +694,7 @@ func FileViewPage(pr domain.PRRef, f review.FileView) templ.Component {
 			var templ_7745c5c3_Var39 string
 			templ_7745c5c3_Var39, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.Path).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 114, Col: 42}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 115, Col: 42}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var39)
 			if templ_7745c5c3_Err != nil {
@@ -706,7 +707,7 @@ func FileViewPage(pr domain.PRRef, f review.FileView) templ.Component {
 			var templ_7745c5c3_Var40 string
 			templ_7745c5c3_Var40, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.Path).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 115, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 116, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var40)
 			if templ_7745c5c3_Err != nil {
@@ -719,7 +720,7 @@ func FileViewPage(pr domain.PRRef, f review.FileView) templ.Component {
 			var templ_7745c5c3_Var41 string
 			templ_7745c5c3_Var41, templ_7745c5c3_Err = templruntime.NewAttributeExpression(string(f.Head)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 115, Col: 80}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 116, Col: 80}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var41)
 			if templ_7745c5c3_Err != nil {
@@ -737,7 +738,7 @@ func FileViewPage(pr domain.PRRef, f review.FileView) templ.Component {
 				var templ_7745c5c3_Var42 string
 				templ_7745c5c3_Var42, templ_7745c5c3_Err = templruntime.NewAttributeExpression("L" + itoa(i+1)).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 118, Col: 29}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 119, Col: 29}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var42)
 				if templ_7745c5c3_Err != nil {
@@ -750,7 +751,7 @@ func FileViewPage(pr domain.PRRef, f review.FileView) templ.Component {
 				var templ_7745c5c3_Var43 string
 				templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(i + 1))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 119, Col: 34}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 120, Col: 34}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 				if templ_7745c5c3_Err != nil {
@@ -763,7 +764,7 @@ func FileViewPage(pr domain.PRRef, f review.FileView) templ.Component {
 				var templ_7745c5c3_Var44 string
 				templ_7745c5c3_Var44, templ_7745c5c3_Err = templruntime.NewAttributeExpression(itoa(i + 1)).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 120, Col: 46}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/navigate.templ`, Line: 121, Col: 46}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var44)
 				if templ_7745c5c3_Err != nil {
