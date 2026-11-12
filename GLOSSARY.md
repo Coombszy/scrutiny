@@ -93,3 +93,7 @@ _Avoid_: Layout, diff style
 **Theme**:
 A named set of colours for both the interface and syntax highlighting.
 _Avoid_: Colour scheme, skin
+
+**Userscript**:
+The Tampermonkey script that adds a Goto Scrutiny button to GitHub PR pages while Scrutiny is running.
+_Avoid_: Extension, plugin, bookmarklet

@@ -11,7 +11,7 @@ Go, Templ and htmx, in a hexagonal architecture: services depend only on ports, 
 - **GitHub is the source of truth** for review state. The sqlite cache is disposable: deleting it never loses data.
 - **The config file is the source of truth** for settings. UI changes write back to it.
 - **Cache-first**: minimise upstream GitHub calls (ETag conditional requests, polling only while a page is connected and focused).
-- **Loopback only**: `serve` binds `127.0.0.1`, rejects non-localhost `Host`/`Origin` and cross-site requests (`Sec-Fetch-Site`) other than to the Dashboard, and requires a CSRF token on mutating requests.
+- **Loopback only**: `serve` binds `127.0.0.1`, rejects non-localhost `Host`/`Origin` and cross-site requests (`Sec-Fetch-Site`) other than to the Dashboard and `/health`, and requires a CSRF token on mutating requests.
 - **Linux and macOS**, using XDG directories on both.
 
 ## Testing
@@ -42,3 +42,4 @@ Go, Templ and htmx, in a hexagonal architecture: services depend only on ports, 
 - `internal/theme`: built-in and drop-in Themes, rendered as CSS. A theme file is TOML with `name`, `scheme`, `[ui]` and `[syntax]` tables; missing keys fall back to Gruvbox Dark (`internal/theme/builtin`).
 - `internal/metrics`: per-minute counts of GitHub and git activity (stored in the sqlite cache, kept a week), shown on the Settings page.
 - `internal/web`: the driving HTTP adapter (handlers, Templ views, embedded static assets).
+- `userscript`: the Userscript adding a Goto Scrutiny button to GitHub PR pages; it checks `GET /health`, the one route any origin may call.

@@ -29,6 +29,8 @@ scrutiny serve   # or run an installed binary (-port N to change the port)
 
 Then open [http://localhost:7878](http://localhost:7878) and paste a PR URL on the Dashboard.
 
+To jump from GitHub to Scrutiny, install [`userscript/scrutiny.user.js`](userscript/scrutiny.user.js) in [Tampermonkey](https://www.tampermonkey.net) (or Violentmonkey). While Scrutiny is running, every pull request page on github.com gets a **Goto Scrutiny** button that opens the PR in Scrutiny in a new tab. If you serve on a port other than 7878, set it from the script's **Set Scrutiny port** menu command.
+
 Code navigation needs a Language Server: install one from **Language Servers** on the Settings page (the cog in the top bar), or have it on `$PATH` (e.g. `gopls`).
 
 Settings live in `$XDG_CONFIG_HOME/scrutiny/config.toml` and changes made in the UI are written back to it. Themes, hotkeys and the diff collapse threshold can all be changed from **Settings**.
