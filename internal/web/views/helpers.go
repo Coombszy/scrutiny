@@ -568,24 +568,72 @@ func rateLimitName(resource string) string {
 	return resource
 }
 
-// conversationEntry is a Conversation Comment or a submitted review.
+// conversationEntry is a Conversation Comment, a submitted review or an
+// edit to the description (Edit indexes the description's Edits; -1 for
+// none).
 type conversationEntry struct {
 	Comment *domain.Comment
 	Review  *domain.SubmittedReview
+	Edit    int
 	At      time.Time
 }
 
-// conversationEntries merges comments and reviews by time, oldest first.
-func conversationEntries(comments []domain.Comment, reviews []domain.SubmittedReview) []conversationEntry {
-	out := make([]conversationEntry, 0, len(comments)+len(reviews))
-	for i := range comments {
-		out = append(out, conversationEntry{Comment: &comments[i], At: comments[i].CreatedAt})
+// conversationEntries merges comments, reviews and description edits by
+// time, oldest first.
+func conversationEntries(c review.Conversation) []conversationEntry {
+	out := make([]conversationEntry, 0, len(c.Comments)+len(c.Reviews)+len(c.Description.Edits))
+	for i := range c.Comments {
+		out = append(out, conversationEntry{Comment: &c.Comments[i], Edit: -1, At: c.Comments[i].CreatedAt})
 	}
-	for i := range reviews {
-		out = append(out, conversationEntry{Review: &reviews[i], At: reviews[i].SubmittedAt})
+	for i := range c.Reviews {
+		out = append(out, conversationEntry{Review: &c.Reviews[i], Edit: -1, At: c.Reviews[i].SubmittedAt})
+	}
+	for i, e := range c.Description.Edits {
+		out = append(out, conversationEntry{Edit: i, At: e.EditedAt})
 	}
 	slices.SortStableFunc(out, func(a, b conversationEntry) int { return a.At.Compare(b.At) })
 	return out
+}
+
+// changeContext is how many unchanged lines show around a description
+// edit's changes.
+const changeContext = 2
+
+// changeExcerpt keeps a description edit's changed lines and the context
+// around them, marking each gap with a Context line numbered zero.
+func changeExcerpt(lines []domain.Line) []domain.Line {
+	keep := make([]bool, len(lines))
+	for i, l := range lines {
+		if l.Kind == domain.Context {
+			continue
+		}
+		for j := max(0, i-changeContext); j <= min(len(lines)-1, i+changeContext); j++ {
+			keep[j] = true
+		}
+	}
+	var out []domain.Line
+	for i, l := range lines {
+		switch {
+		case keep[i]:
+			out = append(out, l)
+		case len(out) == 0 || out[len(out)-1] != (domain.Line{Kind: domain.Context}):
+			out = append(out, domain.Line{Kind: domain.Context})
+		}
+	}
+	return out
+}
+
+func isGap(l domain.Line) bool { return l == domain.Line{Kind: domain.Context} }
+
+// changeMarker is a description diff line's +, − or space.
+func changeMarker(k domain.LineKind) string {
+	switch k {
+	case domain.Add:
+		return "+"
+	case domain.Delete:
+		return "−"
+	}
+	return " "
 }
 
 func reviewVerdictText(v domain.ReviewVerdict) string {

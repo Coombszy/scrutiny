@@ -235,13 +235,28 @@ func (s *Service) SetReaction(ctx context.Context, ref domain.PRRef, subjectID s
 	return nil, fmt.Errorf("comment %s: %w", subjectID, ErrThreadNotFound)
 }
 
-// AddConversationComment posts a Conversation Comment, returning all of
-// them and the submitted reviews shown among them.
-func (s *Service) AddConversationComment(ctx context.Context, ref domain.PRRef, body string) ([]domain.Comment, []domain.SubmittedReview, error) {
+// Conversation is what the PR page's Conversation shows: the description,
+// with its edits, then Conversation Comments and submitted reviews.
+type Conversation struct {
+	Description domain.Description
+	Comments    []domain.Comment
+	Reviews     []domain.SubmittedReview
+}
+
+func conversationOf(s domain.ReviewState) Conversation {
+	return Conversation{Description: s.Description, Comments: s.Conversation, Reviews: s.Reviews}
+}
+
+// Count is the number of Conversation Comments and submitted reviews.
+func (c Conversation) Count() int { return len(c.Comments) + len(c.Reviews) }
+
+// AddConversationComment posts a Conversation Comment, returning the
+// Conversation re-read afterwards.
+func (s *Service) AddConversationComment(ctx context.Context, ref domain.PRRef, body string) (Conversation, error) {
 	snap, err := s.write(ctx, ref, func(snap snapshot) error {
 		return s.CodeHost.AddConversationComment(ctx, snap.State.PRID, body)
 	})
-	return snap.State.Conversation, snap.State.Reviews, err
+	return conversationOf(snap.State), err
 }
 
 // SetViewed marks or unmarks a file as Viewed.
@@ -325,8 +340,7 @@ func pendingComments(st domain.ReviewState) []PendingComment {
 // afterwards: its thread, or the Conversation.
 type CommentChange struct {
 	InConversation bool
-	Conversation   []domain.Comment
-	Reviews        []domain.SubmittedReview // shown in the Conversation too
+	Conversation   Conversation
 	ThreadID       string
 	// Thread is nil when deleting its last comment deleted the thread.
 	Thread *domain.ReviewThread
@@ -390,7 +404,7 @@ func (s *Service) changeComment(ctx context.Context, ref domain.PRRef, commentID
 		return CommentChange{}, err
 	}
 	if out.InConversation {
-		out.Conversation, out.Reviews = snap.State.Conversation, snap.State.Reviews
+		out.Conversation = conversationOf(snap.State)
 	} else if t, err := findThread(snap.State, out.ThreadID); err == nil {
 		out.Thread = &t
 	}

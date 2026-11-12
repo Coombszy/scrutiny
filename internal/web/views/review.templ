@@ -235,25 +235,31 @@ templ PendingList(comments []review.PendingComment, oob bool) {
 	</div>
 }
 
-// Conversation renders the Conversation Comments and the form for a new one.
-templ Conversation(pr domain.PRRef, comments []domain.Comment, reviews []domain.SubmittedReview) {
-	@conversationView(pr, comments, reviews, false)
+// Conversation renders the Conversation and the form for a new comment,
+// refreshing the description above it.
+templ Conversation(pr domain.PRRef, c review.Conversation) {
+	@conversationView(pr, c, false)
+	@descriptionView(c.Description, true)
 }
 
 // conversationView interleaves Conversation Comments with submitted
-// reviews, oldest first, as GitHub's conversation does.
-templ conversationView(pr domain.PRRef, comments []domain.Comment, reviews []domain.SubmittedReview, oob bool) {
+// reviews and description edits, oldest first, as GitHub's conversation
+// does.
+templ conversationView(pr domain.PRRef, c review.Conversation, oob bool) {
 	<section
 		id="conversation"
 		if oob {
 			hx-swap-oob="true"
 		}
 	>
-		for _, e := range conversationEntries(comments, reviews) {
-			if e.Review != nil {
-				@reviewEvent(*e.Review)
-			} else {
-				@commentView(pr, *e.Comment, "#conversation", suggestion{}, true)
+		for _, e := range conversationEntries(c) {
+			switch {
+				case e.Review != nil:
+					@reviewEvent(*e.Review)
+				case e.Comment != nil:
+					@commentView(pr, *e.Comment, "#conversation", suggestion{}, true)
+				default:
+					@descriptionEdit(c.Description, e.Edit)
 			}
 		}
 		<form class="reply" autocomplete="off" hx-post={ pr.Path() + "/comments" } hx-target="#conversation" hx-swap="outerHTML">
@@ -285,6 +291,63 @@ templ submitDialog(pr domain.PRRef, head domain.SHA, pending []review.PendingCom
 			</div>
 		</form>
 	</dialog>
+}
+
+// descriptionView is the PR's description, shown above the Conversation.
+templ descriptionView(d domain.Description, oob bool) {
+	<section
+		id="description"
+		class="description"
+		if oob {
+			hx-swap-oob="true"
+		}
+	>
+		<header>
+			<strong>{ d.Author }</strong>
+			if !d.CreatedAt.IsZero() {
+				<span class="muted">opened { d.CreatedAt.Local().Format("2 Jan 2006 15:04") }</span>
+			}
+			if n := len(d.Edits); n > 0 {
+				<span class="muted">· edited by { d.Edits[n-1].Editor } { d.Edits[n-1].EditedAt.Local().Format("2 Jan 2006 15:04") }</span>
+			}
+		</header>
+		if d.BodyHTML != "" {
+			<div class="markdown" hx-disable>
+				@templ.Raw(d.BodyHTML)
+			</div>
+		} else {
+			<p class="muted">No description provided.</p>
+		}
+	</section>
+}
+
+// descriptionEdit is an edit to the description in the Conversation, with
+// the lines it changed.
+templ descriptionEdit(d domain.Description, i int) {
+	<article class="review-event description-edit">
+		<header>
+			<span class="review-icon" aria-hidden="true">✎</span>
+			<strong>{ d.Edits[i].Editor }</strong>
+			<span>edited the description</span>
+			<span class="muted">{ d.Edits[i].EditedAt.Local().Format("2 Jan 2006 15:04") }</span>
+		</header>
+		if lines := d.Change(i); lines != nil {
+			<details class="description-change">
+				<summary>Show changes</summary>
+				<pre>
+					for _, l := range changeExcerpt(lines) {
+						if isGap(l) {
+							<span class="gap">…</span>
+						} else {
+							<span class={ kindClass(l.Kind) }>{ changeMarker(l.Kind) } { l.Text }</span>
+						}
+					}
+				</pre>
+			</details>
+		} else if d.Edits[i].Deleted {
+			<p class="muted">This revision was deleted from the history.</p>
+		}
+	</article>
 }
 
 // reviewEvent is a submitted review in the Conversation: who, the verdict,

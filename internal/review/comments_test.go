@@ -41,7 +41,7 @@ func TestEditingAConversationCommentReturnsTheConversation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ch.InConversation || len(ch.Conversation) != 1 || ch.Conversation[0].Body != "Thanks all" {
+	if !ch.InConversation || len(ch.Conversation.Comments) != 1 || ch.Conversation.Comments[0].Body != "Thanks all" {
 		t.Errorf("change = %+v", ch)
 	}
 }
@@ -79,7 +79,7 @@ func TestDeletingAConversationComment(t *testing.T) {
 	f := newFixture(t)
 	withOwnComments(f)
 	ch, err := f.svc.DeleteComment(context.Background(), ref, "IC1")
-	if err != nil || !ch.InConversation || len(ch.Conversation) != 0 {
+	if err != nil || !ch.InConversation || len(ch.Conversation.Comments) != 0 {
 		t.Errorf("change = %+v, err %v", ch, err)
 	}
 }

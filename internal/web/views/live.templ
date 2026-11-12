@@ -15,8 +15,9 @@ templ LiveUpdate(pr domain.PRRef, u review.Update) {
 		@ThreadOOB(pr, t)
 	}
 	if u.ConversationChanged {
-		@conversationView(pr, u.Conversation, u.Reviews, true)
-		@ConversationCount(len(u.Conversation) + len(u.Reviews))
+		@conversationView(pr, u.Conversation, true)
+		@descriptionView(u.Conversation.Description, true)
+		@ConversationCount(u.Conversation.Count())
 	}
 	if u.PendingChanged {
 		@PendingCount(u.Pending, true)

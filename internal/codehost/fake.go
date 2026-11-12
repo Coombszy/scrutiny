@@ -145,6 +145,7 @@ func clone(s domain.ReviewState) domain.ReviewState {
 		out.Threads[i] = t
 	}
 	out.Conversation = cloneComments(s.Conversation)
+	out.Description.Edits = slices.Clone(s.Description.Edits)
 	out.Reactions = append([]domain.ReactionGroup(nil), s.Reactions...)
 	out.Viewed = make(map[string]domain.ViewedState, len(s.Viewed))
 	for k, v := range s.Viewed {

@@ -3,6 +3,14 @@ query ReviewState($owner: String!, $name: String!, $number: Int!, $threads: Stri
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       id
+      author { login }
+      bodyHTML
+      createdAt
+      includesCreatedEdit
+      userContentEdits(first: 20) {
+        totalCount
+        nodes { editedAt deletedAt editor { login } diff }
+      }
       reactionGroups { ...reactions }
       reviews(states: PENDING, first: 1) {
         nodes { id commit { oid } comments { totalCount } }
