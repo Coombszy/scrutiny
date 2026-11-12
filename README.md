@@ -29,7 +29,7 @@ scrutiny serve   # or run an installed binary (-port N to change the port)
 
 Then open [http://localhost:7878](http://localhost:7878) and paste a PR URL on the Dashboard.
 
-Code navigation needs a Language Server: install one from **Language Servers** in the top bar, or have it on `$PATH` (e.g. `gopls`).
+Code navigation needs a Language Server: install one from **Language Servers** on the Settings page (the cog in the top bar), or have it on `$PATH` (e.g. `gopls`).
 
 Settings live in `$XDG_CONFIG_HOME/scrutiny/config.toml` and changes made in the UI are written back to it. Themes, hotkeys and the diff collapse threshold can all be changed from **Settings**.
 
