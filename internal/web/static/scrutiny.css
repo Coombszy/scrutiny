@@ -114,6 +114,17 @@ button.primary:hover { filter: brightness(1.1); background: var(--green); }
 .conversation-panel { margin: .5rem 0 1rem; }
 .conversation-panel > summary { cursor: pointer; color: var(--fg-dim); }
 #conversation { max-width: 60rem; }
+.description-panel { margin: .5rem 0; }
+.description-panel > summary { cursor: pointer; color: var(--fg-dim); }
+.description { max-width: 60rem; padding: .5rem .8rem; border: 1px solid var(--bg2); border-radius: 4px; }
+.description header { display: flex; gap: .5rem; align-items: baseline; flex-wrap: wrap; }
+.description-change { margin-top: .3rem; padding-left: 1.8rem; }
+.description-change > summary { cursor: pointer; color: var(--fg-dim); }
+.description-change pre { background: var(--bg1); padding: .5rem 0; overflow-x: auto; white-space: pre-wrap; }
+.description-change pre > span { display: block; padding: 0 .5rem; }
+.description-change .add { background: var(--add-bg); }
+.description-change .del { background: var(--del-bg); }
+.description-change .gap { color: var(--fg-dim); }
 
 /* Viewed files start collapsed; the arrow, or navigating into one, opens it without un-marking it. */
 .file.collapsed .file-body { display: none; }

@@ -334,3 +334,32 @@ func TestASubmittedReviewShowsUpAfterSubmitting(t *testing.T) {
 	rec := a.do(t, http.MethodPost, prPath+"/comments", url.Values{"body": {"Done"}})
 	mustContain(t, rec.Body.String(), "requested changes", "Done", `<span id="conversation-count" hx-swap-oob="true">2</span>`)
 }
+
+func TestTheDescriptionShowsAboveTheConversationWithItsEdits(t *testing.T) {
+	a := newApp(t)
+	at := func(m int) time.Time { return time.Date(2026, 11, 11, 9, m, 0, 0, time.UTC) }
+	st := a.host.State(ref)
+	st.Conversation = []domain.Comment{{ID: "IC1", Author: "sam", BodyHTML: "<p>Looks promising</p>", CreatedAt: at(10)}}
+	st.Description = domain.Description{
+		Author: "ana", BodyHTML: "<p>Adds caching</p>", CreatedAt: at(0),
+		Original: "Adds a cache\nKeep\n", HasOriginal: true,
+		Edits: []domain.DescriptionEdit{{Editor: "bo", EditedAt: at(20), Body: "Adds caching\nKeep\n"}},
+	}
+
+	page := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	desc, conv := strings.Index(page, `id="description"`), strings.Index(page, `id="conversation"`)
+	if desc < 0 || conv < desc {
+		t.Fatalf("description at %d, conversation at %d", desc, conv)
+	}
+	mustContain(t, page[desc:conv], "ana", "<p>Adds caching</p>", "edited by bo")
+	// The edit comes after the comment, showing the lines it changed.
+	timeline := page[conv:]
+	comment, edit := strings.Index(timeline, "Looks promising"), strings.Index(timeline, "edited the description")
+	if comment < 0 || edit < comment {
+		t.Fatalf("comment at %d, edit at %d in:\n%s", comment, edit, timeline)
+	}
+	mustContain(t, timeline, `<span class="del">− Adds a cache</span>`, `<span class="add">+ Adds caching</span>`, `<span class="ctx">  Keep</span>`)
+	// Posting a comment refreshes the description too.
+	rec := a.do(t, http.MethodPost, prPath+"/comments", url.Values{"body": {"Done"}})
+	mustContain(t, rec.Body.String(), `id="description" class="description" hx-swap-oob="true"`, `<span id="conversation-count" hx-swap-oob="true">2</span>`)
+}

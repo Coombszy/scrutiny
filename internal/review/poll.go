@@ -20,8 +20,7 @@ type Update struct {
 	Threads    []domain.ReviewThread
 	NewThreads int
 
-	Conversation        []domain.Comment
-	Reviews             []domain.SubmittedReview // with Conversation, when either changed
+	Conversation        Conversation // set with ConversationChanged
 	ConversationChanged bool
 	Pending             *domain.PendingReview
 	PendingComments     []PendingComment // set with PendingChanged
@@ -94,8 +93,8 @@ func (s *Service) Poll(ctx context.Context, ref domain.PRRef) (Update, error) {
 		return u, nil
 	}
 	diffThreads(&u, prev.State.Threads, next.State.Threads)
-	if !sameJSON(prev.State.Conversation, next.State.Conversation) || !sameJSON(prev.State.Reviews, next.State.Reviews) {
-		u.Conversation, u.Reviews, u.ConversationChanged = next.State.Conversation, next.State.Reviews, true
+	if c := conversationOf(next.State); !sameJSON(conversationOf(prev.State), c) {
+		u.Conversation, u.ConversationChanged = c, true
 	}
 	if pending := pendingComments(next.State); !sameJSON(prev.State.Pending, next.State.Pending) ||
 		!sameJSON(pendingComments(prev.State), pending) {

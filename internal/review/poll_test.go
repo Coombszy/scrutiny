@@ -72,8 +72,25 @@ func TestPollReportsChangedAndNewThreads(t *testing.T) {
 	if len(u.Threads) != 1 || u.Threads[0].ID != "T1" || len(u.Threads[0].Comments) != 2 {
 		t.Errorf("Threads = %+v, want just T1 with its reply", u.Threads)
 	}
-	if u.NewThreads != 1 || !u.ConversationChanged || len(u.Conversation) != 1 {
+	if u.NewThreads != 1 || !u.ConversationChanged || len(u.Conversation.Comments) != 1 {
 		t.Errorf("NewThreads %d, ConversationChanged %v", u.NewThreads, u.ConversationChanged)
+	}
+}
+
+func TestPollReportsAnEditedDescription(t *testing.T) {
+	f := newFixture(t)
+	f.openPage(t)
+	f.host.State(ref).Description = domain.Description{
+		Author: "sam", BodyHTML: "<p>New</p>", Original: "Old", HasOriginal: true,
+		Edits: []domain.DescriptionEdit{{Editor: "sam", Body: "New"}},
+	}
+
+	u, err := f.svc.Poll(context.Background(), ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !u.ConversationChanged || u.Conversation.Description.BodyHTML != "<p>New</p>" || len(u.Conversation.Description.Edits) != 1 {
+		t.Errorf("Update = %+v", u)
 	}
 }
 
@@ -147,7 +164,7 @@ func TestPollReportsNewlySubmittedReviews(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !u.ConversationChanged || len(u.Reviews) != 1 || u.Reviews[0].Verdict != domain.ReviewApproved {
+	if !u.ConversationChanged || len(u.Conversation.Reviews) != 1 || u.Conversation.Reviews[0].Verdict != domain.ReviewApproved {
 		t.Errorf("Update = %+v", u)
 	}
 }

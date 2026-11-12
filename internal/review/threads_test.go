@@ -191,11 +191,11 @@ func TestConversationCommentsArePostedImmediately(t *testing.T) {
 	f.withDiff(mb, c3)
 	ctx := context.Background()
 
-	conv, _, err := f.svc.AddConversationComment(ctx, ref, "Thanks!")
+	conv, err := f.svc.AddConversationComment(ctx, ref, "Thanks!")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(conv) != 1 || conv[0].Body != "Thanks!" || conv[0].Pending {
+	if len(conv.Comments) != 1 || conv.Comments[0].Body != "Thanks!" || conv.Comments[0].Pending {
 		t.Errorf("Conversation = %+v", conv)
 	}
 	if f.host.State(ref).Pending != nil {

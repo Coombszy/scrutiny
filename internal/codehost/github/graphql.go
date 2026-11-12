@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -121,15 +122,34 @@ type gqlThread struct {
 	} `json:"comments"`
 }
 
+// gqlEdits is a body's edit history, newest first. When the body has been
+// edited GitHub also lists its creation, as the oldest edit.
+type gqlEdits struct {
+	TotalCount int       `json:"totalCount"`
+	Nodes      []gqlEdit `json:"nodes"`
+}
+
+type gqlEdit struct {
+	EditedAt  time.Time  `json:"editedAt"`
+	DeletedAt *time.Time `json:"deletedAt"`
+	Editor    *gqlActor  `json:"editor"`
+	Diff      *string    `json:"diff"` // the whole body after the edit, despite its name
+}
+
 type gqlReviewState struct {
 	Viewer struct {
 		Login string `json:"login"`
 	} `json:"viewer"`
 	Repository struct {
 		PullRequest *struct {
-			ID             string             `json:"id"`
-			ReactionGroups []gqlReactionGroup `json:"reactionGroups"`
-			Reviews        struct {
+			ID                  string             `json:"id"`
+			Author              *gqlActor          `json:"author"`
+			BodyHTML            string             `json:"bodyHTML"`
+			CreatedAt           time.Time          `json:"createdAt"`
+			IncludesCreatedEdit bool               `json:"includesCreatedEdit"`
+			UserContentEdits    gqlEdits           `json:"userContentEdits"`
+			ReactionGroups      []gqlReactionGroup `json:"reactionGroups"`
+			Reviews             struct {
 				Nodes []struct {
 					ID     string `json:"id"`
 					Commit *struct {
@@ -205,6 +225,7 @@ func (c *Client) ReviewState(ctx context.Context, ref domain.PRRef) (domain.Revi
 		if first {
 			state.PRID = pr.ID
 			state.Viewer = page.Viewer.Login
+			state.Description = description(pr.Author.login(), pr.BodyHTML, pr.CreatedAt, pr.IncludesCreatedEdit, pr.UserContentEdits)
 			state.Reactions = reactions(pr.ReactionGroups)
 			for _, c := range pr.Comments.Nodes {
 				state.Conversation = append(state.Conversation, comment(c))
@@ -256,6 +277,40 @@ func (c *Client) ReviewState(ctx context.Context, ref domain.PRRef) (domain.Revi
 		vars["threads"] = cursor(pr.ReviewThreads.PageInfo.EndCursor)
 		vars["files"] = cursor(pr.Files.PageInfo.EndCursor)
 	}
+}
+
+// description maps a PR's description and its edit history. The creation
+// is only known to be among the edits read when they are all of them.
+func description(author, bodyHTML string, createdAt time.Time, includesCreated bool, edits gqlEdits) domain.Description {
+	d := domain.Description{Author: author, BodyHTML: bodyHTML, CreatedAt: createdAt}
+	nodes := slices.Clone(edits.Nodes)
+	slices.SortStableFunc(nodes, func(a, b gqlEdit) int { return a.EditedAt.Compare(b.EditedAt) })
+	for i, n := range nodes {
+		body := ""
+		if n.Diff != nil {
+			body = *n.Diff
+		}
+		if i == 0 && includesCreated && len(nodes) == edits.TotalCount {
+			d.Original, d.HasOriginal = body, true
+			continue
+		}
+		d.Edits = append(d.Edits, domain.DescriptionEdit{
+			Editor: n.Editor.login(), EditedAt: n.EditedAt, Body: body, Deleted: n.DeletedAt != nil || n.Diff == nil,
+		})
+	}
+	return d
+}
+
+type gqlActor struct {
+	Login string `json:"login"`
+}
+
+// login is the actor's login, or "ghost" for a deleted account.
+func (a *gqlActor) login() string {
+	if a == nil {
+		return "ghost"
+	}
+	return a.Login
 }
 
 func thread(t gqlThread) domain.ReviewThread {

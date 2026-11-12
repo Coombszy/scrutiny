@@ -94,6 +94,30 @@ func TestReviewStateMapsThreadsFilesAndViewer(t *testing.T) {
 	}
 }
 
+func TestReviewStateMapsTheDescriptionAndItsEdits(t *testing.T) {
+	body := fixture(t, "review_state.json")
+	srv, _ := graphqlServer(t, func(gqlRequest) []byte { return body })
+
+	got, err := newClient(srv, cache.NewMemory()).ReviewState(context.Background(), pr14956)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := got.Description
+	if d.Author != "eeroniemi" || !strings.Contains(d.BodyHTML, "<h2") || !d.CreatedAt.Equal(time.Date(2026, 11, 5, 21, 58, 2, 0, time.UTC)) {
+		t.Errorf("Description = %+v", d)
+	}
+	// The creation is the oldest edit; the rest are edits, oldest first.
+	if !d.HasOriginal || d.Original != "Preserve the host." || len(d.Edits) != 2 {
+		t.Fatalf("Original %q, Edits %+v", d.Original, d.Edits)
+	}
+	if e := d.Edits[0]; e.Editor != "ghost" || e.Body != "## Summary\n\nPreserve the host." || e.Deleted {
+		t.Errorf("Edits[0] = %+v", e)
+	}
+	if e := d.Edits[1]; e.Editor != "eeroniemi" || !e.EditedAt.Equal(time.Date(2026, 11, 6, 9, 14, 51, 0, time.UTC)) {
+		t.Errorf("Edits[1] = %+v", e)
+	}
+}
+
 func TestReviewStateMapsConversationComments(t *testing.T) {
 	body := fixture(t, "review_state_comments.json")
 	srv, _ := graphqlServer(t, func(gqlRequest) []byte { return body })

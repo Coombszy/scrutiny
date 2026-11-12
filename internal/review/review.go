@@ -94,6 +94,9 @@ type PRPage struct {
 	Offline bool
 }
 
+// Conversation is the PR's description and Conversation.
+func (p PRPage) Conversation() Conversation { return conversationOf(p.Review) }
+
 // FileEntry is a changed file as listed on the PR page.
 type FileEntry struct {
 	domain.FileChange

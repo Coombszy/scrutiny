@@ -34,9 +34,13 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 				</nav>
 			}
 		</header>
+		<details class="description-panel" open>
+			<summary>Description</summary>
+			@descriptionView(p.Conversation().Description, false)
+		</details>
 		<details class="conversation-panel">
-			<summary>Conversation (<span id="conversation-count">{ itoa(len(p.Review.Conversation) + len(p.Review.Reviews)) }</span>)</summary>
-			@Conversation(p.PR.Ref, p.Review.Conversation, p.Review.Reviews)
+			<summary>Conversation (<span id="conversation-count">{ itoa(p.Conversation().Count()) }</span>)</summary>
+			@conversationView(p.PR.Ref, p.Conversation(), false)
 		</details>
 		<div class="toolbar">
 			@comparisonPicker(p)

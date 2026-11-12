@@ -154,6 +154,7 @@ type SubmittedReview struct {
 type ReviewState struct {
 	PRID         string // the PR's node ID
 	Viewer       string
+	Description  Description
 	Reactions    []ReactionGroup // on the PR itself
 	Threads      []ReviewThread
 	Conversation []Comment // Conversation Comments, oldest first

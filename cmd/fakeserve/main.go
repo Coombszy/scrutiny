@@ -85,6 +85,15 @@ func demo() (*codehost.Fake, *repostore.Fake, domain.PRRef) {
 			Comments: []domain.Comment{comment("C4", "pat", "Resolved, in a Viewed file.")}},
 	}
 	st.Conversation = []domain.Comment{comment("C5", "pat", "Thanks, looking now.")}
+	st.Description = domain.Description{
+		Author: "sam", CreatedAt: now.Add(-3 * time.Hour),
+		BodyHTML: "<p>A pull request served by fakeserve.</p><p>It changes a.go and b.go.</p>",
+		Original: "A pull request served by fakeserve.\n", HasOriginal: true,
+		Edits: []domain.DescriptionEdit{{
+			Editor: "sam", EditedAt: now.Add(-20 * time.Minute),
+			Body: "A pull request served by fakeserve.\n\nIt changes a.go and b.go.\n",
+		}},
+	}
 
 	repos.Remotes[ref] = repostore.FakeRemote{BaseTip: tip, Commits: []domain.SHA{c1, c2}}
 	repos.MergeBases[repostore.Pair{From: tip, To: c2}] = base
