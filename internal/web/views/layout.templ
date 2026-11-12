@@ -30,6 +30,7 @@ templ Layout(title string) {
 				}
 				<span class="tagline" data-phrases={ toJSON(taglines) } aria-hidden="true"><span class="tagline-text"></span><span class="tagline-cursor"></span></span>
 				<span class="topbar-end">
+				<span class="version" title={ buildVersion() }>{ versionLabel(buildVersion()) }</span>
 				if pageFrom(ctx).KeyHelp {
 					<span id="help-hint" class="topbar-hint muted"><kbd>{ pageFrom(ctx).Keys["help"] }</kbd> { "for keyboard shortcuts" }</span>
 				}

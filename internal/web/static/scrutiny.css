@@ -276,7 +276,9 @@ details.status-row { display: block; }
 
 /* Code navigation */
 .topbar-hint { font-size: var(--fs-sm); }
-/* The top bar's right-hand group: keyboard hint, Language Server icon, settings cog. */
+/* The build version: faint, there when wanted. */
+.version { color: var(--gray); font-family: var(--mono); font-size: var(--fs-sm); opacity: .5; }
+/* The top bar's right-hand group: version, keyboard hint, Language Server icon, settings cog. */
 .topbar-end { margin-left: auto; display: inline-flex; gap: 1rem; align-items: center; }
 
 /* Language Server status: a ring spins while starting or indexing; a badge

@@ -4,7 +4,17 @@ A local tool for reviewing GitHub pull requests: split and unified diffs, tree-s
 
 ## Install
 
-Requires Go, `git`, a C compiler (tree-sitter uses cgo), [`just`](https://github.com/casey/just) and an authenticated [`gh`](https://cli.github.com) CLI.
+Requires Go, `git`, a C compiler (tree-sitter uses cgo) and an authenticated [`gh`](https://cli.github.com) CLI.
+
+```sh
+go install github.com/Coombszy/scrutiny/cmd/scrutiny@latest
+```
+
+This puts `scrutiny` in `$(go env GOPATH)/bin` (or `$GOBIN`), which needs to be on your `$PATH`. Use `@v0.1.0` in place of `@latest` to install a specific release.
+
+To update to a new release, run the same command again: `@latest` resolves to the newest tagged release and replaces the installed binary. The version you're running is shown faintly in the top bar.
+
+To build from a checkout instead (needs [`just`](https://github.com/casey/just)):
 
 ```sh
 just build   # builds ./bin/scrutiny
