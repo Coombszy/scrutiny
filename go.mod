@@ -1,6 +1,6 @@
 module github.com/Coombszy/scrutiny
 
-go 1.27.0
+go 1.27.4
 
 tool (
 	github.com/a-h/templ/cmd/templ
