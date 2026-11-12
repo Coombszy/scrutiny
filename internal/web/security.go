@@ -28,7 +28,8 @@ func NewCSRFToken() string {
 
 // Secure rejects requests that did not come from a page served on localhost:
 // the Host and Origin headers must name a loopback host (a DNS-rebinding
-// defence), and every mutating request must carry the CSRF token in the
+// defence), the browser must not mark the request as coming from another
+// site, and every mutating request must carry the CSRF token in the
 // X-CSRF-Token header or a csrf_token form field.
 func Secure(next http.Handler, csrfToken string) http.Handler {
 	return secure(next, csrfToken, contentSecurityPolicy)
@@ -46,6 +47,10 @@ func secure(next http.Handler, csrfToken, csp string) http.Handler {
 				http.Error(w, "forbidden origin", http.StatusForbidden)
 				return
 			}
+		}
+		if !sameOrigin(r) {
+			http.Error(w, "forbidden cross-site request: open this page from Scrutiny", http.StatusForbidden)
+			return
 		}
 		if isMutating(r.Method) {
 			got := r.Header.Get("X-CSRF-Token")
@@ -76,6 +81,21 @@ func isLoopback(hostport string) bool {
 	}
 	ip := net.ParseIP(host)
 	return ip != nil && ip.IsLoopback()
+}
+
+// sameOrigin reports whether the browser says r came from Scrutiny's own
+// pages, or from the user (a typed URL, a bookmark, another app). Opening a
+// PR page fetches it and starts Language Servers on its code, so another
+// site, including one on another localhost port, must not be able to load
+// one with a GET. Only the Dashboard may be linked to from elsewhere.
+// Clients that send no Sec-Fetch-Site header are not browsers acting for a
+// web page.
+func sameOrigin(r *http.Request) bool {
+	switch r.Header.Get("Sec-Fetch-Site") {
+	case "", "same-origin", "none":
+		return true
+	}
+	return r.Method == http.MethodGet && r.URL.Path == "/"
 }
 
 func isMutating(method string) bool {

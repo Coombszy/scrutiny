@@ -45,6 +45,35 @@ func TestSecureRejectsForeignOrigin(t *testing.T) {
 	}
 }
 
+func TestSecureRejectsCrossSiteRequests(t *testing.T) {
+	pr := "/github.com/o/r/pull/1"
+	cases := []struct {
+		path, site string
+		want       int
+	}{
+		{pr, "", http.StatusOK},            // not a browser
+		{pr, "none", http.StatusOK},        // typed, bookmarked or opened by another app
+		{pr, "same-origin", http.StatusOK}, // Scrutiny's own pages
+		{pr, "same-site", http.StatusForbidden},
+		{pr, "cross-site", http.StatusForbidden},
+		{"/open?url=https://github.com/o/r/pull/1", "cross-site", http.StatusForbidden},
+		{"/static/scrutiny.js", "cross-site", http.StatusForbidden},
+		{"/", "cross-site", http.StatusOK}, // the Dashboard may be linked to
+	}
+	for _, c := range cases {
+		req := httptest.NewRequest(http.MethodGet, c.path, nil)
+		req.Host = "127.0.0.1:7878"
+		if c.site != "" {
+			req.Header.Set("Sec-Fetch-Site", c.site)
+		}
+		rec := httptest.NewRecorder()
+		secured().ServeHTTP(rec, req)
+		if rec.Code != c.want {
+			t.Errorf("GET %s with Sec-Fetch-Site %q: status %d, want %d", c.path, c.site, rec.Code, c.want)
+		}
+	}
+}
+
 func TestSecureRequiresCSRFTokenOnMutatingRequests(t *testing.T) {
 	cases := []struct {
 		name   string
