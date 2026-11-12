@@ -1,5 +1,7 @@
 package views
 
+import "github.com/Coombszy/scrutiny/internal/release"
+
 // Layout is the page shell; title is the whole <title>, e.g. "Settings ·
 // Scrutiny".
 templ Layout(title string) {
@@ -30,7 +32,11 @@ templ Layout(title string) {
 				}
 				<span class="tagline" data-phrases={ toJSON(taglines) } aria-hidden="true"><span class="tagline-text"></span><span class="tagline-cursor"></span></span>
 				<span class="topbar-end">
-				<span class="version" title={ buildVersion() }>{ versionLabel(buildVersion()) }</span>
+				if v := pageFrom(ctx).NewVersion; v != "" {
+					<a class="version new-version" href={ templ.SafeURL(release.URL(v)) } target="_blank" rel="noopener" title={ newVersionTitle(v) }>{ versionLabel(buildVersion()) } · { v } available</a>
+				} else {
+					<span class="version" title={ buildVersion() }>{ versionLabel(buildVersion()) }</span>
+				}
 				if pageFrom(ctx).KeyHelp {
 					<span id="help-hint" class="topbar-hint muted"><kbd>{ pageFrom(ctx).Keys["help"] }</kbd> { "for keyboard shortcuts" }</span>
 				}

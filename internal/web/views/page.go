@@ -28,6 +28,8 @@ type Page struct {
 	KeyHelp, CodeHelp bool
 	// AuthFailed opens the dialog saying GitHub rejected the credentials.
 	AuthFailed bool
+	// NewVersion, when set, is a newer release the top bar's version offers.
+	NewVersion string
 }
 
 // ThemeOption is a Theme the Command Palette can switch to.

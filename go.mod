@@ -16,6 +16,7 @@ require (
 	github.com/tree-sitter/tree-sitter-bash v0.25.1
 	github.com/tree-sitter/tree-sitter-go v0.25.0
 	github.com/tree-sitter/tree-sitter-json v0.24.8
+	golang.org/x/mod v0.42.0
 	golang.org/x/net v0.61.0
 	modernc.org/sqlite v1.62.0
 )
@@ -57,7 +58,6 @@ require (
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/tdewolff/parse/v2 v2.8.12 // indirect
 	github.com/thlib/go-timezone-local v0.0.9 // indirect
-	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/term v0.47.0 // indirect
