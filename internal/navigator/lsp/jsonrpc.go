@@ -164,6 +164,10 @@ func (c *conn) answer(m message) {
 	_ = c.send(reply)
 }
 
+// maxMessage bounds a message from a Language Server, so a bad
+// Content-Length ends the connection instead of the process.
+const maxMessage = 64 << 20
+
 func readMessage(tp *textproto.Reader, br *bufio.Reader) (message, error) {
 	header, err := tp.ReadMIMEHeader()
 	if err != nil {
@@ -172,6 +176,9 @@ func readMessage(tp *textproto.Reader, br *bufio.Reader) (message, error) {
 	n, err := strconv.Atoi(header.Get("Content-Length"))
 	if err != nil {
 		return message{}, fmt.Errorf("bad Content-Length: %w", err)
+	}
+	if n < 0 || n > maxMessage {
+		return message{}, fmt.Errorf("bad Content-Length: %d", n)
 	}
 	body := make([]byte, n)
 	if _, err := io.ReadFull(br, body); err != nil {
