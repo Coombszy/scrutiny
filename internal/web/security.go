@@ -41,6 +41,10 @@ func secure(next http.Handler, csrfToken, csp string) http.Handler {
 			http.Error(w, "forbidden host", http.StatusForbidden)
 			return
 		}
+		if isHealthCheck(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if origin := r.Header.Get("Origin"); origin != "" {
 			u, err := url.Parse(origin)
 			if err != nil || !isLoopback(u.Host) {
@@ -96,6 +100,14 @@ func sameOrigin(r *http.Request) bool {
 		return true
 	}
 	return r.Method == http.MethodGet && r.URL.Path == "/"
+}
+
+// isHealthCheck reports whether r is a GET of /health, which the Userscript
+// on github.com (whose requests may carry its own extension Origin) uses to
+// see whether Scrutiny is running. It says only that, so it skips the Origin
+// and cross-site checks; the Host check still applies.
+func isHealthCheck(r *http.Request) bool {
+	return r.Method == http.MethodGet && r.URL.Path == "/health"
 }
 
 func isMutating(method string) bool {

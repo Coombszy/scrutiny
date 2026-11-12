@@ -58,7 +58,8 @@ func TestSecureRejectsCrossSiteRequests(t *testing.T) {
 		{pr, "cross-site", http.StatusForbidden},
 		{"/open?url=https://github.com/o/r/pull/1", "cross-site", http.StatusForbidden},
 		{"/static/scrutiny.js", "cross-site", http.StatusForbidden},
-		{"/", "cross-site", http.StatusOK}, // the Dashboard may be linked to
+		{"/", "cross-site", http.StatusOK},       // the Dashboard may be linked to
+		{"/health", "cross-site", http.StatusOK}, // the Userscript checks Scrutiny is running
 	}
 	for _, c := range cases {
 		req := httptest.NewRequest(http.MethodGet, c.path, nil)
@@ -70,6 +71,27 @@ func TestSecureRejectsCrossSiteRequests(t *testing.T) {
 		secured().ServeHTTP(rec, req)
 		if rec.Code != c.want {
 			t.Errorf("GET %s with Sec-Fetch-Site %q: status %d, want %d", c.path, c.site, rec.Code, c.want)
+		}
+	}
+}
+
+func TestHealthAnswersAnyOriginOnALoopbackHost(t *testing.T) {
+	h := web.NewServer(web.Deps{CSRFToken: token}).Handler()
+	for host, want := range map[string]int{
+		"127.0.0.1:7878":    http.StatusOK,
+		"evil.example:7878": http.StatusForbidden,
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/health", nil)
+		req.Host = host
+		req.Header.Set("Origin", "chrome-extension://abcdef")
+		req.Header.Set("Sec-Fetch-Site", "cross-site")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != want {
+			t.Errorf("Host %q: status %d, want %d", host, rec.Code, want)
+		}
+		if want == http.StatusOK && !strings.Contains(rec.Body.String(), `"app":"scrutiny"`) {
+			t.Errorf("body %q does not name Scrutiny", rec.Body.String())
 		}
 	}
 }

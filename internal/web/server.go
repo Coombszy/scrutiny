@@ -57,6 +57,7 @@ func NewServer(d Deps) *Server {
 	}
 	static, _ := fs.Sub(staticFS, "static")
 	s.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
+	s.mux.HandleFunc("GET /health", s.health)
 	s.mux.HandleFunc("GET /{$}", s.dashboard)
 	s.mux.HandleFunc("GET /open", s.open)
 	s.mux.HandleFunc("GET /dashboard/lists", s.dashboardLists)
