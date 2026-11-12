@@ -25,6 +25,8 @@ import (
 	"github.com/Coombszy/scrutiny/internal/metrics"
 	"github.com/Coombszy/scrutiny/internal/navigator"
 	"github.com/Coombszy/scrutiny/internal/navigator/lsp"
+	"github.com/Coombszy/scrutiny/internal/release"
+	"github.com/Coombszy/scrutiny/internal/release/goproxy"
 	"github.com/Coombszy/scrutiny/internal/repostore"
 	"github.com/Coombszy/scrutiny/internal/repostore/gitcli"
 	"github.com/Coombszy/scrutiny/internal/review"
@@ -116,6 +118,8 @@ func serve(portOverride int, dev bool) error {
 			publishLanguages(ref)
 		}
 	})
+	checker := &release.Checker{Source: goproxy.New(os.Getenv("GOPROXY"), release.Module), Current: release.BuildVersion()}
+	go checker.Run(ctx, 10*time.Minute)
 	poller := &live.Poller{Source: svc, Hub: hub, Interval: 30 * time.Second, Now: time.Now}
 	go poller.Run(ctx)
 
@@ -127,7 +131,7 @@ func serve(portOverride int, dev bool) error {
 		Handler: web.NewServer(web.Deps{
 			CSRFToken: web.NewCSRFToken(), Review: svc, Settings: settings, Hub: hub,
 			Servers: languageServers, ThemesDir: filepath.Join(dirs.Config, "themes"), Dev: dev,
-			Metrics: counts,
+			Metrics: counts, Release: checker,
 		}).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		// Requests share ctx so that open event streams end on shutdown.

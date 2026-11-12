@@ -19,6 +19,7 @@ import (
 	"github.com/Coombszy/scrutiny/internal/live"
 	"github.com/Coombszy/scrutiny/internal/metrics"
 	"github.com/Coombszy/scrutiny/internal/navigator"
+	"github.com/Coombszy/scrutiny/internal/release"
 	"github.com/Coombszy/scrutiny/internal/repostore"
 	"github.com/Coombszy/scrutiny/internal/review"
 	"github.com/Coombszy/scrutiny/internal/servers"
@@ -40,6 +41,7 @@ const (
 
 type app struct {
 	metrics   *metrics.Collector
+	release   *release.Fake
 	themesDir string
 	inst      *installer.Fake
 	nav       *navigator.Fake
@@ -48,6 +50,8 @@ type app struct {
 	repos     *repostore.Fake
 	settings  *settings.Memory
 	handler   http.Handler
+	// checkRelease runs the New Version check once.
+	checkRelease func()
 }
 
 func newApp(t *testing.T) *app {
@@ -83,13 +87,17 @@ func newApp(t *testing.T) *app {
 	})
 	lookPath := func(string) (string, error) { return "", exec.ErrNotFound }
 	a.themesDir = t.TempDir()
+	a.release = &release.Fake{}
+	checker := &release.Checker{Source: a.release, Current: "v0.2.0"}
 	a.metrics = metrics.NewCollector(metrics.NewMemory(), nil)
 	languageServers := servers.New(a.inst, lookPath)
 	languageServers.Logs = a.nav
 	a.handler = web.NewServer(web.Deps{
 		CSRFToken: token, Review: svc, Settings: a.settings, Hub: a.hub,
 		Servers: languageServers, ThemesDir: a.themesDir, Metrics: a.metrics,
+		Release: checker,
 	}).Handler()
+	a.checkRelease = func() { checker.Check(context.Background()) }
 	return a
 }
 

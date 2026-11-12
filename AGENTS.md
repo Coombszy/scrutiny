@@ -34,12 +34,13 @@ Go, Templ and htmx, in a hexagonal architecture: services depend only on ports, 
 - `cmd/scrutiny`: the CLI entry point. `cmd/fakeserve`: the UI over in-memory fakes (`just run-fake`).
 - `internal/domain`: core types shared by every layer.
 - `internal/xdg`: XDG config/state/data directories (used on Linux and macOS).
-- `internal/<port>`: one package per port (`codehost`, `repostore`, `cache`, `settings`, `highlight`, `navigator` (CodeNavigator), `installer` (ServerInstaller)), holding the interface and its in-memory fake (`highlight.PlainHighlighter` doubles as the Highlighter's).
-- `internal/<port>/<adapter>`: the real adapters (`codehost/github`, `repostore/gitcli`, `cache/sqlite`, `settings/tomlfile`, `highlight/treesitter`, `navigator/lsp`, `installer/mason`).
+- `internal/<port>`: one package per port (`codehost`, `repostore`, `cache`, `settings`, `highlight`, `release`, `navigator` (CodeNavigator), `installer` (ServerInstaller)), holding the interface and its in-memory fake (`highlight.PlainHighlighter` doubles as the Highlighter's).
+- `internal/<port>/<adapter>`: the real adapters (`codehost/github`, `repostore/gitcli`, `cache/sqlite`, `settings/tomlfile`, `highlight/treesitter`, `navigator/lsp`, `installer/mason`, `release/goproxy`).
 - `internal/review`: application services that compose the ports (PR pages, review activity, polling, navigation).
 - `internal/live`: the SSE hub and the poller that pushes PR changes to open pages.
 - `internal/servers`: which Language Server launches for a language, and background installs.
 - `internal/theme`: built-in and drop-in Themes, rendered as CSS. A theme file is TOML with `name`, `scheme`, `[ui]` and `[syntax]` tables; missing keys fall back to Gruvbox Dark (`internal/theme/builtin`).
+- `internal/release`: the port for finding Scrutiny's latest release, and the Checker that looks for a New Version on startup and every 10 minutes (release builds only); `internal/release/goproxy` asks the Go module proxy (`$GOPROXY`, default proxy.golang.org) for `@latest`.
 - `internal/metrics`: per-minute counts of GitHub and git activity (stored in the sqlite cache, kept a week), shown on the Settings page.
 - `internal/web`: the driving HTTP adapter (handlers, Templ views, embedded static assets).
 - `userscript`: the Userscript adding a Goto Scrutiny button to GitHub PR pages; it checks `GET /health`, the one route any origin may call.

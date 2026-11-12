@@ -97,3 +97,7 @@ _Avoid_: Colour scheme, skin
 **Userscript**:
 The Tampermonkey script that adds a Goto Scrutiny button to GitHub PR pages while Scrutiny is running.
 _Avoid_: Extension, plugin, bookmarklet
+
+**New Version**:
+A Scrutiny release tag newer than the running release build, found on the Go module proxy and offered by the top bar's version; dev and dirty builds never look for one.
+_Avoid_: Update, upgrade

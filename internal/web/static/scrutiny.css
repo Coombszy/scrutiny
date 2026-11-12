@@ -278,6 +278,9 @@ details.status-row { display: block; }
 .topbar-hint { font-size: var(--fs-sm); }
 /* The build version: faint, there when wanted. */
 .version { color: var(--gray); font-family: var(--mono); font-size: var(--fs-sm); opacity: .5; }
+/* A New Version stands out, in the same place. */
+.version.new-version { color: var(--yellow); opacity: 1; text-decoration: none; }
+.version.new-version:hover { text-decoration: underline; }
 /* The top bar's right-hand group: version, keyboard hint, Language Server icon, settings cog. */
 .topbar-end { margin-left: auto; display: inline-flex; gap: 1rem; align-items: center; }
 

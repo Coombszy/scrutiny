@@ -14,6 +14,7 @@ import (
 	"github.com/Coombszy/scrutiny/internal/live"
 	"github.com/Coombszy/scrutiny/internal/metrics"
 	"github.com/Coombszy/scrutiny/internal/navigator"
+	"github.com/Coombszy/scrutiny/internal/release"
 	"github.com/Coombszy/scrutiny/internal/repostore"
 	"github.com/Coombszy/scrutiny/internal/review"
 	"github.com/Coombszy/scrutiny/internal/servers"
@@ -32,6 +33,7 @@ type Deps struct {
 	Servers   *servers.Service
 	ThemesDir string             // drop-in Themes; may be empty
 	Metrics   *metrics.Collector // optional: the Settings page's Activity panel
+	Release   *release.Checker   // optional: offers a New Version in the top bar
 	// Dev relaxes the Content-Security-Policy for a live-reload proxy.
 	Dev bool
 }
@@ -45,6 +47,7 @@ type Server struct {
 	servers   *servers.Service
 	themesDir string
 	metrics   *metrics.Collector
+	release   *release.Checker
 	dev       bool
 	mux       *http.ServeMux
 }
@@ -53,7 +56,7 @@ type Server struct {
 func NewServer(d Deps) *Server {
 	s := &Server{
 		csrfToken: d.CSRFToken, review: d.Review, settings: d.Settings, hub: d.Hub, servers: d.Servers,
-		themesDir: d.ThemesDir, metrics: d.Metrics, dev: d.Dev, mux: http.NewServeMux(),
+		themesDir: d.ThemesDir, metrics: d.Metrics, release: d.Release, dev: d.Dev, mux: http.NewServeMux(),
 	}
 	static, _ := fs.Sub(staticFS, "static")
 	s.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
@@ -102,7 +105,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, cs .
 }
 
 // renderPage renders with page's per-page data; the CSRF token, Theme,
-// hotkeys and View Mode are filled in.
+// hotkeys, View Mode and New Version are filled in.
 func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, status int, page views.Page, cs ...component) {
 	if r.Context().Err() != nil {
 		return // the browser went away; there is no one to render for
@@ -111,6 +114,7 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, status int, 
 	w.WriteHeader(status)
 	page.CSRFToken = s.csrfToken
 	page.AuthFailed = s.review.Status().Unauthorized
+	page.NewVersion = s.release.NewVersion()
 	if cfg, err := s.settings.Load(); err == nil {
 		page.Theme, page.Keys, page.ViewMode = cfg.Theme, cfg.Keys, string(cfg.ViewMode)
 	}
