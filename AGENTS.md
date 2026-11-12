@@ -11,7 +11,7 @@ Go, Templ and htmx, in a hexagonal architecture: services depend only on ports, 
 - **GitHub is the source of truth** for review state. The sqlite cache is disposable: deleting it never loses data.
 - **The config file is the source of truth** for settings. UI changes write back to it.
 - **Cache-first**: minimise upstream GitHub calls (ETag conditional requests, polling only while a page is connected and focused).
-- **Loopback only**: `serve` binds `127.0.0.1`, rejects non-localhost `Host`/`Origin`, and requires a CSRF token on mutating requests.
+- **Loopback only**: `serve` binds `127.0.0.1`, rejects non-localhost `Host`/`Origin` and cross-site requests (`Sec-Fetch-Site`) other than to the Dashboard, and requires a CSRF token on mutating requests.
 - **Linux and macOS**, using XDG directories on both.
 
 ## Testing
