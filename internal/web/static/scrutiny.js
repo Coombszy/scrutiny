@@ -1281,7 +1281,7 @@ window.Scrutiny = { actions: {} };
     o: "iklp", p: "ol", q: "wa", r: "edft", s: "awedxz", t: "rfgy", u: "yhji",
     v: "cfgb", w: "qase", x: "zsdc", y: "tghu", z: "asx",
   };
-  const typoChance = 0.04;
+  const typoChance = 0.03;
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const between = (min, max) => min + Math.random() * (max - min);
 
@@ -1324,14 +1324,14 @@ window.Scrutiny = { actions: {} };
         type(chars[i]);
       }
       root.classList.remove("typing");
-      await sleep(2500);
+      await sleep(between(30000, 120000));
       root.classList.add("typing");
       while (text.lastChild) {
         backspace();
         await sleep(35);
       }
       root.classList.remove("typing");
-      await sleep(600);
+      await sleep(between(500, 750));
       index = (index + 1) % phrases.length;
     }
   }
