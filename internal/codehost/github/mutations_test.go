@@ -2,6 +2,9 @@ package github_test
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -44,6 +47,18 @@ func TestMutationsSendTheRightOperation(t *testing.T) {
 			func(c *github.Client) error { return c.Reply(context.Background(), "PRR_1", "PRRT_1", "agreed") },
 			"addPullRequestReviewThreadReply",
 			map[string]any{"input": map[string]any{"pullRequestReviewId": "PRR_1", "pullRequestReviewThreadId": "PRRT_1", "body": "agreed"}},
+		},
+		{
+			"single comment reply",
+			func(c *github.Client) error { return c.Reply(context.Background(), "", "PRRT_1", "agreed") },
+			"addPullRequestReviewThreadReply",
+			map[string]any{"input": map[string]any{"pullRequestReviewThreadId": "PRRT_1", "body": "agreed"}},
+		},
+		{
+			"discard review",
+			func(c *github.Client) error { return c.DiscardReview(context.Background(), "PRR_1") },
+			"deletePullRequestReview",
+			map[string]any{"input": map[string]any{"pullRequestReviewId": "PRR_1"}},
 		},
 		{
 			"edit review comment",
@@ -142,6 +157,52 @@ func TestMutationsSendTheRightOperation(t *testing.T) {
 				t.Errorf("variables = %v\nwant %v", req.Variables, tc.vars)
 			}
 		})
+	}
+}
+
+func TestPostThreadCreatesAReviewCommentOverREST(t *testing.T) {
+	type request struct {
+		method, path string
+		body         map[string]any
+	}
+	var got []request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("bad request body: %v", err)
+		}
+		got = append(got, request{r.Method, r.URL.Path, body})
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(srv.Close)
+	c := newClient(srv, cache.NewMemory())
+	ctx := context.Background()
+
+	if err := c.PostThread(ctx, pr325, "abc", codehost.NewThread{Path: "a.go", Line: 12, StartLine: 10, Side: domain.Right, StartSide: domain.Right, Body: "nit"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.PostThread(ctx, pr325, "abc", codehost.NewThread{Path: "a.go", Line: 3, Side: domain.Left, Body: "why?"}); err != nil {
+		t.Fatal(err)
+	}
+	want := []request{
+		{http.MethodPost, "/repos/cli/go-gh/pulls/325/comments", map[string]any{
+			"commit_id": "abc", "path": "a.go", "line": float64(12), "side": "RIGHT", "start_line": float64(10), "start_side": "RIGHT", "body": "nit"}},
+		{http.MethodPost, "/repos/cli/go-gh/pulls/325/comments", map[string]any{
+			"commit_id": "abc", "path": "a.go", "line": float64(3), "side": "LEFT", "body": "why?"}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("requests = %+v\nwant %+v", got, want)
+	}
+}
+
+func TestPostThreadReturnsGitHubsRefusal(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"message":"Validation Failed"}`, http.StatusUnprocessableEntity)
+	}))
+	t.Cleanup(srv.Close)
+	err := newClient(srv, cache.NewMemory()).PostThread(context.Background(), pr325, "abc", codehost.NewThread{Path: "a.go", Line: 1, Side: domain.Right, Body: "x"})
+	if err == nil || !strings.Contains(err.Error(), "Validation Failed") {
+		t.Errorf("err = %v", err)
 	}
 }
 

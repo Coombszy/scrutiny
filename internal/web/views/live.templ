@@ -22,6 +22,7 @@ templ LiveUpdate(pr domain.PRRef, u review.Update) {
 	if u.PendingChanged {
 		@PendingCount(u.Pending, true)
 		@PendingList(u.PendingComments, true)
+		@DiscardButton(pr, u.Pending, true)
 	}
 	if u.Checks != nil {
 		@statusBox(*u.Checks, true)

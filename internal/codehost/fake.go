@@ -31,7 +31,7 @@ type Fake struct {
 	Health      Status
 	// Forgotten lists the PRs Forget was called for.
 	Forgotten []domain.PRRef
-	// FailAddThread, when set, makes AddThread fail with it.
+	// FailAddThread, when set, makes AddThread and PostThread fail with it.
 	FailAddThread error
 	nextID        int
 }
@@ -210,23 +210,49 @@ func (f *Fake) StartReview(_ context.Context, prID string, commit domain.SHA) (s
 func (f *Fake) AddThread(_ context.Context, reviewID string, t NewThread) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.Health.Online {
-		return ErrOffline
-	}
-	if f.FailAddThread != nil {
-		return f.FailAddThread
-	}
-	s, err := f.byReviewID(reviewID)
+	s, err := f.writable(func() (*domain.ReviewState, error) { return f.byReviewID(reviewID) })
 	if err != nil {
 		return err
 	}
+	f.addThread(s, t, true)
+	s.Pending.Comments++
+	return nil
+}
+
+func (f *Fake) PostThread(_ context.Context, ref domain.PRRef, _ domain.SHA, t NewThread) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	s, err := f.writable(func() (*domain.ReviewState, error) {
+		if s, ok := f.States[ref]; ok {
+			return s, nil
+		}
+		return nil, fmt.Errorf("PR %v: %w", ref, ErrNotFound)
+	})
+	if err != nil {
+		return err
+	}
+	f.addThread(s, t, false)
+	return nil
+}
+
+// writable finds the state a new thread goes on, failing as AddThread and
+// PostThread do when offline or told to.
+func (f *Fake) writable(find func() (*domain.ReviewState, error)) (*domain.ReviewState, error) {
+	if !f.Health.Online {
+		return nil, ErrOffline
+	}
+	if f.FailAddThread != nil {
+		return nil, f.FailAddThread
+	}
+	return find()
+}
+
+func (f *Fake) addThread(s *domain.ReviewState, t NewThread, pending bool) {
 	s.Threads = append(s.Threads, domain.ReviewThread{
 		ID: f.id("PRRT"), Path: t.Path, Line: t.Line, StartLine: t.StartLine, Side: t.Side, StartSide: t.StartSide,
 		ViewerCanResolve: true,
-		Comments:         []domain.Comment{{ID: f.id("PRRC"), Author: s.Viewer, Body: t.Body, BodyHTML: renderBody(t.Body), Pending: true, ViewerDidAuthor: true, ViewerCanUpdate: true, ViewerCanDelete: true}},
+		Comments:         []domain.Comment{{ID: f.id("PRRC"), Author: s.Viewer, Body: t.Body, BodyHTML: renderBody(t.Body), Pending: pending, ViewerDidAuthor: true, ViewerCanUpdate: true, ViewerCanDelete: true}},
 	})
-	s.Pending.Comments++
-	return nil
 }
 
 func (f *Fake) Reply(_ context.Context, reviewID, threadID, body string) error {
@@ -235,17 +261,21 @@ func (f *Fake) Reply(_ context.Context, reviewID, threadID, body string) error {
 	if !f.Health.Online {
 		return ErrOffline
 	}
-	s, err := f.byReviewID(reviewID)
-	if err != nil {
-		return err
-	}
-	for i := range s.Threads {
-		if s.Threads[i].ID == threadID {
-			s.Threads[i].Comments = append(s.Threads[i].Comments, domain.Comment{
-				ID: f.id("PRRC"), Author: s.Viewer, Body: body, BodyHTML: renderBody(body), Pending: true, ViewerDidAuthor: true, ViewerCanUpdate: true, ViewerCanDelete: true,
-			})
-			s.Pending.Comments++
-			return nil
+	pending := reviewID != ""
+	for _, s := range f.States {
+		if pending && (s.Pending == nil || s.Pending.ID != reviewID) {
+			continue
+		}
+		for i := range s.Threads {
+			if s.Threads[i].ID == threadID {
+				s.Threads[i].Comments = append(s.Threads[i].Comments, domain.Comment{
+					ID: f.id("PRRC"), Author: s.Viewer, Body: body, BodyHTML: renderBody(body), Pending: pending, ViewerDidAuthor: true, ViewerCanUpdate: true, ViewerCanDelete: true,
+				})
+				if pending {
+					s.Pending.Comments++
+				}
+				return nil
+			}
 		}
 	}
 	return fmt.Errorf("thread %s: %w", threadID, ErrNotFound)
@@ -330,6 +360,28 @@ func react(groups []domain.ReactionGroup, r domain.Reaction, on bool) []domain.R
 		groups = append(groups, domain.ReactionGroup{Content: r, Count: 1, ViewerHasReacted: true})
 	}
 	return groups
+}
+
+func (f *Fake) DiscardReview(_ context.Context, reviewID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.Health.Online {
+		return ErrOffline
+	}
+	s, err := f.byReviewID(reviewID)
+	if err != nil {
+		return err
+	}
+	threads := s.Threads[:0]
+	for _, t := range s.Threads {
+		t.Comments = slices.DeleteFunc(t.Comments, func(c domain.Comment) bool { return c.Pending })
+		if len(t.Comments) > 0 {
+			threads = append(threads, t)
+		}
+	}
+	s.Threads = threads
+	s.Pending = nil
+	return nil
 }
 
 func (f *Fake) SubmitReview(_ context.Context, prID, reviewID string, commit domain.SHA, event domain.ReviewEvent, body string) error {

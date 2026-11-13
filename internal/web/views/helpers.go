@@ -330,6 +330,14 @@ func ago(t time.Time) string {
 	return t.Local().Format("2 Jan 15:04")
 }
 
+// discardCount is how many comments discarding p deletes, e.g. "2 comments".
+func discardCount(p *domain.PendingReview) string {
+	if p == nil {
+		return commentCount(0)
+	}
+	return commentCount(p.Comments)
+}
+
 func commentCount(n int) string {
 	if n == 1 {
 		return "1 comment"

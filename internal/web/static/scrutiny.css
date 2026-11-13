@@ -218,6 +218,9 @@ button.primary:hover { filter: brightness(1.1); background: var(--green); }
 textarea { font: inherit; color: var(--fg); background: var(--bg1); border: 1px solid var(--bg2); border-radius: 4px; padding: .4rem; width: 100%; resize: vertical; }
 .actions { display: flex; gap: .5rem; }
 
+/* While there is a Pending Review, GitHub would add a Single Comment to it, so only "in review" is offered */
+body:has(#pending-count[data-pending]) .reply button[name="post"][value="single"] { display: none; }
+
 /* Comment boxes: Write/Preview tabs and the formatting toolbar */
 .md-editor { border: 1px solid var(--bg2); border-radius: 6px; background: var(--bg-soft); min-width: 0; }
 .md-header { display: flex; align-items: flex-end; flex-wrap: wrap; gap: .3rem; border-bottom: 1px solid var(--bg2); padding: .3rem .4rem 0; }
@@ -249,6 +252,7 @@ textarea { font: inherit; color: var(--fg); background: var(--bg1); border: 1px 
 dialog { background: var(--bg0); color: var(--fg); border: 1px solid var(--bg2); border-radius: 8px; width: min(36rem, calc(100vw - 32px)); }
 dialog::backdrop { background: rgba(0, 0, 0, .5); }
 dialog form { display: flex; flex-direction: column; gap: .7rem; }
+#submit-review .danger:hover { color: var(--red); border-color: var(--red); }
 dialog h2 { margin: 0; font-size: var(--fs-lg); }
 dialog fieldset { border: 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
 

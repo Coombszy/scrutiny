@@ -159,6 +159,52 @@ func TestReplyAndResolveReturnTheThread(t *testing.T) {
 	mustContain(t, rec.Body.String(), `id="thread-T1"`, `data-resolved="true"`, "Unresolve")
 }
 
+func TestReplyingAsASingleCommentSkipsTheReview(t *testing.T) {
+	a := newApp(t)
+	a.withThread()
+	a.do(t, http.MethodGet, prPath, nil)
+
+	rec := a.do(t, http.MethodPost, prPath+"/threads/T1/replies", url.Values{"body": {"Posted now"}, "post": {"single"}})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	mustContain(t, rec.Body.String(), `id="thread-T1"`, "Posted now", `name="post" value="single"`)
+	if p := a.host.State(ref).Pending; p != nil {
+		t.Errorf("Pending = %+v, want none", p)
+	}
+}
+
+func TestDiscardingTheReviewRefreshesThePage(t *testing.T) {
+	a := newApp(t)
+	a.withThread()
+	before := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	mustContain(t, before, `id="discard-review" class="danger" hidden`)
+	if strings.Contains(before, "data-pending") {
+		t.Error("page marked as having a Pending Review before there is one")
+	}
+
+	reply := a.do(t, http.MethodPost, prPath+"/threads/T1/replies", url.Values{"body": {"Never mind"}}).Body.String()
+	mustContain(t, reply, `id="discard-review" hx-swap-oob="true" class="danger" hx-post`, `id="pending-count" hx-swap-oob="true" class="count" data-pending`)
+	page := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	mustContain(t, page, `id="discard-review" class="danger" hx-post="/github.com/o/r/pull/7/review/discard"`, `id="pending-count" class="count" data-pending`)
+	submit, discard := strings.Index(page, ">Submit review<"), strings.Index(page, ">Discard review<")
+	cancel := submit + strings.Index(page[submit:], ">Cancel<")
+	if !(submit < discard && discard < cancel) {
+		t.Errorf("dialog buttons out of order: Submit %d, Discard %d, Cancel %d", submit, discard, cancel)
+	}
+
+	rec := a.do(t, http.MethodPost, prPath+"/review/discard", url.Values{})
+	if rec.Code != http.StatusNoContent || rec.Header().Get("HX-Refresh") != "true" {
+		t.Fatalf("status %d, HX-Refresh %q: %s", rec.Code, rec.Header().Get("HX-Refresh"), rec.Body)
+	}
+	if p := a.host.State(ref).Pending; p != nil {
+		t.Errorf("Pending = %+v, want none", p)
+	}
+	if rec := a.do(t, http.MethodPost, prPath+"/review/discard", url.Values{}); rec.Code != http.StatusConflict {
+		t.Errorf("discarding again: status %d, want 409", rec.Code)
+	}
+}
+
 func TestReactingReturnsTheReactionBar(t *testing.T) {
 	a := newApp(t)
 	a.withThread()

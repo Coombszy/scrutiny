@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/Coombszy/scrutiny/internal/codehost"
 	"github.com/Coombszy/scrutiny/internal/domain"
+	"github.com/Coombszy/scrutiny/internal/highlight"
 	"github.com/Coombszy/scrutiny/internal/repostore"
 	"github.com/Coombszy/scrutiny/internal/review"
 )
@@ -98,7 +100,7 @@ func TestAddingAThreadStartsAPendingReviewAtTheComparisonHead(t *testing.T) {
 	}
 
 	for _, body := range []string{"first", "second"} {
-		_, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: body})
+		_, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: body}, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,16 +130,16 @@ func TestCommentingIsRefusedWhereGitHubWouldMisplaceIt(t *testing.T) {
 	}
 
 	// The left side of a range is not the PR's base.
-	_, err := f.svc.AddThread(ctx, ref, c1, c2, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Left, Body: "x"})
+	_, err := f.svc.AddThread(ctx, ref, c1, c2, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Left, Body: "x"}, true)
 	if !errors.Is(err, review.ErrCannotComment) {
 		t.Errorf("left side of a range: err = %v, want ErrCannotComment", err)
 	}
 
 	// A Pending Review on head cannot take comments made against c2.
-	if _, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"}); err != nil {
+	if _, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"}, true); err != nil {
 		t.Fatal(err)
 	}
-	_, err = f.svc.AddThread(ctx, ref, c1, c2, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"})
+	_, err = f.svc.AddThread(ctx, ref, c1, c2, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"}, true)
 	if !errors.Is(err, review.ErrCannotComment) {
 		t.Errorf("pending review elsewhere: err = %v, want ErrCannotComment", err)
 	}
@@ -154,7 +156,7 @@ func TestReplyResolveReactAndViewedGoToGitHub(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	th, err := f.svc.Reply(ctx, ref, "T1", "agreed")
+	th, err := f.svc.Reply(ctx, ref, "T1", "agreed", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +218,7 @@ func TestSubmittingAReview(t *testing.T) {
 		t.Fatal(err)
 	}
 	// With one, it is submitted at its own commit.
-	if _, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"}); err != nil {
+	if _, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"}, true); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.svc.Submit(ctx, ref, c2, domain.RequestChanges, "fix it"); err != nil {
@@ -248,13 +250,13 @@ func TestAFailedWriteDoesNotLeaveAStaleSnapshot(t *testing.T) {
 
 	// The Pending Review is created, then adding the thread fails.
 	f.host.FailAddThread = errors.New("line could not be resolved")
-	if _, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"}); err == nil {
+	if _, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"}, true); err == nil {
 		t.Fatal("AddThread succeeded, want the injected failure")
 	}
 	f.host.FailAddThread = nil
 
 	// The retry must reuse that Pending Review rather than start another.
-	if _, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"}); err != nil {
+	if _, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"}, true); err != nil {
 		t.Fatalf("retry: %v", err)
 	}
 }
@@ -268,7 +270,7 @@ func TestAddThreadReturnsOnlyTheNewThread(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"})
+	got, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,7 +287,7 @@ func TestWritesAreRefusedForThingsNotOnThisPR(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "not-in-diff.go", Line: 1, Side: domain.Right, Body: "x"}); !errors.Is(err, review.ErrCannotComment) {
+	if _, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "not-in-diff.go", Line: 1, Side: domain.Right, Body: "x"}, true); !errors.Is(err, review.ErrCannotComment) {
 		t.Errorf("file outside the diff: err = %v, want ErrCannotComment", err)
 	}
 	if _, err := f.svc.SetResolved(ctx, ref, "PRRT_elsewhere", true); !errors.Is(err, review.ErrThreadNotFound) {
@@ -322,5 +324,188 @@ func TestPendingCommentsListEveryDraftInFileOrder(t *testing.T) {
 	}
 	if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
 		t.Errorf("PendingComments = %+v\nwant %+v", got, want)
+	}
+}
+
+func TestSingleCommentsArePostedWithoutAReview(t *testing.T) {
+	f := newFixture(t)
+	f.withDiff(mb, c3)
+	f.withDiff(mb, c2)
+	st := f.host.State(ref)
+	st.Threads = []domain.ReviewThread{{ID: "T1", Path: "a.go", Line: 2, Side: domain.Right,
+		Comments: []domain.Comment{{ID: "C1", Body: "hm"}}}}
+	ctx := context.Background()
+	if _, err := f.svc.PRPage(ctx, ref, review.ComparisonRequest{}); err != nil {
+		t.Fatal(err)
+	}
+
+	th, err := f.svc.Reply(ctx, ref, "T1", "agreed", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(th.Comments) != 2 || th.Comments[1].Pending {
+		t.Errorf("single reply: %+v", th.Comments)
+	}
+	added, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "now"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(added) != 1 || added[0].Comments[0].Pending {
+		t.Errorf("single thread: %+v", added)
+	}
+	if st.Pending != nil {
+		t.Errorf("a Single Comment started a Pending Review: %+v", st.Pending)
+	}
+
+	// A Single Comment goes on the PR's head, so not on an earlier Comparison.
+	if _, err := f.svc.AddThread(ctx, ref, mb, c2, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"}, false); !errors.Is(err, review.ErrCannotComment) {
+		t.Errorf("single comment before head: err = %v, want ErrCannotComment", err)
+	}
+}
+
+func TestSingleCommentsAreRefusedWithAPendingReview(t *testing.T) {
+	f := newFixture(t)
+	f.withDiff(mb, c3)
+	st := f.host.State(ref)
+	st.Threads = []domain.ReviewThread{{ID: "T1", Path: "a.go", Line: 2, Side: domain.Right,
+		Comments: []domain.Comment{{ID: "C1", Body: "hm"}}}}
+	ctx := context.Background()
+	if _, err := f.svc.PRPage(ctx, ref, review.ComparisonRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.Reply(ctx, ref, "T1", "in review", true); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := f.svc.Reply(ctx, ref, "T1", "now", false); !errors.Is(err, review.ErrCannotComment) {
+		t.Errorf("single reply: err = %v, want ErrCannotComment", err)
+	}
+	if _, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "now"}, false); !errors.Is(err, review.ErrCannotComment) {
+		t.Errorf("single thread: err = %v, want ErrCannotComment", err)
+	}
+}
+
+func TestDiscardingAPendingReviewDeletesItsComments(t *testing.T) {
+	f := newFixture(t)
+	f.withDiff(mb, c3)
+	st := f.host.State(ref)
+	st.Threads = []domain.ReviewThread{{ID: "T1", Path: "a.go", Line: 2, Side: domain.Right,
+		Comments: []domain.Comment{{ID: "C1", Body: "hm"}}}}
+	ctx := context.Background()
+	if _, err := f.svc.PRPage(ctx, ref, review.ComparisonRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.Discard(ctx, ref); !errors.Is(err, review.ErrNoPendingReview) {
+		t.Errorf("no pending review: err = %v, want ErrNoPendingReview", err)
+	}
+
+	if _, err := f.svc.Reply(ctx, ref, "T1", "draft reply", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "draft thread"}, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.Discard(ctx, ref); err != nil {
+		t.Fatal(err)
+	}
+	if st.Pending != nil {
+		t.Errorf("Pending = %+v, want none", st.Pending)
+	}
+	if got := threadIDs(st.Threads); len(got) != 1 || got[0] != "T1" {
+		t.Errorf("threads = %v, want only T1", got)
+	}
+	if cs := st.Threads[0].Comments; len(cs) != 1 || cs[0].ID != "C1" {
+		t.Errorf("T1 comments = %+v, want only C1", cs)
+	}
+}
+
+// laggingHost keeps returning the review state from before a discard for
+// stale more reads, as GitHub does for a few seconds.
+type laggingHost struct {
+	*codehost.Fake
+	stale  int
+	before domain.ReviewState
+}
+
+func (h *laggingHost) DiscardReview(ctx context.Context, reviewID string) error {
+	before, err := h.Fake.ReviewState(ctx, ref)
+	if err != nil {
+		return err
+	}
+	h.before = before
+	return h.Fake.DiscardReview(ctx, reviewID)
+}
+
+func (h *laggingHost) ReviewState(ctx context.Context, r domain.PRRef) (domain.ReviewState, error) {
+	if h.before.PRID != "" && h.stale > 0 {
+		h.stale--
+		return h.before, nil
+	}
+	return h.Fake.ReviewState(ctx, r)
+}
+
+func TestDiscardRereadsWithBackoffUntilGitHubCatchesUp(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		stale  int
+		sleeps int
+	}{
+		{"caught up at once", 0, 0},
+		{"caught up after two retries", 2, 2},
+		{"never caught up", 10, 4},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture(t)
+			f.withDiff(mb, c3)
+			host := &laggingHost{Fake: f.host}
+			var sleeps []time.Duration
+			svc := review.NewService(review.Deps{
+				CodeHost: host, Repos: f.repos, Highlighter: highlight.PlainHighlighter{}, Cache: f.cache, Settings: f.settings,
+				Now:        func() time.Time { return f.now },
+				Sleep:      func(_ context.Context, d time.Duration) error { sleeps = append(sleeps, d); return nil },
+				Background: func(fn func()) { fn() },
+			})
+			ctx := context.Background()
+			if _, err := svc.PRPage(ctx, ref, review.ComparisonRequest{}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "draft"}, true); err != nil {
+				t.Fatal(err)
+			}
+
+			host.stale = tc.stale
+			if err := svc.Discard(ctx, ref); err != nil {
+				t.Fatal(err)
+			}
+			if len(sleeps) != tc.sleeps {
+				t.Errorf("slept %v, want %d sleeps", sleeps, tc.sleeps)
+			}
+			if tc.sleeps > 1 && sleeps[1] <= sleeps[0] {
+				t.Errorf("sleeps %v do not back off", sleeps)
+			}
+		})
+	}
+}
+
+func TestDiscardStopsWaitingWhenTheRequestIsCancelled(t *testing.T) {
+	f := newFixture(t)
+	f.withDiff(mb, c3)
+	host := &laggingHost{Fake: f.host}
+	ctx, cancel := context.WithCancel(context.Background())
+	svc := review.NewService(review.Deps{
+		CodeHost: host, Repos: f.repos, Highlighter: highlight.PlainHighlighter{}, Cache: f.cache, Settings: f.settings,
+		Now:        func() time.Time { return f.now },
+		Sleep:      func(ctx context.Context, _ time.Duration) error { cancel(); return ctx.Err() },
+		Background: func(fn func()) { fn() },
+	})
+	if _, err := svc.PRPage(ctx, ref, review.ComparisonRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "draft"}, true); err != nil {
+		t.Fatal(err)
+	}
+	host.stale = 10
+	if err := svc.Discard(ctx, ref); !errors.Is(err, context.Canceled) {
+		t.Errorf("err = %v, want context.Canceled", err)
 	}
 }

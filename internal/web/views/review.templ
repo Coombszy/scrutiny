@@ -47,7 +47,8 @@ templ threadView(pr domain.PRRef, t domain.ReviewThread, oob bool) {
 					<textarea autocomplete="off" id={ "reply-" + t.ID } name="body" rows="2" placeholder="Reply…" required></textarea>
 				}
 				<div class="actions">
-					<button type="submit">Reply</button>
+					<button type="submit" name="post" value="review" title="Add this reply to your Pending Review">Reply in review</button>
+					<button type="submit" name="post" value="single" title="Post this reply now, outside any review">Reply</button>
 					if t.Resolved && t.ViewerCanUnresolve {
 						<button type="button" hx-post={ pr.Path() + "/threads/" + t.ID + "/resolve" } hx-vals={ `{"resolved":"false"}` } hx-target="closest .thread" hx-swap="outerHTML">Unresolve</button>
 					} else if !t.Resolved && t.ViewerCanResolve {
@@ -179,7 +180,8 @@ templ NewThreadForm(pr domain.PRRef, a ThreadAnchor, cols int) {
 						<textarea autocomplete="off" name="body" rows="3" placeholder="Leave a comment" required autofocus></textarea>
 					}
 					<div class="actions">
-						<button type="submit">Add to review</button>
+						<button type="submit" name="post" value="review" title="Add this comment to your Pending Review">Add to review</button>
+						<button type="submit" name="post" value="single" title="Post this comment now, outside any review">Comment</button>
 						<button type="button" data-remove-row>Cancel</button>
 					</div>
 				</form>
@@ -190,7 +192,8 @@ templ NewThreadForm(pr domain.PRRef, a ThreadAnchor, cols int) {
 
 // PendingCount says how many comments the Pending Review holds, e.g.
 // "(2 pending)", and nothing when it holds none. It is swapped out of band
-// after every write.
+// after every write. Its data-pending, set while there is a Pending Review,
+// hides the Single Comment buttons, which GitHub would add to the review.
 templ PendingCount(p *domain.PendingReview, oob bool) {
 	<span
 		id="pending-count"
@@ -198,6 +201,7 @@ templ PendingCount(p *domain.PendingReview, oob bool) {
 			hx-swap-oob="true"
 		}
 		class="count"
+		data-pending?={ p != nil }
 	>
 		if p != nil && p.Comments > 0 {
 			({ itoa(p.Comments) } pending)
@@ -233,6 +237,23 @@ templ PendingList(comments []review.PendingComment, oob bool) {
 			</details>
 		}
 	</div>
+}
+
+// DiscardButton, in the submit dialog, deletes the Pending Review and its
+// comments. It is hidden while there is no Pending Review, and swapped out
+// of band alongside PendingList.
+templ DiscardButton(pr domain.PRRef, p *domain.PendingReview, oob bool) {
+	<button
+		type="button"
+		id="discard-review"
+		if oob {
+			hx-swap-oob="true"
+		}
+		class="danger"
+		hidden?={ p == nil }
+		hx-post={ pr.Path() + "/review/discard" }
+		hx-confirm={ "Discard your Pending Review and its " + discardCount(p) + "? This cannot be undone." }
+	>Discard review</button>
 }
 
 // Conversation renders the Conversation and the form for a new comment,
@@ -271,7 +292,7 @@ templ conversationView(pr domain.PRRef, c review.Conversation, oob bool) {
 	</section>
 }
 
-templ submitDialog(pr domain.PRRef, head domain.SHA, pending []review.PendingComment) {
+templ submitDialog(pr domain.PRRef, head domain.SHA, pendingReview *domain.PendingReview, pending []review.PendingComment) {
 	<dialog id="submit-review">
 		<form autocomplete="off" hx-post={ pr.Path() + "/review" }>
 			<h2>Finish your review</h2>
@@ -287,6 +308,7 @@ templ submitDialog(pr domain.PRRef, head domain.SHA, pending []review.PendingCom
 			</fieldset>
 			<div class="actions">
 				<button type="submit">Submit review</button>
+				@DiscardButton(pr, pendingReview, false)
 				<button type="button" data-close-dialog>Cancel</button>
 			</div>
 		</form>

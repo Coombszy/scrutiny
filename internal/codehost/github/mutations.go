@@ -22,6 +22,7 @@ var (
 	addComment          = mutation("addComment", "AddCommentInput", "commentEdge { node { id } }")
 	addReaction         = mutation("addReaction", "AddReactionInput", "reaction { content }")
 	removeReaction      = mutation("removeReaction", "RemoveReactionInput", "reaction { content }")
+	deleteReview        = mutation("deletePullRequestReview", "DeletePullRequestReviewInput", "pullRequestReview { id }")
 	submitReview        = mutation("submitPullRequestReview", "SubmitPullRequestReviewInput", "pullRequestReview { id }")
 	editReviewComment   = mutation("updatePullRequestReviewComment", "UpdatePullRequestReviewCommentInput", "pullRequestReviewComment { id }")
 	deleteReviewComment = mutation("deletePullRequestReviewComment", "DeletePullRequestReviewCommentInput", "clientMutationId")
@@ -57,8 +58,22 @@ func (c *Client) AddThread(ctx context.Context, reviewID string, t codehost.NewT
 	return c.mutate(ctx, addThread, in, nil)
 }
 
+// PostThread uses REST: GraphQL's addPullRequestReviewThread given only the
+// PR starts a Pending Review rather than posting the thread.
+func (c *Client) PostThread(ctx context.Context, ref domain.PRRef, commit domain.SHA, t codehost.NewThread) error {
+	in := map[string]any{"commit_id": string(commit), "path": t.Path, "line": t.Line, "side": string(t.Side), "body": t.Body}
+	if t.StartLine != 0 && t.StartLine != t.Line {
+		in["start_line"], in["start_side"] = t.StartLine, string(t.StartSide)
+	}
+	return c.post(ctx, pullPath(ref)+"/comments", in)
+}
+
 func (c *Client) Reply(ctx context.Context, reviewID, threadID, body string) error {
-	return c.mutate(ctx, addThreadReply, input{"pullRequestReviewId": reviewID, "pullRequestReviewThreadId": threadID, "body": body}, nil)
+	in := input{"pullRequestReviewThreadId": threadID, "body": body}
+	if reviewID != "" {
+		in["pullRequestReviewId"] = reviewID
+	}
+	return c.mutate(ctx, addThreadReply, in, nil)
 }
 
 func (c *Client) SetThreadResolved(ctx context.Context, threadID string, resolved bool) error {
@@ -86,6 +101,10 @@ func (c *Client) SubmitReview(ctx context.Context, prID, reviewID string, commit
 		return c.mutate(ctx, addReview, input{"pullRequestId": prID, "commitOID": string(commit), "event": string(event), "body": body}, nil)
 	}
 	return c.mutate(ctx, submitReview, input{"pullRequestReviewId": reviewID, "event": string(event), "body": body}, nil)
+}
+
+func (c *Client) DiscardReview(ctx context.Context, reviewID string) error {
+	return c.mutate(ctx, deleteReview, input{"pullRequestReviewId": reviewID}, nil)
 }
 
 func (c *Client) SetViewed(ctx context.Context, prID, path string, viewed bool) error {

@@ -47,7 +47,8 @@ type Dashboard struct {
 	Authored        []domain.PRSummary
 }
 
-// NewThread is a Review Thread to add to a Pending Review. StartLine is zero
+// NewThread is a Review Thread to add to a Pending Review or post as a
+// Single Comment. StartLine is zero
 // for a single-line thread.
 type NewThread struct {
 	Path            string
@@ -83,7 +84,11 @@ type CodeHost interface {
 	StartReview(ctx context.Context, prID string, commit domain.SHA) (reviewID string, err error)
 	// AddThread adds a Review Thread to a Pending Review.
 	AddThread(ctx context.Context, reviewID string, t NewThread) error
-	// Reply adds a Review Comment to a thread, within a Pending Review.
+	// PostThread posts a Review Thread on commit straight away, as a Single
+	// Comment.
+	PostThread(ctx context.Context, ref domain.PRRef, commit domain.SHA, t NewThread) error
+	// Reply adds a Review Comment to a thread within a Pending Review, or
+	// when reviewID is empty posts it as a Single Comment.
 	Reply(ctx context.Context, reviewID, threadID, body string) error
 	SetThreadResolved(ctx context.Context, threadID string, resolved bool) error
 	// EditReviewComment replaces a Review Comment's body, pending or not.
@@ -98,6 +103,8 @@ type CodeHost interface {
 	DeleteConversationComment(ctx context.Context, commentID string) error
 	// SetReaction adds or removes the viewer's Reaction on a comment or PR.
 	SetReaction(ctx context.Context, subjectID string, r domain.Reaction, on bool) error
+	// DiscardReview deletes a Pending Review and its comments.
+	DiscardReview(ctx context.Context, reviewID string) error
 	// SubmitReview submits the Pending Review, or when reviewID is empty
 	// creates and submits a review at commit in one step.
 	SubmitReview(ctx context.Context, prID, reviewID string, commit domain.SHA, event domain.ReviewEvent, body string) error

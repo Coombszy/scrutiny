@@ -31,6 +31,8 @@ type Deps struct {
 	Settings    settings.Store
 	Navigator   navigator.Navigator // optional: code navigation is off without it
 	Now         func() time.Time
+	// Sleep waits for d or until ctx is done; it defaults to a timer.
+	Sleep func(ctx context.Context, d time.Duration) error
 	// Background runs work the page should not wait for, such as warming
 	// Language Servers; it defaults to a new goroutine.
 	Background func(func())
@@ -50,10 +52,24 @@ func NewService(d Deps) *Service {
 	if d.Now == nil {
 		d.Now = time.Now
 	}
+	if d.Sleep == nil {
+		d.Sleep = sleep
+	}
 	if d.Background == nil {
 		d.Background = func(fn func()) { go fn() }
 	}
 	return &Service{Deps: d}
+}
+
+func sleep(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // ComparisonRequest selects a Comparison. The zero value is the default

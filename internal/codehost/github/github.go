@@ -1,9 +1,10 @@
 // Package github is the CodeHost adapter for github.com: REST reads with
 // ETag conditional requests cached in the Cache port, and GraphQL for
-// review state and writes.
+// review state and writes (except PostThread, which GraphQL cannot do).
 package github
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -202,6 +203,38 @@ func (c *Client) get(ctx context.Context, path string, v any) (link string, err 
 		body = entry.Value
 	}
 	return link, json.Unmarshal(cachedBody(body), v)
+}
+
+// post sends v as JSON to path (relative to the API base), for REST writes.
+// The response body is not read: writers re-read ReviewState afterwards.
+func (c *Client) post(ctx context.Context, path string, v any) error {
+	payload, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		c.status.failed()
+		return fmt.Errorf("POST %s: %w: %v", path, codehost.ErrOffline, err)
+	}
+	defer resp.Body.Close()
+	c.status.observe(resp)
+	switch {
+	case resp.StatusCode == http.StatusNotFound:
+		return fmt.Errorf("POST %s: %w", path, codehost.ErrNotFound)
+	case resp.StatusCode == http.StatusUnauthorized:
+		return fmt.Errorf("POST %s: %w", path, codehost.ErrUnauthorized)
+	case resp.StatusCode < 200 || resp.StatusCode > 299:
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("POST %s: %s: %s", path, resp.Status, strings.TrimSpace(string(msg)))
+	}
+	return nil
 }
 
 // Cached values keep the Link header (for pagination) on the first line,

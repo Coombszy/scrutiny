@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/Coombszy/scrutiny/internal/cache"
 	"github.com/Coombszy/scrutiny/internal/codehost"
@@ -25,6 +26,9 @@ var (
 	// ErrCannotChangeComment is returned for an edit or delete the code host
 	// does not allow the viewer, or an empty edit.
 	ErrCannotChangeComment = errors.New("cannot change this comment")
+	// ErrNoPendingReview is returned for discarding a Pending Review when
+	// the viewer has none.
+	ErrNoPendingReview = errors.New("you have no Pending Review")
 	// ErrThreadNotFound is returned when a thread or comment is not on the PR.
 	ErrThreadNotFound = errors.New("not found on this pull request")
 )
@@ -109,12 +113,14 @@ func (s *Service) write(ctx context.Context, ref domain.PRRef, fn func(snapshot)
 }
 
 // AddThread starts a Review Thread in the viewer's Pending Review, creating
-// the review at head if there is none. GitHub anchors a thread to its
-// review's commit and LEFT lines to the PR's merge base, so the thread is
-// refused when either would differ from the Comparison shown.
+// the review at head if there is none, or when inReview is false posts it
+// as a Single Comment. GitHub anchors a thread to its review's commit (a
+// Single Comment's to the PR's head) and LEFT lines to the PR's merge base,
+// so the thread is refused when either would differ from the Comparison
+// shown.
 // It returns the thread it added. Threads may only go on files in the
 // Comparison.
-func (s *Service) AddThread(ctx context.Context, ref domain.PRRef, base, head domain.SHA, t codehost.NewThread) ([]domain.ReviewThread, error) {
+func (s *Service) AddThread(ctx context.Context, ref domain.PRRef, base, head domain.SHA, t codehost.NewThread, inReview bool) ([]domain.ReviewThread, error) {
 	changes, err := s.Repos.Changes(ctx, ref.Repo, base, head)
 	if err != nil {
 		return nil, err
@@ -129,6 +135,16 @@ func (s *Service) AddThread(ctx context.Context, ref domain.PRRef, base, head do
 		}
 		if (t.Side == domain.Left || t.StartSide == domain.Left) && base != snap.MergeBase {
 			return fmt.Errorf("%w: the left side of this Comparison is not the pull request's base", ErrCannotComment)
+		}
+		if !inReview {
+			if err := singleCommentAllowed(snap.State); err != nil {
+				return err
+			}
+			if head != snap.Head {
+				return fmt.Errorf("%w: a single comment goes on the pull request's head; view a Comparison ending there, or add it to a review",
+					ErrCannotComment)
+			}
+			return s.CodeHost.PostThread(ctx, ref, head, t)
 		}
 		reviewID := ""
 		switch p := snap.State.Pending; {
@@ -171,11 +187,18 @@ func (s *Service) Anchors(ctx context.Context, ref domain.PRRef) (Anchors, error
 }
 
 // Reply adds a Review Comment to a thread within the viewer's Pending
-// Review, starting one at the PR's head if needed.
-func (s *Service) Reply(ctx context.Context, ref domain.PRRef, threadID, body string) (domain.ReviewThread, error) {
+// Review, starting one at the PR's head if needed, or when inReview is
+// false posts it as a Single Comment.
+func (s *Service) Reply(ctx context.Context, ref domain.PRRef, threadID, body string, inReview bool) (domain.ReviewThread, error) {
 	snap, err := s.write(ctx, ref, func(snap snapshot) error {
 		if _, err := findThread(snap.State, threadID); err != nil {
 			return err
+		}
+		if !inReview {
+			if err := singleCommentAllowed(snap.State); err != nil {
+				return err
+			}
+			return s.CodeHost.Reply(ctx, "", threadID, body)
 		}
 		reviewID := ""
 		if p := snap.State.Pending; p != nil {
@@ -193,6 +216,17 @@ func (s *Service) Reply(ctx context.Context, ref domain.PRRef, threadID, body st
 		return domain.ReviewThread{}, err
 	}
 	return findThread(snap.State, threadID)
+}
+
+// singleCommentAllowed refuses a Single Comment while the viewer has a
+// Pending Review, since GitHub adds the comment to that review instead of
+// posting it.
+func singleCommentAllowed(st domain.ReviewState) error {
+	if st.Pending != nil {
+		return fmt.Errorf("%w: you have a Pending Review, so GitHub would add this comment to it; add it to the review, or submit the review first",
+			ErrCannotComment)
+	}
+	return nil
 }
 
 // SetResolved resolves or unresolves a thread.
@@ -282,6 +316,38 @@ func (s *Service) Submit(ctx context.Context, ref domain.PRRef, head domain.SHA,
 		return s.CodeHost.SubmitReview(ctx, snap.State.PRID, "", head, event, body)
 	})
 	return err
+}
+
+// discardBackoff is how long Discard waits between re-reads while GitHub
+// still lists the discarded comments.
+var discardBackoff = []time.Duration{250 * time.Millisecond, 500 * time.Millisecond, time.Second, 2 * time.Second}
+
+// Discard deletes the viewer's Pending Review and its comments. GitHub
+// keeps listing the deleted comments as pending for a few seconds, so the
+// review state is re-read with backoff until they are gone, and the page
+// reloaded afterwards does not show them. If they outlast the backoff, the
+// next poll catches up.
+func (s *Service) Discard(ctx context.Context, ref domain.PRRef) error {
+	snap, err := s.write(ctx, ref, func(snap snapshot) error {
+		p := snap.State.Pending
+		if p == nil {
+			return ErrNoPendingReview
+		}
+		return s.CodeHost.DiscardReview(ctx, p.ID)
+	})
+	for _, d := range discardBackoff {
+		if err != nil || !hasPendingComments(snap.State) {
+			return err
+		}
+		if err = s.Sleep(ctx, d); err == nil {
+			snap, err = s.readState(ctx, ref, snap.Head, snap.MergeBase)
+		}
+	}
+	return err
+}
+
+func hasPendingComments(st domain.ReviewState) bool {
+	return st.Pending != nil || slices.ContainsFunc(allComments(st), func(c domain.Comment) bool { return c.Pending })
 }
 
 func findThread(st domain.ReviewState, id string) (domain.ReviewThread, error) {

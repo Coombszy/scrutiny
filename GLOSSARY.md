@@ -17,7 +17,7 @@ The Comparison from the head commit at your last submitted review to the current
 _Avoid_: New changes, delta
 
 **Pending Review**:
-A reviewer's not-yet-submitted review on GitHub, holding their draft comments until they submit it as Approve, Request changes or Comment.
+A reviewer's not-yet-submitted review on GitHub, holding their draft comments until they submit it as Approve, Request changes or Comment, or discard it, deleting them.
 _Avoid_: Draft, local draft
 
 **Review Thread**:
@@ -27,6 +27,10 @@ _Avoid_: Comment chain, discussion
 **Review Comment**:
 A single comment within a Review Thread.
 _Avoid_: Inline comment, note
+
+**Single Comment**:
+A Review Comment posted straight away rather than held in a Pending Review, either starting a Review Thread or replying in one.
+_Avoid_: Standalone comment, immediate comment
 
 **Conversation Comment**:
 A PR-level comment not anchored to any line.

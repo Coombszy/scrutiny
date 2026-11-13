@@ -25,6 +25,7 @@ func (s *Server) routeReview() {
 	s.mux.HandleFunc("POST "+pr+"/comments/{comment}/delete", s.deleteComment)
 	s.mux.HandleFunc("POST "+pr+"/viewed", s.viewed)
 	s.mux.HandleFunc("POST "+pr+"/review", s.submit)
+	s.mux.HandleFunc("POST "+pr+"/review/discard", s.discard)
 	s.mux.HandleFunc("POST "+pr+"/markdown", s.previewMarkdown)
 }
 
@@ -86,7 +87,7 @@ func (s *Server) createThread(w http.ResponseWriter, r *http.Request) {
 	threads, err := s.review.AddThread(r.Context(), ref, domain.SHA(a.Base), domain.SHA(a.Head), codehost.NewThread{
 		Path: a.Path, Line: a.Line, Side: domain.DiffSide(a.Side),
 		StartLine: a.StartLine, StartSide: domain.DiffSide(a.StartSide), Body: r.FormValue("body"),
-	})
+	}, inReview(r))
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -94,13 +95,18 @@ func (s *Server) createThread(w http.ResponseWriter, r *http.Request) {
 	s.renderWithPending(w, r, views.ThreadRows(ref, threads, cols))
 }
 
+// inReview reports whether a new Review Comment goes in the Pending Review
+// rather than being posted as a Single Comment. A form submitted without a
+// button (Ctrl+Enter) adds to the review.
+func inReview(r *http.Request) bool { return r.FormValue("post") != "single" }
+
 func (s *Server) reply(w http.ResponseWriter, r *http.Request) {
 	ref, ok := prRef(r)
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	t, err := s.review.Reply(r.Context(), ref, r.PathValue("thread"), r.FormValue("body"))
+	t, err := s.review.Reply(r.Context(), ref, r.PathValue("thread"), r.FormValue("body"), inReview(r))
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -226,6 +232,20 @@ func (s *Server) submit(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (s *Server) discard(w http.ResponseWriter, r *http.Request) {
+	ref, ok := prRef(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	if err := s.review.Discard(r.Context(), ref); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	w.Header().Set("HX-Refresh", "true")
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // previewMarkdown renders a comment body for a comment box's Preview tab.
 func (s *Server) previewMarkdown(w http.ResponseWriter, r *http.Request) {
 	ref, ok := prRef(r)
@@ -255,7 +275,7 @@ func (s *Server) renderWithPending(w http.ResponseWriter, r *http.Request, c com
 		s.fail(w, r, err)
 		return
 	}
-	s.render(w, r, http.StatusOK, c, views.PendingCount(anchors.Pending, true), views.PendingList(pending, true))
+	s.render(w, r, http.StatusOK, c, views.PendingCount(anchors.Pending, true), views.PendingList(pending, true), views.DiscardButton(ref, anchors.Pending, true))
 }
 
 func prRefOrZero(r *http.Request) domain.PRRef {

@@ -148,7 +148,7 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, review.ErrThreadNotFound):
 		status = http.StatusNotFound
 	case errors.Is(err, review.ErrCannotComment), errors.Is(err, review.ErrCannotChangeComment),
-		errors.Is(err, review.ErrNotAtHead), errors.Is(err, servers.ErrBusy):
+		errors.Is(err, review.ErrNotAtHead), errors.Is(err, review.ErrNoPendingReview), errors.Is(err, servers.ErrBusy):
 		status = http.StatusConflict
 	case errors.Is(err, review.ErrInvalidComparison), errors.Is(err, review.ErrInvalidReaction),
 		errors.Is(err, review.ErrInvalidEvent), errors.Is(err, review.ErrBadPath), errors.Is(err, errBadRequest):
