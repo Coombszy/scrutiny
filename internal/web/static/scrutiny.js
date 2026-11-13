@@ -74,6 +74,14 @@ window.Scrutiny = { actions: {} };
   "use strict";
   let release = null;
   Scrutiny.barBottom = () => document.querySelector(".topbar")?.getBoundingClientRect().bottom ?? 0;
+  // File headers stick just below the top bar, whose height changes as it
+  // wraps or shows a refresh banner.
+  const topbar = document.querySelector(".topbar");
+  if (topbar) {
+    new ResizeObserver(() =>
+      document.documentElement.style.setProperty("--topbar-height", `${topbar.offsetHeight}px`),
+    ).observe(topbar);
+  }
   // centred is the offset for pin that puts el in the middle of the page
   // below the top bar, or at its top when el is too tall to fit.
   Scrutiny.centred = (el) => Math.max(0, (innerHeight - Scrutiny.barBottom() - el.offsetHeight) / 2);
@@ -319,6 +327,7 @@ window.Scrutiny = { actions: {} };
   });
 
   // A [data-copy] button copies its value, e.g. a comment's ID, and says so.
+  // An icon button says so in CSS, from data-copied.
   document.addEventListener("click", async (e) => {
     const btn = e.target.closest("[data-copy]");
     if (!btn) return;
@@ -331,6 +340,10 @@ window.Scrutiny = { actions: {} };
     }
     if (btn.dataset.copied) return;
     btn.dataset.copied = "true";
+    if (btn.querySelector("svg")) {
+      setTimeout(() => delete btn.dataset.copied, 1200);
+      return;
+    }
     const label = btn.textContent;
     btn.style.minWidth = btn.offsetWidth + "px";
     btn.textContent = "Copied";

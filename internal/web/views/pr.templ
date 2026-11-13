@@ -118,6 +118,10 @@ templ fileSection(p review.PRPage, i int, f review.FileEntry) {
 			} else {
 				<span class="path">{ f.Path }</span>
 			}
+			<button type="button" class="copy-path" data-copy={ f.Path } title="Copy the file's path" aria-label="Copy the file's path">
+				<svg class="copy" viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"></rect><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"></path></svg>
+				<svg class="copied" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7"></path></svg>
+			</button>
 			if f.Threads > 0 {
 				<span class="badge" title="Review Threads on this file">💬 { itoa(f.Threads - f.Unresolved) } Resolved { itoa(f.Unresolved) } Unresolved</span>
 			}
