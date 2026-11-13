@@ -1,6 +1,7 @@
 package web_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -135,6 +136,70 @@ func TestOnlyDevModeAllowsInlineScripts(t *testing.T) {
 		h.ServeHTTP(rec, req)
 		if got := strings.Contains(rec.Header().Get("Content-Security-Policy"), "'unsafe-inline'; style-src"); got != want {
 			t.Errorf("dev=%v: inline scripts allowed = %v, want %v (CSP %q)", dev, got, want, rec.Header().Get("Content-Security-Policy"))
+		}
+	}
+}
+
+func ticket(t *testing.T, h http.Handler) string {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/ticket", nil)
+	req.Host = "127.0.0.1:7878"
+	req.Header.Set("Origin", "chrome-extension://abcdef")
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	var body struct{ Ticket string }
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &body) != nil || body.Ticket == "" {
+		t.Fatalf("GET /ticket: status %d, body %q", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Error("GET /ticket must not let web pages read the ticket")
+	}
+	return body.Ticket
+}
+
+func TestGotoTicketLetsOneCrossSiteNavigationThrough(t *testing.T) {
+	h := secured()
+	tk := ticket(t, h)
+	get := func(path string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Host = "127.0.0.1:7878"
+		req.Header.Set("Sec-Fetch-Site", "cross-site")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+
+	rec := get("/github.com/o/r/pull/1?ticket=" + tk + "&comment=5")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("with a ticket: status %d, want 200", rec.Code)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, `data-to="/github.com/o/r/pull/1?comment=5"`) || strings.Contains(body, tk) {
+		t.Errorf("bounce page should send the tab on without the ticket: %q", body)
+	}
+	if rec := get("/github.com/o/r/pull/1?ticket=" + tk); rec.Code != http.StatusForbidden {
+		t.Errorf("reused ticket: status %d, want 403", rec.Code)
+	}
+	if rec := get("/github.com/o/r/pull/1?ticket=forged"); rec.Code != http.StatusForbidden {
+		t.Errorf("forged ticket: status %d, want 403", rec.Code)
+	}
+}
+
+func TestGotoTicketNeverSendsTheTabToAnotherHost(t *testing.T) {
+	h := secured()
+	for _, path := range []string{"//evil.example/x", `/\evil.example/x`, "/%2Fevil.example/x"} {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.URL.Path = path
+		req.URL.RawQuery = "ticket=" + ticket(t, h)
+		req.Host = "127.0.0.1:7878"
+		req.Header.Set("Sec-Fetch-Site", "cross-site")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		body := rec.Body.String()
+		to := body[strings.Index(body, `data-to="`)+len(`data-to="`):]
+		to = to[:strings.Index(to, `"`)]
+		if strings.HasPrefix(to, "//") || strings.HasPrefix(to, `/\`) {
+			t.Errorf("path %q bounces to %q, another host", path, to)
 		}
 	}
 }

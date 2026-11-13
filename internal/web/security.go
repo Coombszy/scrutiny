@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 // contentSecurityPolicy only allows Scrutiny's own scripts, so HTML from
@@ -29,13 +30,15 @@ func NewCSRFToken() string {
 // Secure rejects requests that did not come from a page served on localhost:
 // the Host and Origin headers must name a loopback host (a DNS-rebinding
 // defence), the browser must not mark the request as coming from another
-// site, and every mutating request must carry the CSRF token in the
-// X-CSRF-Token header or a csrf_token form field.
+// site (unless a GET carries a Goto Ticket from GET /ticket), and every
+// mutating request must carry the CSRF token in the X-CSRF-Token header or a
+// csrf_token form field.
 func Secure(next http.Handler, csrfToken string) http.Handler {
 	return secure(next, csrfToken, contentSecurityPolicy)
 }
 
 func secure(next http.Handler, csrfToken, csp string) http.Handler {
+	t := newTickets()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !isLoopback(r.Host) {
 			http.Error(w, "forbidden host", http.StatusForbidden)
@@ -43,6 +46,10 @@ func secure(next http.Handler, csrfToken, csp string) http.Handler {
 		}
 		if isHealthCheck(r) {
 			next.ServeHTTP(w, r)
+			return
+		}
+		if isTicketRequest(r) {
+			t.serveIssue(w)
 			return
 		}
 		if origin := r.Header.Get("Origin"); origin != "" {
@@ -53,6 +60,10 @@ func secure(next http.Handler, csrfToken, csp string) http.Handler {
 			}
 		}
 		if !sameOrigin(r) {
+			if r.Method == http.MethodGet && t.redeem(r.URL.Query().Get("ticket"), time.Now()) {
+				serveBounce(w, r, csp)
+				return
+			}
 			http.Error(w, "forbidden cross-site request: open this page from Scrutiny", http.StatusForbidden)
 			return
 		}
