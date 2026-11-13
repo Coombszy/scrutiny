@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Goto Scrutiny
 // @namespace    https://github.com/Coombszy/scrutiny
-// @version      0.1.0
+// @version      0.2.0
 // @description  On a GitHub pull request, adds a "Goto Scrutiny" button when Scrutiny is running locally.
 // @match        https://github.com/*
 // @connect      localhost
@@ -72,11 +72,34 @@
     return checking;
   }
 
-  // Opening the PR with GM_openInTab makes it a browser-initiated navigation
-  // (Sec-Fetch-Site: none), which Scrutiny allows; a link from github.com
-  // would be refused as cross-site.
-  function open(pr) {
-    GM_openInTab(`${base()}/github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`, { active: true, insert: true });
+  const prURL = (pr) => `${base()}/github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`;
+
+  // openHere sends this tab to the PR in Scrutiny. A link from github.com is
+  // cross-site, which Scrutiny refuses, so it first fetches a Goto Ticket
+  // (single use, valid 30s) that lets this one navigation through; GitHub's
+  // own scripts cannot read it. Without one it falls back to a new tab.
+  function openHere(pr) {
+    GM_xmlhttpRequest({
+      method: "GET",
+      url: `${base()}/ticket`,
+      timeout: 1500,
+      onload: (res) => {
+        let ticket = "";
+        try {
+          if (res.status === 200) ticket = JSON.parse(res.responseText).ticket;
+        } catch (_) {}
+        if (ticket) location.assign(`${prURL(pr)}?ticket=${encodeURIComponent(ticket)}`);
+        else openNewTab(pr);
+      },
+      onerror: () => openNewTab(pr),
+      ontimeout: () => openNewTab(pr),
+    });
+  }
+
+  // openNewTab opens the PR in Scrutiny in a new tab. GM_openInTab makes it a
+  // browser-initiated navigation (Sec-Fetch-Site: none), which Scrutiny allows.
+  function openNewTab(pr) {
+    GM_openInTab(prURL(pr), { active: true, insert: true });
   }
 
   // The button's specular edge light is ported from React Bits'
@@ -435,11 +458,23 @@ void main() {
     label.textContent = "Goto Scrutiny";
     b.append(canvas, label);
     host.append(b);
+    // Left click opens the PR in this tab; middle click, or ctrl/cmd click,
+    // in a new one, as a link would.
     b.addEventListener("click", (e) => {
       e.preventDefault();
       const pr = pullRequest();
-      if (pr) open(pr);
+      if (!pr) return;
+      if (e.ctrlKey || e.metaKey) openNewTab(pr);
+      else openHere(pr);
     });
+    b.addEventListener("auxclick", (e) => {
+      if (e.button !== 1) return;
+      e.preventDefault();
+      const pr = pullRequest();
+      if (pr) openNewTab(pr);
+    });
+    // Stop middle press starting autoscroll.
+    b.addEventListener("mousedown", (e) => e.button === 1 && e.preventDefault());
     specular(b, canvas);
     return host;
   }
