@@ -183,8 +183,8 @@ templ commitPicker(name string, commits []domain.Commit, picked domain.SHA) {
 	</div>
 }
 
-// commitLabel is "{title} {hash}" over the commit's time.
+// commitLabel is the commit's title over "{hash} {time}".
 templ commitLabel(c domain.Commit) {
-	<span class="commit-line"><span class="commit-title">{ c.Headline }</span> <code class="commit-hash">{ c.SHA.Short() }</code></span>
-	<span class="commit-date">{ commitTime(c) }</span>
+	<span class="commit-title">{ c.Headline }</span>
+	<span class="commit-meta"><code class="commit-hash">{ c.SHA.Short() }</code> <span class="commit-date">{ commitTime(c) }</span></span>
 }

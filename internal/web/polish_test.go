@@ -179,7 +179,7 @@ func TestCommitPickersShowTitleHashAndTime(t *testing.T) {
 		`<input type="hidden" name="first" value="`+string(c1)+`"`,
 		`<input type="hidden" name="last" value="`+string(c2)+`"`,
 		`role="listbox"`, `data-value="`+string(c2)+`"`,
-		`<span class="commit-title">first step</span>`, `<code class="commit-hash">`+c1.Short()+`</code>`, `<span class="commit-date">11/10 13:57</span>`,
+		`<span class="commit-title">first step</span>`, `<code class="commit-hash">`+c1.Short()+`</code>`, `<span class="commit-date">10/11 13:57</span>`,
 		`<span class="commit-date">11/11 09:05</span>`,
 	)
 	if strings.Contains(form, "<select") {

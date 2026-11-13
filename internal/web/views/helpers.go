@@ -682,10 +682,10 @@ func pickedLast(p review.PRPage) domain.SHA {
 	return p.Commits[len(p.Commits)-1].SHA
 }
 
-// commitTime is when a commit was authored, as MM/DD HH:MM.
+// commitTime is when a commit was authored, as DD/MM HH:MM.
 func commitTime(c domain.Commit) string {
 	if c.AuthoredAt.IsZero() {
 		return ""
 	}
-	return c.AuthoredAt.Local().Format("01/02 15:04")
+	return c.AuthoredAt.Local().Format("02/01 15:04")
 }
