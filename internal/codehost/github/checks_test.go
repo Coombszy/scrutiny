@@ -97,6 +97,29 @@ func TestUnreachableGitHubServesReadsFromCache(t *testing.T) {
 	}
 }
 
+func TestACancelledRequestIsNotOffline(t *testing.T) {
+	srv := fixtureServer(t, map[string]string{"/repos/cli/go-gh/pulls/325": "pull.json"})
+	client := newClient(srv, cache.NewMemory())
+	if _, err := client.PullRequest(context.Background(), pr325); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // the browser has gone
+
+	if _, err := client.PullRequest(ctx, pr325); !errors.Is(err, context.Canceled) || errors.Is(err, codehost.ErrOffline) {
+		t.Errorf("cached PullRequest: err = %v, want context.Canceled, not a cached copy", err)
+	}
+	if _, err := client.ReviewState(ctx, pr14956); !errors.Is(err, context.Canceled) || errors.Is(err, codehost.ErrOffline) {
+		t.Errorf("ReviewState: err = %v, want context.Canceled", err)
+	}
+	if err := client.PostThread(ctx, pr325, "abc", codehost.NewThread{Path: "a.go", Line: 1, Side: domain.Right, Body: "x"}); !errors.Is(err, context.Canceled) || errors.Is(err, codehost.ErrOffline) {
+		t.Errorf("PostThread: err = %v, want context.Canceled", err)
+	}
+	if !client.Status().Online {
+		t.Error("Status().Online = false after requests the caller cancelled")
+	}
+}
+
 func TestChecksIncludeReviewStatus(t *testing.T) {
 	var doc map[string]any
 	json.Unmarshal(fixture(t, "checks.json"), &doc) // cli/go-gh#324: a review is required, none given

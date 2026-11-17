@@ -1,9 +1,11 @@
 package web
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/a-h/templ"
 
@@ -12,6 +14,16 @@ import (
 	"github.com/Coombszy/scrutiny/internal/review"
 	"github.com/Coombszy/scrutiny/internal/web/views"
 )
+
+// writeTimeout bounds a write that outlives its request.
+const writeTimeout = 30 * time.Second
+
+// writeContext is the context for a write to GitHub: it carries on when the
+// browser leaves mid-request, so the write is not cut off and the review
+// state is still re-read afterwards.
+func writeContext(r *http.Request) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(r.Context()), writeTimeout)
+}
 
 func (s *Server) routeReview() {
 	pr := "/github.com/{owner}/{repo}/pull/{number}"
@@ -79,12 +91,14 @@ func (s *Server) createThread(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	ctx, cancel := writeContext(r)
+	defer cancel()
 	a, cols, err := threadAnchor(r)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	threads, err := s.review.AddThread(r.Context(), ref, domain.SHA(a.Base), domain.SHA(a.Head), codehost.NewThread{
+	threads, err := s.review.AddThread(ctx, ref, domain.SHA(a.Base), domain.SHA(a.Head), codehost.NewThread{
 		Path: a.Path, Line: a.Line, Side: domain.DiffSide(a.Side),
 		StartLine: a.StartLine, StartSide: domain.DiffSide(a.StartSide), Body: r.FormValue("body"),
 	}, inReview(r))
@@ -106,7 +120,9 @@ func (s *Server) reply(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	t, err := s.review.Reply(r.Context(), ref, r.PathValue("thread"), r.FormValue("body"), inReview(r))
+	ctx, cancel := writeContext(r)
+	defer cancel()
+	t, err := s.review.Reply(ctx, ref, r.PathValue("thread"), r.FormValue("body"), inReview(r))
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -120,7 +136,9 @@ func (s *Server) resolve(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	t, err := s.review.SetResolved(r.Context(), ref, r.PathValue("thread"), r.FormValue("resolved") == "true")
+	ctx, cancel := writeContext(r)
+	defer cancel()
+	t, err := s.review.SetResolved(ctx, ref, r.PathValue("thread"), r.FormValue("resolved") == "true")
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -134,8 +152,10 @@ func (s *Server) react(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	ctx, cancel := writeContext(r)
+	defer cancel()
 	subject := r.FormValue("subject")
-	groups, err := s.review.SetReaction(r.Context(), ref, subject, domain.Reaction(r.FormValue("content")), r.FormValue("on") == "true")
+	groups, err := s.review.SetReaction(ctx, ref, subject, domain.Reaction(r.FormValue("content")), r.FormValue("on") == "true")
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -149,7 +169,9 @@ func (s *Server) comment(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	conv, err := s.review.AddConversationComment(r.Context(), ref, r.FormValue("body"))
+	ctx, cancel := writeContext(r)
+	defer cancel()
+	conv, err := s.review.AddConversationComment(ctx, ref, r.FormValue("body"))
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -163,7 +185,9 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	ch, err := s.review.EditComment(r.Context(), ref, r.PathValue("comment"), r.FormValue("body"))
+	ctx, cancel := writeContext(r)
+	defer cancel()
+	ch, err := s.review.EditComment(ctx, ref, r.PathValue("comment"), r.FormValue("body"))
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -177,7 +201,9 @@ func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	ch, err := s.review.DeleteComment(r.Context(), ref, r.PathValue("comment"))
+	ctx, cancel := writeContext(r)
+	defer cancel()
+	ch, err := s.review.DeleteComment(ctx, ref, r.PathValue("comment"))
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -205,7 +231,9 @@ func (s *Server) viewed(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if err := s.review.SetViewed(r.Context(), ref, r.FormValue("path"), r.FormValue("viewed") == "true"); err != nil {
+	ctx, cancel := writeContext(r)
+	defer cancel()
+	if err := s.review.SetViewed(ctx, ref, r.FormValue("path"), r.FormValue("viewed") == "true"); err != nil {
 		s.fail(w, r, err)
 		return
 	}
@@ -218,12 +246,14 @@ func (s *Server) submit(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	ctx, cancel := writeContext(r)
+	defer cancel()
 	head := r.FormValue("head")
 	if !shaPattern.MatchString(head) {
 		s.fail(w, r, fmt.Errorf("%w: head is required", errBadRequest))
 		return
 	}
-	err := s.review.Submit(r.Context(), ref, domain.SHA(head), domain.ReviewEvent(r.FormValue("event")), r.FormValue("body"))
+	err := s.review.Submit(ctx, ref, domain.SHA(head), domain.ReviewEvent(r.FormValue("event")), r.FormValue("body"))
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -238,7 +268,9 @@ func (s *Server) discard(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if err := s.review.Discard(r.Context(), ref); err != nil {
+	ctx, cancel := writeContext(r)
+	defer cancel()
+	if err := s.review.Discard(ctx, ref); err != nil {
 		s.fail(w, r, err)
 		return
 	}

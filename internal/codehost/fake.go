@@ -33,7 +33,11 @@ type Fake struct {
 	Forgotten []domain.PRRef
 	// FailAddThread, when set, makes AddThread and PostThread fail with it.
 	FailAddThread error
-	nextID        int
+	// AfterReviewState, when set, runs once ReviewState has read the state
+	// and before it returns, so tests can interleave other calls with a
+	// read in flight.
+	AfterReviewState func()
+	nextID           int
 }
 
 var _ CodeHost = (*Fake)(nil)
@@ -51,11 +55,23 @@ func NewFake() *Fake {
 // SetOnline sets whether the Fake behaves as reachable. Unreachable, it acts
 // like the GitHub adapter: REST reads (PRs, commits, Dashboard) still succeed
 // as if served from cache, while GraphQL reads and all writes fail with
-// ErrOffline.
+// ErrOffline. Reads and writes fail with the context's error once it is done.
 func (f *Fake) SetOnline(online bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.Health.Online = online
+}
+
+// reachable fails as the GitHub adapter does: with the context's error
+// once the caller has gone, else ErrOffline while unreachable.
+func (f *Fake) reachable(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !f.Health.Online {
+		return ErrOffline
+	}
+	return nil
 }
 
 func (f *Fake) Status() Status {
@@ -64,11 +80,11 @@ func (f *Fake) Status() Status {
 	return f.Health
 }
 
-func (f *Fake) Checks(_ context.Context, ref domain.PRRef) (domain.Checks, error) {
+func (f *Fake) Checks(ctx context.Context, ref domain.PRRef) (domain.Checks, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.Health.Online {
-		return domain.Checks{}, ErrOffline
+	if err := f.reachable(ctx); err != nil {
+		return domain.Checks{}, err
 	}
 	pr, ok := f.PRs[ref]
 	if !ok {
@@ -79,7 +95,10 @@ func (f *Fake) Checks(_ context.Context, ref domain.PRRef) (domain.Checks, error
 	return c, nil
 }
 
-func (f *Fake) PullRequest(_ context.Context, ref domain.PRRef) (domain.PullRequest, error) {
+func (f *Fake) PullRequest(ctx context.Context, ref domain.PRRef) (domain.PullRequest, error) {
+	if err := ctx.Err(); err != nil {
+		return domain.PullRequest{}, err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	pr, ok := f.PRs[ref]
@@ -89,7 +108,10 @@ func (f *Fake) PullRequest(_ context.Context, ref domain.PRRef) (domain.PullRequ
 	return pr, nil
 }
 
-func (f *Fake) Commits(_ context.Context, ref domain.PRRef) ([]domain.Commit, error) {
+func (f *Fake) Commits(ctx context.Context, ref domain.PRRef) ([]domain.Commit, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if _, ok := f.PRs[ref]; !ok {
@@ -124,11 +146,19 @@ func (f *Fake) state(ref domain.PRRef) *domain.ReviewState {
 	return s
 }
 
-func (f *Fake) ReviewState(_ context.Context, ref domain.PRRef) (domain.ReviewState, error) {
+func (f *Fake) ReviewState(ctx context.Context, ref domain.PRRef) (domain.ReviewState, error) {
+	st, err := f.readState(ctx, ref)
+	if f.AfterReviewState != nil {
+		f.AfterReviewState()
+	}
+	return st, err
+}
+
+func (f *Fake) readState(ctx context.Context, ref domain.PRRef) (domain.ReviewState, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.Health.Online {
-		return domain.ReviewState{}, ErrOffline
+	if err := f.reachable(ctx); err != nil {
+		return domain.ReviewState{}, err
 	}
 	if _, ok := f.PRs[ref]; !ok {
 		return domain.ReviewState{}, ErrNotFound
@@ -190,11 +220,11 @@ func (f *Fake) byReviewID(reviewID string) (*domain.ReviewState, error) {
 	return nil, fmt.Errorf("review %s: %w", reviewID, ErrNotFound)
 }
 
-func (f *Fake) StartReview(_ context.Context, prID string, commit domain.SHA) (string, error) {
+func (f *Fake) StartReview(ctx context.Context, prID string, commit domain.SHA) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.Health.Online {
-		return "", ErrOffline
+	if err := f.reachable(ctx); err != nil {
+		return "", err
 	}
 	_, s, err := f.byPRID(prID)
 	if err != nil {
@@ -207,10 +237,10 @@ func (f *Fake) StartReview(_ context.Context, prID string, commit domain.SHA) (s
 	return s.Pending.ID, nil
 }
 
-func (f *Fake) AddThread(_ context.Context, reviewID string, t NewThread) error {
+func (f *Fake) AddThread(ctx context.Context, reviewID string, t NewThread) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	s, err := f.writable(func() (*domain.ReviewState, error) { return f.byReviewID(reviewID) })
+	s, err := f.writable(ctx, func() (*domain.ReviewState, error) { return f.byReviewID(reviewID) })
 	if err != nil {
 		return err
 	}
@@ -219,10 +249,10 @@ func (f *Fake) AddThread(_ context.Context, reviewID string, t NewThread) error 
 	return nil
 }
 
-func (f *Fake) PostThread(_ context.Context, ref domain.PRRef, _ domain.SHA, t NewThread) error {
+func (f *Fake) PostThread(ctx context.Context, ref domain.PRRef, _ domain.SHA, t NewThread) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	s, err := f.writable(func() (*domain.ReviewState, error) {
+	s, err := f.writable(ctx, func() (*domain.ReviewState, error) {
 		if s, ok := f.States[ref]; ok {
 			return s, nil
 		}
@@ -237,9 +267,9 @@ func (f *Fake) PostThread(_ context.Context, ref domain.PRRef, _ domain.SHA, t N
 
 // writable finds the state a new thread goes on, failing as AddThread and
 // PostThread do when offline or told to.
-func (f *Fake) writable(find func() (*domain.ReviewState, error)) (*domain.ReviewState, error) {
-	if !f.Health.Online {
-		return nil, ErrOffline
+func (f *Fake) writable(ctx context.Context, find func() (*domain.ReviewState, error)) (*domain.ReviewState, error) {
+	if err := f.reachable(ctx); err != nil {
+		return nil, err
 	}
 	if f.FailAddThread != nil {
 		return nil, f.FailAddThread
@@ -255,11 +285,11 @@ func (f *Fake) addThread(s *domain.ReviewState, t NewThread, pending bool) {
 	})
 }
 
-func (f *Fake) Reply(_ context.Context, reviewID, threadID, body string) error {
+func (f *Fake) Reply(ctx context.Context, reviewID, threadID, body string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.Health.Online {
-		return ErrOffline
+	if err := f.reachable(ctx); err != nil {
+		return err
 	}
 	pending := reviewID != ""
 	for _, s := range f.States {
@@ -281,11 +311,11 @@ func (f *Fake) Reply(_ context.Context, reviewID, threadID, body string) error {
 	return fmt.Errorf("thread %s: %w", threadID, ErrNotFound)
 }
 
-func (f *Fake) SetThreadResolved(_ context.Context, threadID string, resolved bool) error {
+func (f *Fake) SetThreadResolved(ctx context.Context, threadID string, resolved bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.Health.Online {
-		return ErrOffline
+	if err := f.reachable(ctx); err != nil {
+		return err
 	}
 	for _, s := range f.States {
 		for i := range s.Threads {
@@ -299,11 +329,11 @@ func (f *Fake) SetThreadResolved(_ context.Context, threadID string, resolved bo
 	return fmt.Errorf("thread %s: %w", threadID, ErrNotFound)
 }
 
-func (f *Fake) AddConversationComment(_ context.Context, prID, body string) error {
+func (f *Fake) AddConversationComment(ctx context.Context, prID, body string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.Health.Online {
-		return ErrOffline
+	if err := f.reachable(ctx); err != nil {
+		return err
 	}
 	_, s, err := f.byPRID(prID)
 	if err != nil {
@@ -313,11 +343,11 @@ func (f *Fake) AddConversationComment(_ context.Context, prID, body string) erro
 	return nil
 }
 
-func (f *Fake) SetReaction(_ context.Context, subjectID string, r domain.Reaction, on bool) error {
+func (f *Fake) SetReaction(ctx context.Context, subjectID string, r domain.Reaction, on bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.Health.Online {
-		return ErrOffline
+	if err := f.reachable(ctx); err != nil {
+		return err
 	}
 	for _, s := range f.States {
 		if s.PRID == subjectID {
@@ -362,11 +392,11 @@ func react(groups []domain.ReactionGroup, r domain.Reaction, on bool) []domain.R
 	return groups
 }
 
-func (f *Fake) DiscardReview(_ context.Context, reviewID string) error {
+func (f *Fake) DiscardReview(ctx context.Context, reviewID string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.Health.Online {
-		return ErrOffline
+	if err := f.reachable(ctx); err != nil {
+		return err
 	}
 	s, err := f.byReviewID(reviewID)
 	if err != nil {
@@ -384,11 +414,11 @@ func (f *Fake) DiscardReview(_ context.Context, reviewID string) error {
 	return nil
 }
 
-func (f *Fake) SubmitReview(_ context.Context, prID, reviewID string, commit domain.SHA, event domain.ReviewEvent, body string) error {
+func (f *Fake) SubmitReview(ctx context.Context, prID, reviewID string, commit domain.SHA, event domain.ReviewEvent, body string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.Health.Online {
-		return ErrOffline
+	if err := f.reachable(ctx); err != nil {
+		return err
 	}
 	ref, s, err := f.byPRID(prID)
 	if err != nil {
@@ -415,11 +445,11 @@ func (f *Fake) SubmitReview(_ context.Context, prID, reviewID string, commit dom
 	return nil
 }
 
-func (f *Fake) SetViewed(_ context.Context, prID, path string, viewed bool) error {
+func (f *Fake) SetViewed(ctx context.Context, prID, path string, viewed bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.Health.Online {
-		return ErrOffline
+	if err := f.reachable(ctx); err != nil {
+		return err
 	}
 	_, s, err := f.byPRID(prID)
 	if err != nil {
@@ -437,11 +467,11 @@ func (f *Fake) SetViewed(_ context.Context, prID, path string, viewed bool) erro
 // paragraph.
 func renderBody(body string) string { return "<p>" + html.EscapeString(body) + "</p>" }
 
-func (f *Fake) RenderMarkdown(_ context.Context, _ domain.Repo, body string) (string, error) {
+func (f *Fake) RenderMarkdown(ctx context.Context, _ domain.Repo, body string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.Health.Online {
-		return "", ErrOffline
+	if err := f.reachable(ctx); err != nil {
+		return "", err
 	}
 	return renderBody(body), nil
 }
@@ -453,17 +483,17 @@ func (f *Fake) Forget(_ context.Context, ref domain.PRRef) error {
 	return nil
 }
 
-func (f *Fake) EditReviewComment(_ context.Context, commentID, body string) error {
-	return f.editComment(commentID, func(c *domain.Comment) { c.Body, c.BodyHTML = body, renderBody(body) })
+func (f *Fake) EditReviewComment(ctx context.Context, commentID, body string) error {
+	return f.editComment(ctx, commentID, func(c *domain.Comment) { c.Body, c.BodyHTML = body, renderBody(body) })
 }
 
 // DeleteReviewComment removes the comment, and its thread once empty, as
 // GitHub does.
-func (f *Fake) DeleteReviewComment(_ context.Context, commentID string) error {
+func (f *Fake) DeleteReviewComment(ctx context.Context, commentID string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.Health.Online {
-		return ErrOffline
+	if err := f.reachable(ctx); err != nil {
+		return err
 	}
 	for _, s := range f.States {
 		for i := range s.Threads {
@@ -486,15 +516,15 @@ func (f *Fake) DeleteReviewComment(_ context.Context, commentID string) error {
 	return fmt.Errorf("comment %s: %w", commentID, ErrNotFound)
 }
 
-func (f *Fake) EditConversationComment(_ context.Context, commentID, body string) error {
-	return f.editComment(commentID, func(c *domain.Comment) { c.Body, c.BodyHTML = body, renderBody(body) })
+func (f *Fake) EditConversationComment(ctx context.Context, commentID, body string) error {
+	return f.editComment(ctx, commentID, func(c *domain.Comment) { c.Body, c.BodyHTML = body, renderBody(body) })
 }
 
-func (f *Fake) DeleteConversationComment(_ context.Context, commentID string) error {
+func (f *Fake) DeleteConversationComment(ctx context.Context, commentID string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.Health.Online {
-		return ErrOffline
+	if err := f.reachable(ctx); err != nil {
+		return err
 	}
 	for _, s := range f.States {
 		for i, c := range s.Conversation {
@@ -508,11 +538,11 @@ func (f *Fake) DeleteConversationComment(_ context.Context, commentID string) er
 }
 
 // editComment applies change to the comment with id, wherever it is.
-func (f *Fake) editComment(id string, change func(*domain.Comment)) error {
+func (f *Fake) editComment(ctx context.Context, id string, change func(*domain.Comment)) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.Health.Online {
-		return ErrOffline
+	if err := f.reachable(ctx); err != nil {
+		return err
 	}
 	for _, s := range f.States {
 		for i := range s.Conversation {

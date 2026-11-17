@@ -10,7 +10,9 @@ func (s *Server) forgetPR(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if err := s.review.ForgetPR(r.Context(), ref); err != nil {
+	ctx, cancel := writeContext(r)
+	defer cancel()
+	if err := s.review.ForgetPR(ctx, ref); err != nil {
 		s.fail(w, r, err)
 		return
 	}

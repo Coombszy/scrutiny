@@ -71,7 +71,10 @@ func (s *Service) ForgetPR(ctx context.Context, ref domain.PRRef) error {
 	if err := s.closeWorkspaces(ctx, ref); err != nil {
 		return err
 	}
-	if err := s.Cache.Delete(ctx, snapshotKey(ref)); err != nil {
+	unlock := s.lockPR(ref)
+	err := s.Cache.Delete(ctx, snapshotKey(ref))
+	unlock()
+	if err != nil {
 		return err
 	}
 	if err := s.Cache.DeletePrefix(ctx, "mergebase:"+ref.String()+":"); err != nil {

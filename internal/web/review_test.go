@@ -1,12 +1,15 @@
 package web_test
 
 import (
-	"golang.org/x/net/html"
+	"context"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/net/html"
 
 	"github.com/Coombszy/scrutiny/internal/codehost"
 	"github.com/Coombszy/scrutiny/internal/domain"
@@ -230,6 +233,36 @@ func TestViewedIsSynced(t *testing.T) {
 	rec := a.do(t, http.MethodPost, prPath+"/viewed", url.Values{"path": {"parser.go"}, "viewed": {"true"}})
 	if rec.Code != http.StatusNoContent || a.host.State(ref).Viewed["parser.go"] != domain.Viewed {
 		t.Errorf("status %d, viewed %q", rec.Code, a.host.State(ref).Viewed["parser.go"])
+	}
+}
+
+func TestWritesFinishWhenTheBrowserLeaves(t *testing.T) {
+	for _, tc := range []struct {
+		name, path string
+		form       url.Values
+		done       func(a *app) bool
+	}{
+		{"viewed", "/viewed", url.Values{"path": {"parser.go"}, "viewed": {"true"}},
+			func(a *app) bool { return a.host.State(ref).Viewed["parser.go"] == domain.Viewed }},
+		{"comment", "/comments", url.Values{"body": {"Ship it"}},
+			func(a *app) bool { return len(a.host.State(ref).Conversation) == 1 }},
+		{"submit", "/review", url.Values{"head": {string(c2)}, "event": {"APPROVE"}},
+			func(a *app) bool { return len(a.host.Submissions) == 1 }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a := newApp(t)
+			a.do(t, http.MethodGet, prPath, nil)
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel() // the browser has already gone
+			req := httptest.NewRequest(http.MethodPost, prPath+tc.path, strings.NewReader(tc.form.Encode())).WithContext(ctx)
+			req.Host = "127.0.0.1:7878"
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Set("X-CSRF-Token", token)
+			a.handler.ServeHTTP(httptest.NewRecorder(), req)
+			if !tc.done(a) {
+				t.Error("the write did not reach the code host")
+			}
+		})
 	}
 }
 

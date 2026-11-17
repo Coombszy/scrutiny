@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Coombszy/scrutiny/internal/cache"
@@ -46,8 +47,26 @@ type snapshot struct {
 
 func snapshotKey(ref domain.PRRef) string { return "review:" + ref.String() }
 
+// lockPR holds ref's lock, returning its unlock. Everything that reads the
+// review state and saves it holds the lock throughout, so a read begun
+// before a write cannot save over what the write re-read.
+func (s *Service) lockPR(ref domain.PRRef) (unlock func()) {
+	mu, _ := s.prLocks.LoadOrStore(ref, &sync.Mutex{})
+	mu.(*sync.Mutex).Lock()
+	return mu.(*sync.Mutex).Unlock
+}
+
 // snapshot returns the cached snapshot for ref, reading it fresh if absent.
 func (s *Service) snapshot(ctx context.Context, ref domain.PRRef) (snapshot, error) {
+	if snap, ok, err := s.cachedSnapshot(ctx, ref); err != nil || ok {
+		return snap, err
+	}
+	defer s.lockPR(ref)()
+	return s.snapshotLocked(ctx, ref)
+}
+
+// snapshotLocked is snapshot for a caller holding ref's lock.
+func (s *Service) snapshotLocked(ctx context.Context, ref domain.PRRef) (snapshot, error) {
 	if snap, ok, err := s.cachedSnapshot(ctx, ref); err != nil || ok {
 		return snap, err
 	}
@@ -63,7 +82,7 @@ func (s *Service) snapshot(ctx context.Context, ref domain.PRRef) (snapshot, err
 }
 
 // readState reads the review state from the code host and caches it,
-// keeping the cached Checks.
+// keeping the cached Checks. The caller holds ref's lock.
 func (s *Service) readState(ctx context.Context, ref domain.PRRef, head, mergeBase domain.SHA) (snapshot, error) {
 	st, err := s.CodeHost.ReviewState(ctx, ref)
 	if err != nil {
@@ -101,7 +120,13 @@ func (s *Service) saveSnapshot(ctx context.Context, ref domain.PRRef, snap snaps
 // re-read even when the write fails, since part of it may have happened
 // (e.g. a Pending Review created before its first thread was refused).
 func (s *Service) write(ctx context.Context, ref domain.PRRef, fn func(snapshot) error) (snapshot, error) {
-	snap, err := s.snapshot(ctx, ref)
+	defer s.lockPR(ref)()
+	return s.writeLocked(ctx, ref, fn)
+}
+
+// writeLocked is write for a caller holding ref's lock.
+func (s *Service) writeLocked(ctx context.Context, ref domain.PRRef, fn func(snapshot) error) (snapshot, error) {
+	snap, err := s.snapshotLocked(ctx, ref)
 	if err != nil {
 		return snapshot{}, err
 	}
@@ -328,7 +353,10 @@ var discardBackoff = []time.Duration{250 * time.Millisecond, 500 * time.Millisec
 // reloaded afterwards does not show them. If they outlast the backoff, the
 // next poll catches up.
 func (s *Service) Discard(ctx context.Context, ref domain.PRRef) error {
-	snap, err := s.write(ctx, ref, func(snap snapshot) error {
+	// The lock is held through the re-reads too, so a poll cannot save
+	// the discarded comments back meanwhile.
+	defer s.lockPR(ref)()
+	snap, err := s.writeLocked(ctx, ref, func(snap snapshot) error {
 		p := snap.State.Pending
 		if p == nil {
 			return ErrNoPendingReview

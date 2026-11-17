@@ -29,6 +29,9 @@ func (c *Client) RenderMarkdown(ctx context.Context, repo domain.Repo, body stri
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
+		if ctx.Err() != nil {
+			return "", ctx.Err() // the caller gave up, which says nothing about GitHub
+		}
 		c.status.failed()
 		return "", fmt.Errorf("POST /markdown: %w: %v", codehost.ErrOffline, err)
 	}

@@ -41,7 +41,8 @@ func (u Update) Empty() bool {
 }
 
 // readFresh reads the review state and Checks, falling back to the cached
-// snapshot (marked Offline) when the code host is unreachable.
+// snapshot (marked Offline) when the code host is unreachable. The caller
+// holds ref's lock.
 func (s *Service) readFresh(ctx context.Context, ref domain.PRRef, head, mergeBase domain.SHA) (snapshot, error) {
 	snap, err := s.readState(ctx, ref, head, mergeBase)
 	if errors.Is(err, codehost.ErrOffline) {
@@ -67,7 +68,8 @@ func (s *Service) readFresh(ctx context.Context, ref domain.PRRef, head, mergeBa
 
 // Poll re-reads the PR and reports what changed since the last read.
 func (s *Service) Poll(ctx context.Context, ref domain.PRRef) (Update, error) {
-	prev, err := s.snapshot(ctx, ref)
+	defer s.lockPR(ref)()
+	prev, err := s.snapshotLocked(ctx, ref)
 	if err != nil {
 		return Update{}, err
 	}

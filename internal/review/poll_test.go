@@ -2,8 +2,11 @@ package review_test
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/Coombszy/scrutiny/internal/codehost"
 	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/repostore"
 	"github.com/Coombszy/scrutiny/internal/review"
@@ -166,5 +169,59 @@ func TestPollReportsNewlySubmittedReviews(t *testing.T) {
 	}
 	if !u.ConversationChanged || len(u.Conversation.Reviews) != 1 || u.Conversation.Reviews[0].Verdict != domain.ReviewApproved {
 		t.Errorf("Update = %+v", u)
+	}
+}
+
+// A poll whose read began before a write must not save over the state the
+// write re-read: the Pending Review would vanish from the cache, and the
+// next poll would announce the viewer's own thread as new.
+func TestAPollOverlappingAWriteKeepsTheWrite(t *testing.T) {
+	f := newFixture(t)
+	f.openPage(t)
+	ctx := context.Background()
+
+	read, release := make(chan struct{}), make(chan struct{})
+	var paused atomic.Bool
+	f.host.AfterReviewState = func() {
+		if paused.CompareAndSwap(false, true) { // only the poll's read pauses
+			close(read)
+			<-release
+		}
+	}
+	polled := make(chan error)
+	go func() {
+		_, err := f.svc.Poll(ctx, ref)
+		polled <- err
+	}()
+	<-read
+
+	wrote := make(chan error)
+	go func() {
+		_, err := f.svc.AddThread(ctx, ref, mb, c3, codehost.NewThread{Path: "a.go", Line: 2, Side: domain.Right, Body: "x"}, true)
+		wrote <- err
+	}()
+	var writeErr error
+	writeDone := false
+	select {
+	case writeErr = <-wrote: // no lock: the write ran during the poll's read
+		writeDone = true
+	case <-time.After(100 * time.Millisecond): // the write waits for the poll
+	}
+	close(release)
+	if err := <-polled; err != nil {
+		t.Fatal(err)
+	}
+	if !writeDone {
+		writeErr = <-wrote
+	}
+	if writeErr != nil {
+		t.Fatal(writeErr)
+	}
+
+	if a, err := f.svc.Anchors(ctx, ref); err != nil || a.Pending == nil {
+		t.Errorf("cached Pending Review = %+v (err %v), want the one the write started", a.Pending, err)
+	}
+	if u, err := f.svc.Poll(ctx, ref); err != nil || u.NewThreads != 0 {
+		t.Errorf("next poll NewThreads = %d (err %v), want 0 for the viewer's own thread", u.NewThreads, err)
 	}
 }

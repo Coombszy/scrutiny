@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Coombszy/scrutiny/internal/cache"
@@ -48,6 +49,8 @@ type Deps struct {
 type Service struct {
 	Deps
 	ws workspaces
+	// prLocks holds a *sync.Mutex per PR; see lockPR.
+	prLocks sync.Map
 }
 
 func NewService(d Deps) *Service {
@@ -183,7 +186,9 @@ func (s *Service) PRPage(ctx context.Context, ref domain.PRRef, req ComparisonRe
 		return PRPage{}, err
 	}
 	slices.SortStableFunc(files, func(a, b FileEntry) int { return TreeOrder(a.Path, b.Path) })
+	unlock := s.lockPR(ref)
 	snap, err := s.readFresh(ctx, ref, pr.HeadSHA, mergeBase)
+	unlock()
 	if err != nil {
 		return PRPage{}, err
 	}

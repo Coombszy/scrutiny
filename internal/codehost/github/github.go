@@ -170,6 +170,9 @@ func (c *Client) get(ctx context.Context, path string, v any) (link string, err 
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
+		if ctx.Err() != nil {
+			return "", ctx.Err() // the caller gave up, which says nothing about GitHub
+		}
 		c.status.failed()
 		if hasCached {
 			return cachedLink(cached), json.Unmarshal(cachedBody(cached.Value), v)
@@ -220,6 +223,9 @@ func (c *Client) post(ctx context.Context, path string, v any) error {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err() // the caller gave up, which says nothing about GitHub
+		}
 		c.status.failed()
 		return fmt.Errorf("POST %s: %w: %v", path, codehost.ErrOffline, err)
 	}

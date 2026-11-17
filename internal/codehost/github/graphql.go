@@ -39,6 +39,9 @@ func (c *Client) graphql(ctx context.Context, query string, vars map[string]any,
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err() // the caller gave up, which says nothing about GitHub
+		}
 		c.status.failed()
 		return fmt.Errorf("graphql: %w: %v", codehost.ErrOffline, err)
 	}

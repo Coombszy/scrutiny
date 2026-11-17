@@ -112,6 +112,12 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, status int, 
 		return // the browser went away; there is no one to render for
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if r.Header.Get("HX-Request") != "true" {
+		// Back and Forward would otherwise show the page as first served,
+		// without the changes htmx made since, and live updates would not
+		// repair it.
+		w.Header().Set("Cache-Control", "no-store")
+	}
 	w.WriteHeader(status)
 	page.CSRFToken = s.csrfToken
 	page.AuthFailed = s.review.Status().Unauthorized
@@ -154,6 +160,9 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, review.ErrInvalidComparison), errors.Is(err, review.ErrInvalidReaction),
 		errors.Is(err, review.ErrInvalidEvent), errors.Is(err, review.ErrBadPath), errors.Is(err, errBadRequest):
 		status = http.StatusBadRequest
+	case errors.Is(err, context.DeadlineExceeded):
+		status = http.StatusGatewayTimeout
+		err = errors.New("GitHub did not answer in time; reload to see what happened")
 	case errors.Is(err, context.Canceled) && r.Context().Err() != nil:
 		return // the browser went away; there is no one to tell
 	default:

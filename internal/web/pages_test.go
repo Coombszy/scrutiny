@@ -336,3 +336,20 @@ func TestDashboardListsFinishFetchingWhenTheBrowserGivesUp(t *testing.T) {
 		t.Errorf("logged an error for a browser that went away:\n%s", logs.String())
 	}
 }
+
+func TestFullPagesAreNotStoredForBackNavigation(t *testing.T) {
+	a := newApp(t)
+	for _, path := range []string{"/", prPath, "/settings"} {
+		if got := a.do(t, http.MethodGet, path, nil).Header().Get("Cache-Control"); got != "no-store" {
+			t.Errorf("%s: Cache-Control = %q, want no-store", path, got)
+		}
+	}
+	req := httptest.NewRequest(http.MethodGet, fileURL(), nil)
+	req.Host = "127.0.0.1:7878"
+	req.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+	a.handler.ServeHTTP(rec, req)
+	if got := rec.Header().Get("Cache-Control"); got != "" {
+		t.Errorf("htmx fragment: Cache-Control = %q, want none", got)
+	}
+}
