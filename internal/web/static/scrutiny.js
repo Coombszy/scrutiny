@@ -1942,10 +1942,76 @@ window.Scrutiny = { actions: {} };
         actions[shortcuts[e.key.toLowerCase()]](box);
         return;
       }
-      if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && !e.isComposing) continueList(e, box);
+      if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && !e.isComposing) {
+        if (codeBlock(box)) keepIndent(e, box);
+        else continueList(e, box);
+      }
+      if (e.key === "Tab" && !e.ctrlKey && !e.metaKey && !e.altKey) indent(e, box);
     },
     true,
   );
+
+  // codeBlock is the lines of the fenced code block (a suggestion or any
+  // other) holding the whole selection, or null outside one.
+  function codeBlock(box) {
+    const { value, selectionStart: s, selectionEnd: e } = box;
+    let fence = null;
+    let body = 0;
+    let at = 0;
+    for (const line of value.split("\n")) {
+      const end = at + line.length;
+      const m = line.match(/^ {0,3}(`{3,}|~{3,})/);
+      if (!fence && m) {
+        fence = m[1];
+        body = end + 1;
+      } else if (fence && m && m[1][0] === fence[0] && m[1].length >= fence.length && line.trim() === m[1]) {
+        if (s >= body && e < at) return value.slice(body, Math.max(body, at - 1)).split("\n");
+        if (s < body) return null;
+        fence = null;
+      }
+      at = end + 1;
+    }
+    return fence && s >= body ? value.slice(body).split("\n") : null;
+  }
+
+  // indentUnit is one level of indent as the block's code already uses it:
+  // a tab, or its narrowest run of leading spaces (four when nothing is
+  // indented yet).
+  function indentUnit(code) {
+    if (code.some((l) => l.startsWith("\t"))) return "\t";
+    const widths = code.map((l) => l.match(/^ */)[0].length).filter((n) => n > 0 && n < 9);
+    return " ".repeat(widths.length ? Math.min(...widths) : 4);
+  }
+
+  // Enter in a fenced code block starts the new line at the indent of the
+  // one it breaks.
+  function keepIndent(e, box) {
+    e.preventDefault();
+    const { value, selectionStart: s, selectionEnd: end } = box;
+    const start = value.lastIndexOf("\n", s - 1) + 1;
+    const text = "\n" + value.slice(start, s).match(/^[ \t]*/)[0];
+    replace(box, s, end, text, s + text.length);
+  }
+
+  // Tab and Shift+Tab in a fenced code block indent and outdent the
+  // selected lines, as in an editor; elsewhere Tab still moves focus on.
+  function indent(e, box) {
+    const code = codeBlock(box);
+    if (!code) return;
+    e.preventDefault();
+    const unit = indentUnit(code);
+    const { value, selectionStart: s, selectionEnd: end } = box;
+    if (!e.shiftKey && !value.slice(s, end).includes("\n")) return replace(box, s, end, unit, s + unit.length);
+    const { start, end: stop, text } = lines(box);
+    const outdent = (l) => l.slice(l.startsWith("\t") ? 1 : Math.min(l.match(/^ */)[0].length, unit.length));
+    const out = text.map((l) => (e.shiftKey ? outdent(l) : l === "" ? l : unit + l)).join("\n");
+    if (out === text.join("\n")) return;
+    if (s === end) {
+      const caret = s + out.length - text[0].length;
+      return replace(box, start, stop, out, Math.max(start, caret));
+    }
+    replace(box, start, stop, out, start, start + out.length);
+  }
 
   // Enter in a list item starts the next one; on an empty item it ends
   // the list instead.
