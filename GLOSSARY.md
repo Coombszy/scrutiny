@@ -73,7 +73,7 @@ The period after a Language Server starts and before it can answer navigation re
 _Avoid_: Loading, warming up
 
 **PR Weighting**:
-Ranking search results so files and symbols added or removed by the PR come before the rest of the repo.
+Ranking search results by giving files and symbols added or removed by the PR a score bonus over the rest of the repo, so they lead among comparable matches without burying a much better one.
 _Avoid_: Boost, priority
 
 **Symbol Search**:

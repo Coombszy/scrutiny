@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"math"
 	"path"
 	"slices"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/highlight"
@@ -385,9 +387,15 @@ type SearchResult struct {
 
 const searchLimit = 50
 
+// prWeighting is the score bonus for what the PR added or removed: more than
+// a match in a path's directories rather than its file name loses (100), but
+// less than three broken runs cost (60 each).
+const prWeighting = 150
+
 // SymbolSearch fuzzy-matches query against the repo's files and symbols at
-// the PR's head, putting what the PR added or removed first (PR Weighting)
-// and marking it. Among the rest, anything else the PR changed wins ties.
+// the PR's head, giving what the PR added or removed a bonus (PR Weighting)
+// and marking it. Among equal scores, shorter names and then anything else
+// the PR changed win.
 func (s *Service) SymbolSearch(ctx context.Context, ref domain.PRRef, query string) ([]SearchResult, error) {
 	snap, err := s.snapshot(ctx, ref)
 	if err != nil {
@@ -405,6 +413,9 @@ func (s *Service) SymbolSearch(ctx context.Context, ref domain.PRRef, query stri
 	add := func(r SearchResult, target string) {
 		if score, ok := fuzzyScore(query, target); ok {
 			r.score = score
+			if r.Marker != MarkerNone {
+				r.score += prWeighting
+			}
 			results = append(results, r)
 		}
 	}
@@ -431,8 +442,8 @@ func (s *Service) SymbolSearch(ctx context.Context, ref domain.PRRef, query stri
 
 	slices.SortFunc(results, func(a, b SearchResult) int {
 		return cmp.Or(
-			compareBool(a.Marker != MarkerNone, b.Marker != MarkerNone),
 			cmp.Compare(b.score, a.score),
+			cmp.Compare(len([]rune(a.Name)), len([]rune(b.Name))),
 			compareBool(a.InPR, b.InPR),
 			compareBool(a.Kind != "file", b.Kind != "file"),
 			cmp.Compare(a.Name, b.Name),
@@ -511,31 +522,71 @@ func compareBool(a, b bool) int {
 }
 
 // fuzzyScore matches query's characters in order within target, ignoring
-// case. Matches at word starts and runs of consecutive matches score more,
-// and shorter targets win ties.
+// case, where each character either starts a word or carries on from the
+// one before. The best such match scores, and fewer,
+// longer runs score more; a match wholly within a path's last segment (all
+// of a symbol's name) scores more again.
 func fuzzyScore(query, target string) (int, bool) {
 	if query == "" {
 		return 0, true
 	}
-	q, t := []rune(strings.ToLower(query)), []rune(target)
-	lower := []rune(strings.ToLower(target))
-	score, qi, prev := 0, 0, -2
-	for ti := 0; ti < len(t) && qi < len(q); ti++ {
-		if lower[ti] != q[qi] {
-			continue
-		}
-		score += 10
-		if ti == prev+1 {
-			score += 50
-		}
-		if ti == 0 || strings.ContainsRune("/_-. ", t[ti-1]) || (t[ti] >= 'A' && t[ti] <= 'Z' && t[ti-1] >= 'a' && t[ti-1] <= 'z') {
-			score += 100
-		}
-		prev = ti
-		qi++
-	}
-	if qi < len(q) {
+	q := []rune(strings.ToLower(query))
+	score, ok := align(q, []rune(target))
+	if !ok {
 		return 0, false
 	}
-	return score*100 - len(t), true
+	if base, ok := align(q, []rune(target[strings.LastIndexByte(target, '/')+1:])); ok {
+		score = max(score, base+100)
+	}
+	return score, true
+}
+
+// align finds the best placement of q's runes in order within t, ignoring
+// case: for each rune of q and position in t, the best score with that rune
+// matched there.
+func align(q, t []rune) (int, bool) {
+	const none = math.MinInt / 2
+	prev, cur := make([]int, len(t)), make([]int, len(t))
+	for i, r := range q {
+		gapped := none // the best of prev before t[j-1], for a match after a gap
+		for j := range t {
+			cur[j] = none
+			if j >= 2 {
+				gapped = max(gapped, prev[j-2])
+			}
+			if unicode.ToLower(t[j]) != r {
+				continue
+			}
+			start := wordStart(t, j)
+			switch {
+			case i == 0:
+				if start {
+					cur[j] = 110
+				}
+			default:
+				if j > 0 && prev[j-1] > none {
+					cur[j] = prev[j-1] + 70
+				}
+				if start && gapped > none {
+					cur[j] = max(cur[j], gapped+10)
+				}
+			}
+		}
+		prev, cur = cur, prev
+	}
+	best := slices.Max(append(prev, none))
+	return best, best > none
+}
+
+// wordStart reports whether t[j] starts a word: the first rune, one after a
+// separator, a camelCase hump, or the last capital of an acronym before a
+// lowercase run (the S of HTTPServer).
+func wordStart(t []rune, j int) bool {
+	if j == 0 || strings.ContainsRune("/_-. ", t[j-1]) {
+		return true
+	}
+	if !unicode.IsUpper(t[j]) {
+		return false
+	}
+	return unicode.IsLower(t[j-1]) || j+1 < len(t) && unicode.IsLower(t[j+1])
 }

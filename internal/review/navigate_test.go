@@ -3,6 +3,7 @@ package review_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/Coombszy/scrutiny/internal/domain"
@@ -116,7 +117,8 @@ func TestSymbolSearchWeightsThePRsFilesAndSymbolsFirst(t *testing.T) {
 	for _, r := range got {
 		rows = append(rows, row{r.Name, r.Marker})
 	}
-	// PR items first; within each group the better match first.
+	// Equal matches: the bonus puts the PR's items first, even over the rest's
+	// file-name matches.
 	want := []row{
 		{"Parse", review.MarkerAdded},
 		{"parser/new.go", review.MarkerAdded},
@@ -194,7 +196,7 @@ func TestSymbolSearchRanksAnExactMatchAboveAnUnchangedSymbolInAModifiedFile(t *t
 	f.repos.Blobs[c3] = map[string]string{"a.go": ""}
 	f.nav.AllSymbols = []navigator.Symbol{
 		{Name: "Loader", Kind: "struct", Location: navigator.Location{Path: "lib/load.go", Line: 3}},
-		{Name: "LoadOrder", Kind: "function", Location: navigator.Location{Path: "a.go", Line: 1}},
+		{Name: "LoaderCache", Kind: "function", Location: navigator.Location{Path: "a.go", Line: 1}},
 	}
 	if _, err := f.svc.PRPage(context.Background(), ref, review.ComparisonRequest{}); err != nil {
 		t.Fatal(err)
@@ -205,6 +207,79 @@ func TestSymbolSearchRanksAnExactMatchAboveAnUnchangedSymbolInAModifiedFile(t *t
 	}
 	if len(got) != 2 || got[0].Name != "Loader" {
 		t.Errorf("results = %+v, want the exact match first", got)
+	}
+}
+
+// searchNames runs Symbol Search over files that are all outside the PR.
+func searchNames(t *testing.T, files []string, query string) []string {
+	t.Helper()
+	f := newFixture(t)
+	f.withDiff(mb, c3)
+	blobs := map[string]string{}
+	for _, p := range files {
+		blobs[p] = ""
+	}
+	f.repos.Blobs[c3] = blobs
+	if _, err := f.svc.PRPage(context.Background(), ref, review.ComparisonRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := f.svc.SymbolSearch(context.Background(), ref, query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, r := range got {
+		names = append(names, r.Name)
+	}
+	return names
+}
+
+func TestSymbolSearchMatchesOnlyAtWordStartsAndRunsFromThem(t *testing.T) {
+	files := []string{"internal/canvas.go", "lib/CloseOnFailingGate.go", "internal/review/navigate.go", "lib/HTTPServer.go"}
+	for _, tc := range []struct{ query, want string }{
+		{"nav", "internal/review/navigate.go"}, // not the "nva" inside "canvas"
+		{"config", ""},                         // c, on and f start words, but i and g don't
+		{"hse", "lib/HTTPServer.go"},           // the S after HTTP starts a word
+	} {
+		got := searchNames(t, files, tc.query)
+		if want := []string{tc.want}; tc.want == "" && len(got) != 0 || tc.want != "" && !slices.Equal(got, want) {
+			t.Errorf("%q: results = %v, want %v", tc.query, got, tc.want)
+		}
+	}
+}
+
+func TestSymbolSearchFindsTheBestPlaceForTheQueryInAPath(t *testing.T) {
+	// The first word starts give n, Av and nothing more; the best match is
+	// the whole word "Nav" in "Navigate", one run rather than two.
+	got := searchNames(t, []string{"lib/nameAvailable.go", "lib/newAvatarNavigate.go"}, "nav")
+	if len(got) != 2 || got[0] != "lib/newAvatarNavigate.go" {
+		t.Errorf("results = %v, want newAvatarNavigate.go first", got)
+	}
+}
+
+func TestSymbolSearchPrefersMatchesInTheFileName(t *testing.T) {
+	got := searchNames(t, []string{"parser/a.go", "lib/parser.go"}, "parser")
+	if len(got) != 2 || got[0] != "lib/parser.go" {
+		t.Errorf("results = %v, want lib/parser.go first", got)
+	}
+}
+
+func TestSymbolSearchRanksAnExactMatchAboveAWeakMatchThePRAdded(t *testing.T) {
+	f := newFixture(t)
+	f.withDiff(mb, c3)
+	pair := repostore.Pair{From: mb, To: c3}
+	f.repos.ChangeSets[pair] = append(f.repos.ChangeSets[pair],
+		domain.FileChange{Path: "lib/pin_and_route_setup_engine.go", OldPath: "lib/pin_and_route_setup_engine.go", Status: domain.Added})
+	f.repos.Blobs[c3] = map[string]string{"lib/pin_and_route_setup_engine.go": "", "lib/parse.go": ""}
+	if _, err := f.svc.PRPage(context.Background(), ref, review.ComparisonRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := f.svc.SymbolSearch(context.Background(), ref, "parse")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].Name != "lib/parse.go" || got[1].Marker != review.MarkerAdded {
+		t.Errorf("results = %+v, want the exact match before the PR's added file", got)
 	}
 }
 
