@@ -944,6 +944,181 @@ window.Scrutiny = { actions: {} };
   if (document.getElementById("dashboard-lists")) Scrutiny.actions.symbol_search = Scrutiny.actions.pr_search;
 })();
 
+// The file header stuck below the top bar is marked .stuck and stretched
+// across the page; --stuck-height sizes the File Tree's head to match it.
+(() => {
+  "use strict";
+  const sections = [...document.querySelectorAll(".pr-files-main > .file")];
+  if (!sections.length) return;
+  const root = document.documentElement;
+  let stuck = null;
+  let queued = false;
+  function update() {
+    queued = false;
+    const bar = Scrutiny.barBottom();
+    // Sections are in page order: find the first still reaching below the bar.
+    let lo = 0;
+    let hi = sections.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (sections[mid].getBoundingClientRect().bottom > bar) hi = mid;
+      else lo = mid + 1;
+    }
+    const section = sections[lo];
+    const header = section && section.getBoundingClientRect().top < bar ? section.querySelector(":scope > .file-header") : null;
+    if (header !== stuck) {
+      stuck?.classList.remove("stuck");
+      header?.classList.add("stuck");
+      stuck = header;
+      sections[0].closest(".pr-files")?.classList.toggle("has-stuck", !!header);
+    }
+    if (header) {
+      const r = header.getBoundingClientRect();
+      header.style.setProperty("--stuck-left", `${-r.left}px`);
+      header.style.setProperty("--stuck-width", `${root.clientWidth}px`);
+    }
+    if (header) root.style.setProperty("--stuck-height", `${header.offsetHeight}px`);
+  }
+  const queue = () => {
+    if (!queued) requestAnimationFrame(update);
+    queued = true;
+  };
+  addEventListener("scroll", queue, { passive: true });
+  addEventListener("resize", queue);
+  // Opening or collapsing the File Tree moves the files without a resize of the page.
+  const resize = new ResizeObserver(queue);
+  resize.observe(document.body);
+  resize.observe(sections[0].parentElement);
+  update();
+})();
+
+// The File Tree. Its eye marks the Current File: the file section under
+// the mouse pointer, checked again on scroll since that moves the page under
+// a still pointer. Anywhere else keeps the last one, and the tree never
+// scrolls to follow it.
+(() => {
+  "use strict";
+  const files = document.querySelector(".pr-files");
+  if (!files) return;
+  const rows = new Map([...files.querySelectorAll("[data-tree-file]")].map((a) => [a.dataset.treeFile, a]));
+  let current = null;
+  function setCurrent(id) {
+    const row = rows.get(id);
+    if (!row || row === current) return;
+    current?.classList.remove("current");
+    row.classList.add("current");
+    current = row;
+  }
+
+  let pointer = null; // the last pointer position over the page, if any
+  let queued = false;
+  function check() {
+    queued = false;
+    if (!pointer) return;
+    const section = document.elementFromPoint(pointer.x, pointer.y)?.closest(".file[data-path]");
+    if (section) setCurrent(section.id);
+  }
+  const queue = () => {
+    if (!queued) requestAnimationFrame(check);
+    queued = true;
+  };
+  document.addEventListener("pointermove", (e) => {
+    pointer = { x: e.clientX, y: e.clientY };
+    queue();
+  }, { passive: true });
+  document.addEventListener("pointerout", (e) => {
+    if (!e.relatedTarget) pointer = null; // it left the window
+  });
+  addEventListener("scroll", queue, { passive: true });
+
+  // A click jumps to the file, held in place while lazy diffs above it load,
+  // and makes it the Current File. Viewed files stay collapsed.
+  files.addEventListener("click", (e) => {
+    const row = e.target.closest("[data-tree-file]");
+    if (!row || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+    const section = document.getElementById(row.dataset.treeFile);
+    if (!section) return;
+    e.preventDefault();
+    if (location.hash !== "#" + section.id) history.pushState(null, "", "#" + section.id);
+    Scrutiny.pin(section);
+    setCurrent(section.id);
+  });
+
+  document.addEventListener("change", (e) => {
+    if (!e.target.matches(".viewed-toggle input")) return;
+    const id = e.target.closest(".file")?.id;
+    rows.get(id)?.classList.toggle("viewed", e.target.checked);
+  });
+
+  // Collapsing is saved to the config file.
+  function toggle() {
+    const state = files.dataset.fileTree === "open" ? "collapsed" : "open";
+    files.dataset.fileTree = state;
+    htmx.ajax("POST", "/settings/file-tree", { values: { state }, swap: "none", source: files });
+  }
+  files.addEventListener("click", (e) => {
+    if (e.target.closest("[data-file-tree-toggle]")) toggle();
+  });
+  Scrutiny.actions.toggle_file_tree = toggle;
+
+  // The tree's width is dragged from its edge (or stepped with the arrow
+  // keys there) and kept in this browser only; double-clicking resets it.
+  const widthKey = "scrutiny.fileTreeWidth";
+  const handle = files.querySelector("[data-file-tree-resize]");
+  const tree = files.querySelector(".file-tree");
+  const clamp = (w) => Math.round(Math.min(Math.max(w, 160), innerWidth / 2));
+  function setWidth(w, save) {
+    files.style.setProperty("--file-tree-width", `${clamp(w)}px`);
+    if (!save) return;
+    try {
+      localStorage.setItem(widthKey, String(clamp(w)));
+    } catch {}
+  }
+  try {
+    const saved = Number(localStorage.getItem(widthKey));
+    if (saved > 0) setWidth(saved, false);
+  } catch {}
+  // A cancelled pointerdown stops the browser counting clicks, so a double
+  // click is two presses close together.
+  let lastPress = 0;
+  function reset() {
+    files.style.removeProperty("--file-tree-width");
+    try {
+      localStorage.removeItem(widthKey);
+    } catch {}
+  }
+  handle?.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const now = Date.now();
+    const double = now - lastPress < 400;
+    lastPress = double ? 0 : now;
+    if (double) return reset();
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add("dragging");
+    document.body.classList.add("resizing");
+    const left = tree.getBoundingClientRect().left;
+    let moved = false;
+    const move = (e) => {
+      moved = true;
+      setWidth(e.clientX - left, false);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("lostpointercapture", () => {
+      handle.removeEventListener("pointermove", move);
+      handle.classList.remove("dragging");
+      document.body.classList.remove("resizing");
+      if (moved) setWidth(tree.getBoundingClientRect().width, true);
+    }, { once: true });
+  });
+  handle?.addEventListener("keydown", (e) => {
+    const step = { ArrowLeft: -16, ArrowRight: 16 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    setWidth(tree.getBoundingClientRect().width + step, true);
+  });
+})();
+
 // Hotkeys and the Command Palette.
 (() => {
   "use strict";
@@ -957,6 +1132,7 @@ window.Scrutiny = { actions: {} };
     prev_comment: "Previous comment",
     current_comment: "Go to the selected comment",
     toggle_view_mode: "Toggle split/unified diff",
+    toggle_file_tree: "Toggle the File Tree",
     refresh: "Refresh",
     help: "Show keyboard shortcuts",
     back_to_pr: "Back to the pull request",

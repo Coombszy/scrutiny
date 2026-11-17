@@ -66,6 +66,15 @@ func TestInvalidViewModeIsRejected(t *testing.T) {
 	}
 }
 
+func TestInvalidFileTreeIsRejected(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	write(t, path, "file_tree = \"hidden\"\n")
+
+	if _, err := tomlfile.New(path).Load(); err == nil {
+		t.Fatal("Load() succeeded, want an error for an unknown file_tree")
+	}
+}
+
 func write(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {

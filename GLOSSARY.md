@@ -94,6 +94,14 @@ _Avoid_: Settings search, command menu
 Whether a diff is shown Split (side-by-side) or Unified.
 _Avoid_: Layout, diff style
 
+**File Tree**:
+The collapsible folder tree of a Comparison's changed files beside the diff, showing each file's change status and jumping to it on click.
+_Avoid_: Sidebar, file list, file navigator
+
+**Current File**:
+The file in the diff the mouse pointer is over, marked with an eye in the File Tree; not to be confused with Viewed.
+_Avoid_: Active file, selected file, focused file
+
 **Theme**:
 A named set of colours for both the interface and syntax highlighting.
 _Avoid_: Colour scheme, skin

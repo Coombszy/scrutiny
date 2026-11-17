@@ -15,6 +15,7 @@ func settingsForm(change func(url.Values)) url.Values {
 	v := url.Values{
 		"theme":              {"gruvbox-dark"},
 		"view_mode":          {"split"},
+		"file_tree":          {"open"},
 		"collapse_threshold": {"1000"},
 		"port":               {"7878"},
 	}

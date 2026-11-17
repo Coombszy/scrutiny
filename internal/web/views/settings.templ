@@ -23,6 +23,7 @@ var keyLabels = []struct{ Action, Label string }{
 	{"prev_comment", "Previous comment"},
 	{"current_comment", "Go to the selected comment"},
 	{"toggle_view_mode", "Toggle split/unified diff"},
+	{"toggle_file_tree", "Toggle the File Tree"},
 	{"refresh", "Refresh"},
 	{"help", "Show keyboard shortcuts"},
 	{"back_to_pr", "Back to the pull request"},
@@ -87,6 +88,13 @@ templ SettingsFormView(form SettingsForm) {
 				<select name="view_mode">
 					<option value={ string(settings.Split) } selected?={ form.Settings.ViewMode == settings.Split }>Split</option>
 					<option value={ string(settings.Unified) } selected?={ form.Settings.ViewMode == settings.Unified }>Unified</option>
+				</select>
+			</label>
+			<label>
+				<span>File Tree</span>
+				<select name="file_tree">
+					<option value={ string(settings.FileTreeOpen) } selected?={ form.Settings.FileTree == settings.FileTreeOpen }>Open</option>
+					<option value={ string(settings.FileTreeCollapsed) } selected?={ form.Settings.FileTree == settings.FileTreeCollapsed }>Collapsed</option>
 				</select>
 			</label>
 			<label>

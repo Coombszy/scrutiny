@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/Coombszy/scrutiny/internal/cache"
@@ -122,6 +124,25 @@ type FileEntry struct {
 	Threads, Unresolved int
 }
 
+// TreeOrder compares paths in the File Tree's order: within each folder,
+// folders before files, each by name.
+func TreeOrder(a, b string) int {
+	as, bs := strings.Split(a, "/"), strings.Split(b, "/")
+	for i := 0; i < len(as) && i < len(bs); i++ {
+		if as[i] == bs[i] {
+			continue
+		}
+		if aDir, bDir := i < len(as)-1, i < len(bs)-1; aDir != bDir {
+			if aDir {
+				return -1
+			}
+			return 1
+		}
+		return strings.Compare(as[i], bs[i])
+	}
+	return len(as) - len(bs)
+}
+
 // CanCommentLeft reports whether new threads may go on the left side: only
 // when it is the PR's merge base, which GitHub anchors LEFT lines to.
 func (p PRPage) CanCommentLeft() bool { return p.Comparison.Base == p.MergeBase }
@@ -161,6 +182,7 @@ func (s *Service) PRPage(ctx context.Context, ref domain.PRRef, req ComparisonRe
 	if err != nil {
 		return PRPage{}, err
 	}
+	slices.SortStableFunc(files, func(a, b FileEntry) int { return TreeOrder(a.Path, b.Path) })
 	snap, err := s.readFresh(ctx, ref, pr.HeadSHA, mergeBase)
 	if err != nil {
 		return PRPage{}, err

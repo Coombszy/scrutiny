@@ -73,6 +73,7 @@ func NewServer(d Deps) *Server {
 	s.mux.HandleFunc("GET /settings/metrics", s.activityPanel)
 	s.mux.HandleFunc("POST /settings", s.saveSettings)
 	s.mux.HandleFunc("POST /settings/view-mode", s.setViewMode)
+	s.mux.HandleFunc("POST /settings/file-tree", s.setFileTree)
 	s.mux.HandleFunc("POST /settings/theme", s.setTheme)
 	s.mux.HandleFunc("GET /settings/themes/new", s.newTheme)
 	s.mux.HandleFunc("POST /settings/themes", s.createTheme)

@@ -18,11 +18,20 @@ const (
 	Unified ViewMode = "unified"
 )
 
+// FileTree is whether the File Tree beside the diff is open or collapsed.
+type FileTree string
+
+const (
+	FileTreeOpen      FileTree = "open"
+	FileTreeCollapsed FileTree = "collapsed"
+)
+
 // Settings are the user's settings.
 type Settings struct {
 	Port     int      `toml:"port"`
 	Theme    string   `toml:"theme"`
 	ViewMode ViewMode `toml:"view_mode"`
+	FileTree FileTree `toml:"file_tree"`
 	Diff     Diff     `toml:"diff"`
 	// Keys binds actions to key sequences: keys separated by spaces, each
 	// optionally with modifiers, e.g. "ctrl+k" or "] c".
@@ -39,6 +48,7 @@ func DefaultKeys() map[string]string {
 		"prev_comment":     "[ c",
 		"current_comment":  "g c",
 		"toggle_view_mode": "s",
+		"toggle_file_tree": "t",
 		"refresh":          "r",
 		"help":             "?",
 		"back_to_pr":       "escape",
@@ -79,6 +89,7 @@ func Defaults() Settings {
 		Port:     7878,
 		Theme:    "gruvbox-dark",
 		ViewMode: Split,
+		FileTree: FileTreeOpen,
 		Diff:     Diff{CollapseThreshold: 1000, ExpandLines: 64},
 		Keys:     DefaultKeys(),
 	}
@@ -89,6 +100,8 @@ func (s Settings) Validate() error {
 	switch {
 	case s.ViewMode != Split && s.ViewMode != Unified:
 		return fmt.Errorf("view_mode must be %q or %q, got %q", Split, Unified, s.ViewMode)
+	case s.FileTree != FileTreeOpen && s.FileTree != FileTreeCollapsed:
+		return fmt.Errorf("file_tree must be %q or %q, got %q", FileTreeOpen, FileTreeCollapsed, s.FileTree)
 	case s.Port < 1 || s.Port > 65535:
 		return fmt.Errorf("port must be between 1 and 65535, got %d", s.Port)
 	case s.Diff.CollapseThreshold < 1:

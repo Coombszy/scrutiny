@@ -3,6 +3,7 @@ package review_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -85,6 +86,29 @@ func TestDefaultComparisonIsMergeBaseToHead(t *testing.T) {
 	}
 	if page.PR.Title != "Add things" || len(page.Commits) != 3 {
 		t.Errorf("page = %+v", page)
+	}
+}
+
+func TestFilesAreInFileTreeOrder(t *testing.T) {
+	f := newFixture(t)
+	var changes []domain.FileChange
+	// git's order: plain path order, files and folders mixed.
+	for _, p := range []string{"README.md", "a-b.go", "a/z.go", "cmd/main.go", "go.mod", "internal/web/b.go", "internal/web/views/a.go"} {
+		changes = append(changes, domain.FileChange{Path: p, OldPath: p, Status: domain.Modified})
+	}
+	f.repos.ChangeSets[repostore.Pair{From: mb, To: c3}] = changes
+
+	page, err := f.svc.PRPage(context.Background(), ref, review.ComparisonRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, file := range page.Files {
+		got = append(got, file.Path)
+	}
+	want := []string{"a/z.go", "cmd/main.go", "internal/web/views/a.go", "internal/web/b.go", "README.md", "a-b.go", "go.mod"}
+	if !slices.Equal(got, want) {
+		t.Errorf("Files = %v\nwant    %v", got, want)
 	}
 }
 

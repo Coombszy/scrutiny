@@ -103,7 +103,7 @@ func (s *Server) pullRequest(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	s.renderPage(w, r, http.StatusOK, views.Page{ShowLanguages: true, Refresh: true, Languages: s.review.LanguageStatus(r.Context(), ref), KeyHelp: true, CodeHelp: true}, views.PR(page, cfg.ViewMode))
+	s.renderPage(w, r, http.StatusOK, views.Page{ShowLanguages: true, Refresh: true, Languages: s.review.LanguageStatus(r.Context(), ref), KeyHelp: true, CodeHelp: true}, views.PR(page, cfg.ViewMode, cfg.FileTree))
 }
 
 // file renders one file's diff as an htmx fragment.
@@ -184,6 +184,13 @@ func (s *Server) expandGap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.render(w, r, http.StatusOK, views.ExpandedRows(dc, lines, rest, restBefore, header))
+}
+
+// setFileTree saves whether the File Tree is open; the page has already
+// opened or collapsed it, so it is not reloaded.
+func (s *Server) setFileTree(w http.ResponseWriter, r *http.Request) {
+	state := settings.FileTree(r.PostFormValue("state"))
+	s.updateSettings(w, r, func(cfg *settings.Settings) { cfg.FileTree = state }, false)
 }
 
 // setViewMode saves the View Mode to the config file and reloads the page.

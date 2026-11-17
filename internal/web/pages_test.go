@@ -171,6 +171,38 @@ func TestPRPageFilesBarOrdersViewModeThenCommentNavigation(t *testing.T) {
 	mustContain(t, body, `current_comment`, `g c`) // its default hotkey, in data-keys
 }
 
+func TestPRPageShowsTheFileTree(t *testing.T) {
+	a := newApp(t)
+	body := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	mustContain(t, body,
+		`class="pr-files" data-file-tree="open"`,
+		`<summary title="lex">`, // the folder comes before the files at the top
+		`href="#file-0" class="tree-file" data-tree-file="file-0" title="renamed: lex/old.go → lex/new.go"`, // its folder sorts first
+		`<span class="tree-status status-renamed" aria-label="renamed">→</span>`,
+		`toggle_file_tree`, // its hotkey, in data-keys
+	)
+	mustContain(t, body, `id="file-0" data-path="lex/new.go"`) // the diff follows the tree's order
+
+	cfg := settings.Defaults()
+	cfg.FileTree = settings.FileTreeCollapsed
+	a.settings.Save(cfg)
+	mustContain(t, a.do(t, http.MethodGet, prPath, nil).Body.String(), `data-file-tree="collapsed"`)
+}
+
+func TestToggleFileTreeWritesSettingsWithoutReloading(t *testing.T) {
+	a := newApp(t)
+	rec := a.do(t, http.MethodPost, "/settings/file-tree", url.Values{"state": {"collapsed"}})
+	if rec.Code != http.StatusNoContent || rec.Header().Get("HX-Refresh") != "" {
+		t.Errorf("status %d, HX-Refresh %q", rec.Code, rec.Header().Get("HX-Refresh"))
+	}
+	if cfg, _ := a.settings.Load(); cfg.FileTree != settings.FileTreeCollapsed {
+		t.Errorf("FileTree = %q, want collapsed", cfg.FileTree)
+	}
+	if rec := a.do(t, http.MethodPost, "/settings/file-tree", url.Values{"state": {"sideways"}}); rec.Code != http.StatusBadRequest {
+		t.Errorf("invalid state: status %d, want 400", rec.Code)
+	}
+}
+
 func TestPRPageUnknownPRAndHostAre404(t *testing.T) {
 	a := newApp(t)
 	for _, path := range []string{"/github.com/o/r/pull/8", "/gitlab.com/o/r/pull/7", "/github.com/o/r/pull/x"} {

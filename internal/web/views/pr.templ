@@ -6,7 +6,7 @@ import (
 	"github.com/Coombszy/scrutiny/internal/settings"
 )
 
-templ PR(p review.PRPage, mode settings.ViewMode) {
+templ PR(p review.PRPage, mode settings.ViewMode, tree settings.FileTree) {
 	@Layout(p.PR.Title + " #" + itoa(p.PR.Ref.Number)) {
 		<div data-live={ p.PR.Ref.Path() + "/events?head=" + string(p.PR.HeadSHA) } hidden></div>
 		@OfflineBanner(p.Offline, false)
@@ -51,7 +51,11 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 				disabled in this Comparison. Replies still work.
 			</p>
 		}
+		<div class="pr-files" data-file-tree={ string(tree) }>
+		@fileTreeView(p)
+		<div class="pr-files-main">
 		<div class="files-bar">
+			@fileTreeOpener()
 			<span class="muted">{ itoa(len(p.Files)) } files changed</span>
 			<span class="files-bar-actions">
 				if mode == settings.Split {
@@ -73,7 +77,10 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 		}
 		if len(p.OtherThreads) > 0 {
 			<section class="file other-threads" data-threads={ itoa(len(p.OtherThreads)) } data-unresolved={ itoa(unresolvedThreads(p.OtherThreads)) }>
-				<header class="file-header">Review Threads on files outside this Comparison</header>
+				<header class="file-header">
+					@fileTreeOpener()
+					Review Threads on files outside this Comparison
+				</header>
 				<div class="file-body">
 					for _, t := range p.OtherThreads {
 						@Thread(p.PR.Ref, t)
@@ -81,9 +88,59 @@ templ PR(p review.PRPage, mode settings.ViewMode) {
 				</div>
 			</section>
 		}
+		</div>
+		</div>
 		@submitDialog(p.PR.Ref, p.Comparison.Head, p.Review.Pending, p.PendingComments)
 		@Palette(p.PR.Ref)
 	}
+}
+
+// fileTreeView is the File Tree: a sticky column of the Comparison's files.
+// Collapsed, it is hidden and fileTreeOpener opens it again. scrutiny.js
+// marks the Current File's row.
+templ fileTreeView(p review.PRPage) {
+	<aside class="file-tree" aria-label="File Tree">
+		<div class="file-tree-head">
+			<span class="file-tree-title">Files</span>
+			<button type="button" class="file-tree-toggle" data-file-tree-toggle title={ "Collapse the File Tree (" + pageFrom(ctx).Keys["toggle_file_tree"] + ")" } aria-label="Collapse the File Tree"></button>
+		</div>
+		<nav class="file-tree-body">
+			@treeDirView(fileTree(p.Files))
+		</nav>
+		<div class="file-tree-resize" data-file-tree-resize role="separator" aria-orientation="vertical" aria-label="Resize the File Tree" title="Drag to resize; double-click to reset" tabindex="0"></div>
+	</aside>
+}
+
+// fileTreeOpener opens the collapsed File Tree. It leads the files bar and
+// every sticky file header, so whichever is in view has it at the same spot.
+templ fileTreeOpener() {
+	<button type="button" class="file-tree-open" data-file-tree-toggle title={ "Open the File Tree (" + pageFrom(ctx).Keys["toggle_file_tree"] + ")" } aria-label="Open the File Tree"></button>
+}
+
+templ treeDirView(d *treeDir) {
+	<ul class="tree-list">
+		for _, c := range d.Dirs {
+			<li>
+				<details class="tree-dir" open>
+					<summary title={ c.Name }><span class="tree-name">{ c.Name }</span></summary>
+					@treeDirView(c)
+				</details>
+			</li>
+		}
+		for _, f := range d.Files {
+			<li>
+				<a href={ templ.SafeURL("#" + fileID(f.Index)) } class={ "tree-file", templ.KV("viewed", f.File.Viewed == "VIEWED") } data-tree-file={ fileID(f.Index) } title={ treeFileTitle(f.File) }>
+					<span class={ "tree-status", "status-" + string(f.File.Status) } aria-label={ string(f.File.Status) }>{ treeStatusIcon(f.File.Status) }</span>
+					<span class="tree-name">{ f.Name }</span>
+					if f.File.Unresolved > 0 {
+						<span class="tree-unresolved" title="Unresolved Review Threads">💬 { itoa(f.File.Unresolved) }</span>
+					}
+					<span class="tree-viewed" title="Viewed" aria-label="Viewed">✓</span>
+					<svg class="tree-eye" viewBox="0 0 16 16" aria-label="Current File"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"></path><circle cx="8" cy="8" r="2"></circle></svg>
+				</a>
+			</li>
+		}
+	</ul>
 }
 
 templ comparisonPicker(p review.PRPage) {
@@ -111,6 +168,7 @@ templ comparisonPicker(p review.PRPage) {
 templ fileSection(p review.PRPage, i int, f review.FileEntry) {
 	<section class={ "file", templ.KV("viewed collapsed", f.Viewed == "VIEWED") } id={ fileID(i) } data-path={ f.Path } data-file-url={ FileURL(p.PR.Ref, p.Comparison, f.FileChange) } data-threads={ itoa(f.Threads) } data-unresolved={ itoa(f.Unresolved) }>
 		<header class="file-header">
+			@fileTreeOpener()
 			<button type="button" class="file-collapse" data-file-collapse aria-expanded={ boolString(f.Viewed != "VIEWED") } title="Collapse or expand the file"></button>
 			<span class={ "badge", "status-" + string(f.Status) }>{ string(f.Status) }</span>
 			if f.Path != f.OldPath {

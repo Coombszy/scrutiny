@@ -81,6 +81,7 @@ func (s *Server) applySettingsForm(r *http.Request, cfg *settings.Settings) erro
 		return fmt.Errorf("no theme %q", cfg.Theme)
 	}
 	cfg.ViewMode = settings.ViewMode(r.PostFormValue("view_mode"))
+	cfg.FileTree = settings.FileTree(r.PostFormValue("file_tree"))
 	for name, dst := range map[string]*int{"collapse_threshold": &cfg.Diff.CollapseThreshold, "port": &cfg.Port} {
 		n, err := strconv.Atoi(strings.TrimSpace(r.PostFormValue(name)))
 		if err != nil {
