@@ -236,7 +236,7 @@ func TestViewedIsSynced(t *testing.T) {
 	}
 }
 
-func TestViewedCheckboxIsDisabledOnlyWhileItsOwnRequestRuns(t *testing.T) {
+func TestViewedCheckboxDisablesItselfWhilePosting(t *testing.T) {
 	a := newApp(t)
 	body := a.do(t, http.MethodGet, prPath, nil).Body.String()
 	mustContain(t, body, `hx-post="/github.com/o/r/pull/7/viewed" hx-disabled-elt="this"`)

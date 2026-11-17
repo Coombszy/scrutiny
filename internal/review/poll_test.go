@@ -2,6 +2,7 @@ package review_test
 
 import (
 	"context"
+	"maps"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -223,5 +224,30 @@ func TestAPollOverlappingAWriteKeepsTheWrite(t *testing.T) {
 	}
 	if u, err := f.svc.Poll(ctx, ref); err != nil || u.NewThreads != 0 {
 		t.Errorf("next poll NewThreads = %d (err %v), want 0 for the viewer's own thread", u.NewThreads, err)
+	}
+}
+
+func TestPollReportsViewedChangesMadeElsewhere(t *testing.T) {
+	f := newFixture(t)
+	st := f.host.State(ref)
+	st.Viewed = map[string]domain.ViewedState{"a.go": domain.Viewed, "b.go": domain.Unviewed, "c.go": domain.Viewed}
+	f.openPage(t)
+
+	// On github.com: a.go unticked, b.go ticked; c.go untouched.
+	st.Viewed["a.go"], st.Viewed["b.go"] = domain.Unviewed, domain.Viewed
+
+	u, err := f.svc.Poll(context.Background(), ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]domain.ViewedState{"a.go": domain.Unviewed, "b.go": domain.Viewed}
+	if !maps.Equal(u.Viewed, want) {
+		t.Errorf("Viewed = %v, want %v", u.Viewed, want)
+	}
+	if u.Empty() {
+		t.Error("an Update with only Viewed changes is Empty")
+	}
+	if u, _ := f.svc.Poll(context.Background(), ref); !u.Empty() {
+		t.Errorf("second poll = %+v, want empty", u)
 	}
 }

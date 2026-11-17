@@ -183,9 +183,7 @@ templ fileSection(p review.PRPage, i int, f review.FileEntry) {
 			if f.Threads > 0 {
 				<span class="badge" title="Review Threads on this file">💬 { itoa(f.Threads - f.Unresolved) } Resolved { itoa(f.Unresolved) } Unresolved</span>
 			}
-			if f.Viewed == "DISMISSED" {
-				<span class="badge">Changed since viewed</span>
-			}
+			<span class="badge" data-changed-since-viewed hidden?={ f.Viewed != "DISMISSED" }>Changed since viewed</span>
 			<span class="stat"><span class="plus">+{ itoa(f.Additions) }</span> <span class="minus">−{ itoa(f.Deletions) }</span></span>
 			if !f.Binary && (f.Status == "modified" || f.Status == "renamed") {
 				<button class="full-toggle" data-full-toggle aria-pressed="false" title="Show the whole file, or only the changes">Full file</button>

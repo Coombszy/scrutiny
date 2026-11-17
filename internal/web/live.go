@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -65,16 +66,27 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// writeUpdate writes u as an `update` event of out-of-band HTML.
+// writeUpdate writes u as an `update` event of out-of-band HTML, and its
+// Viewed changes as a `viewed` event of JSON, by path, for the page to
+// apply to the checkboxes it has.
 func (s *Server) writeUpdate(w http.ResponseWriter, r *http.Request, ref domain.PRRef, u review.Update) {
 	var html bytes.Buffer
 	ctx := views.WithPage(r.Context(), views.Page{CSRFToken: s.csrfToken})
 	if err := views.LiveUpdate(ref, u).Render(ctx, &html); err != nil {
 		return
 	}
-	fmt.Fprint(w, "event: update\n")
-	for _, line := range strings.Split(html.String(), "\n") {
-		fmt.Fprintf(w, "data: %s\n", line)
+	if html.Len() > 0 {
+		fmt.Fprint(w, "event: update\n")
+		for _, line := range strings.Split(html.String(), "\n") {
+			fmt.Fprintf(w, "data: %s\n", line)
+		}
+		fmt.Fprint(w, "\n")
 	}
-	fmt.Fprint(w, "\n")
+	if len(u.Viewed) > 0 {
+		viewed, err := json.Marshal(u.Viewed)
+		if err != nil {
+			return
+		}
+		fmt.Fprintf(w, "event: viewed\ndata: %s\n\n", viewed)
+	}
 }

@@ -203,6 +203,7 @@ button.primary:hover { filter: brightness(1.1); background: var(--green); }
 .branch:hover { color: var(--fg); background: var(--bg2); }
 /* A thread row left empty by deleting its last comment; not the new-thread form's */
 .thread-row:not(.new-thread):not(:has(.thread)) { display: none; }
+.badge[hidden] { display: none; }
 .badge.pending { background: var(--yellow); color: var(--bg0); }
 .markdown { overflow-wrap: anywhere; }
 .markdown img { max-width: 100%; }

@@ -279,6 +279,7 @@ window.Scrutiny = { actions: {} };
     if (stream || document.hidden || !live) return;
     stream = new EventSource(live.dataset.live);
     stream.addEventListener("update", (e) => htmx.swap(document.body, e.data, { swapStyle: "none" }));
+    stream.addEventListener("viewed", (e) => Scrutiny.applyViewed(JSON.parse(e.data)));
     stream.addEventListener("unauthorized", () => Scrutiny.authFailed());
   }
   function disconnect() {
@@ -363,23 +364,40 @@ window.Scrutiny = { actions: {} };
   });
 
   // Ticking Viewed collapses the file straight away, and unticking opens
-  // it; the checkbox posts via htmx. The File Tree follows the
-  // scrutiny:viewed event.
-  function showViewed(input, viewed) {
+  // it; the checkbox posts via htmx. state is GitHub's: VIEWED, UNVIEWED or
+  // DISMISSED (was Viewed, then the file changed). The File Tree follows
+  // the scrutiny:viewed event.
+  function showViewed(input, state, collapse = true) {
+    const viewed = state === "VIEWED";
     input.checked = viewed;
     const file = input.closest(".file");
     file?.classList.toggle("viewed", viewed);
-    setCollapsed(file, viewed);
+    if (collapse) setCollapsed(file, viewed);
+    const badge = file?.querySelector("[data-changed-since-viewed]");
+    if (badge) badge.hidden = state !== "DISMISSED";
     input.dispatchEvent(new CustomEvent("scrutiny:viewed", { bubbles: true, detail: { viewed } }));
   }
+  // A Viewed change made elsewhere (github.com, another tab) is shown
+  // without collapsing or opening the file under the reader. A file whose
+  // own request is still running keeps what the reader just clicked.
+  Scrutiny.applyViewed = (states) => {
+    for (const [path, state] of Object.entries(states)) {
+      const input = document.querySelector(`.file[data-path="${CSS.escape(path)}"] .viewed-toggle input`);
+      if (input && !input.disabled) showViewed(input, state, false);
+    }
+  };
   document.addEventListener("change", (e) => {
-    if (e.target.matches(".viewed-toggle input")) showViewed(e.target, e.target.checked);
+    const input = e.target;
+    if (!input.matches(".viewed-toggle input")) return;
+    const badge = input.closest(".file")?.querySelector("[data-changed-since-viewed]");
+    input.dataset.undo = badge && !badge.hidden ? "DISMISSED" : input.checked ? "UNVIEWED" : "VIEWED";
+    showViewed(input, input.checked ? "VIEWED" : "UNVIEWED");
   });
   // A tick GitHub did not take is undone, so the page does not claim it.
   for (const failed of ["htmx:responseError", "htmx:sendError"]) {
     document.addEventListener(failed, (e) => {
       const input = e.detail.elt;
-      if (input.matches(".viewed-toggle input")) showViewed(input, !input.checked);
+      if (input?.matches(".viewed-toggle input")) showViewed(input, input.dataset.undo);
     });
   }
 

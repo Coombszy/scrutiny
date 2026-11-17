@@ -180,3 +180,32 @@ func TestStatusBoxSummarisesReviewsChecksAndMergeState(t *testing.T) {
 		})
 	}
 }
+
+func TestEventsStreamSendsViewedChangesAsTheirOwnEvent(t *testing.T) {
+	a := newApp(t)
+	srv := httptest.NewServer(a.handler)
+	t.Cleanup(srv.Close)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+prPath+"/events", nil)
+	req.Host = "127.0.0.1:7878"
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	lines := bufio.NewScanner(resp.Body)
+	lines.Scan() // the connected comment, sent once subscribed
+	lines.Scan() // and its blank line
+
+	a.hub.Publish(ref, review.Update{Viewed: map[string]domain.ViewedState{"parser.go": domain.Viewed}})
+
+	var event []string
+	for lines.Scan() && lines.Text() != "" {
+		event = append(event, lines.Text())
+	}
+	if got, want := strings.Join(event, "\n"), "event: viewed\ndata: {\"parser.go\":\"VIEWED\"}"; got != want {
+		t.Errorf("event =\n%s\nwant\n%s", got, want)
+	}
+}

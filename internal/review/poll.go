@@ -25,7 +25,8 @@ type Update struct {
 	Pending             *domain.PendingReview
 	PendingComments     []PendingComment // set with PendingChanged
 	PendingChanged      bool
-	Checks              *domain.Checks // set when the Checks changed
+	Checks              *domain.Checks                // set when the Checks changed
+	Viewed              map[string]domain.ViewedState // by path; the files whose Viewed state changed
 
 	Offline        bool
 	OfflineChanged bool
@@ -37,7 +38,7 @@ type Update struct {
 // Empty reports whether nothing changed.
 func (u Update) Empty() bool {
 	return u.Head == "" && len(u.Threads) == 0 && u.NewThreads == 0 && !u.ConversationChanged &&
-		!u.PendingChanged && u.Checks == nil && !u.OfflineChanged && u.Languages == nil
+		!u.PendingChanged && u.Checks == nil && len(u.Viewed) == 0 && !u.OfflineChanged && u.Languages == nil
 }
 
 // readFresh reads the review state and Checks, falling back to the cached
@@ -104,6 +105,14 @@ func (s *Service) Poll(ctx context.Context, ref domain.PRRef) (Update, error) {
 	}
 	if !sameJSON(prev.Checks, next.Checks) {
 		u.Checks = &next.Checks
+	}
+	for path, state := range next.State.Viewed {
+		if prev.State.Viewed[path] != state {
+			if u.Viewed == nil {
+				u.Viewed = map[string]domain.ViewedState{}
+			}
+			u.Viewed[path] = state
+		}
 	}
 	return u, nil
 }
