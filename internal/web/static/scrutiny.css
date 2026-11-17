@@ -195,6 +195,8 @@ button.primary:hover { filter: brightness(1.1); background: var(--green); }
 .comment-id { margin-left: auto; background: none; border: none; padding: 0 .3rem; color: var(--gray); font-family: var(--mono); font-size: var(--fs-sm); }
 .comment-actions + .comment-id { margin-left: 0; }
 .comment-id:hover { color: var(--fg); background: none; }
+.branch { font-family: var(--mono); color: inherit; background: var(--bg1); border: none; padding: 0 .3em; border-radius: 3px; }
+.branch:hover { color: var(--fg); background: var(--bg2); }
 /* A thread row left empty by deleting its last comment; not the new-thread form's */
 .thread-row:not(.new-thread):not(:has(.thread)) { display: none; }
 .badge.pending { background: var(--yellow); color: var(--bg0); }

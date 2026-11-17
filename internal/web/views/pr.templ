@@ -19,7 +19,7 @@ templ PR(p review.PRPage, mode settings.ViewMode, tree settings.FileTree) {
 			</div>
 			<p class="muted">
 				<span class={ "badge", "state-" + prStateLabel(p.PR) }>{ prStateLabel(p.PR) }</span>
-				{ p.PR.Author } wants to merge <code>{ p.PR.HeadBranch }</code> into <code>{ p.PR.BaseBranch }</code>
+				{ p.PR.Author } wants to merge <button type="button" class="branch" data-copy={ p.PR.HeadBranch } title="Branch, click to copy">{ p.PR.HeadBranch }</button> into <button type="button" class="branch" data-copy={ p.PR.BaseBranch } title="Branch, click to copy">{ p.PR.BaseBranch }</button>
 				· <a href={ templ.SafeURL(p.PR.URL) }>GitHub</a>
 			</p>
 			if st := p.Review.Stack; st != nil {
