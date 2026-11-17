@@ -789,6 +789,38 @@ window.Scrutiny = { actions: {} };
   const input = palette.querySelector("input");
   const results = palette.querySelector(".palette-results");
   let timer, seq = 0, selected = 0;
+  // Search Filters hide groups of results; which are off is kept in this
+  // browser only.
+  const filtersKey = "scrutiny.searchFilters.hidden";
+  const filters = [...palette.querySelectorAll("[data-search-filter]")];
+  let hidden = [];
+  try {
+    const saved = JSON.parse(localStorage.getItem(filtersKey));
+    if (Array.isArray(saved)) hidden = saved;
+  } catch {}
+  function showFilters() {
+    filters.forEach((b) => b.setAttribute("aria-pressed", String(!hidden.includes(b.dataset.searchFilter))));
+  }
+  showFilters();
+  function setHidden(h) {
+    hidden = h;
+    try {
+      localStorage.setItem(filtersKey, JSON.stringify(hidden));
+    } catch {}
+    showFilters();
+    input.focus();
+    search();
+  }
+  filters.forEach((b) =>
+    b.addEventListener("click", () => {
+      const g = b.dataset.searchFilter;
+      setHidden(hidden.includes(g) ? hidden.filter((h) => h !== g) : [...hidden, g]);
+    }),
+  );
+  // All and None turn every filter on or off at once.
+  palette.querySelectorAll("[data-search-filters-set]").forEach((b) =>
+    b.addEventListener("click", () => setHidden(b.dataset.searchFiltersSet === "all" ? [] : filters.map((f) => f.dataset.searchFilter))),
+  );
   function select(i) {
     const items = results.querySelectorAll("a.result");
     if (items.length === 0) return;
@@ -799,7 +831,8 @@ window.Scrutiny = { actions: {} };
   async function search() {
     const mine = ++seq;
     try {
-      const html = await (await fetchOK(`${palette.dataset.symbols}?q=${encodeURIComponent(input.value)}`)).text();
+      const params = new URLSearchParams({ q: input.value, hide: hidden.join(",") });
+      const html = await (await fetchOK(`${palette.dataset.symbols}?${params}`)).text();
       if (mine !== seq) return;
       results.innerHTML = html;
       select(0);

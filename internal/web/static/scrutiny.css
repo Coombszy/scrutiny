@@ -356,6 +356,12 @@ h1.path { font-family: var(--mono); font-size: var(--fs-lg); overflow-wrap: anyw
 
 .palette { width: min(44rem, calc(100vw - 32px)); padding: 0; top: 10vh; margin-top: 0; }
 .palette input { width: 100%; border: 0; border-bottom: 1px solid var(--bg2); border-radius: 0; padding: .7rem .9rem; font-size: var(--fs-lg); background: var(--bg1); }
+.palette input:focus { outline: none; }
+.search-filters { display: flex; gap: .2rem; padding: .35rem .7rem; border-bottom: 1px solid var(--bg2); }
+.search-filters button { background: none; border: 0; font-size: var(--fs-sm); padding: .15rem .55rem; color: var(--fg-dim); }
+.search-filters button:hover { background: var(--bg1); color: var(--fg); }
+.search-filters button[aria-pressed="true"] { background: var(--bg2); color: var(--fg); }
+.search-filters .search-filters-all { margin-left: auto; }
 .palette-results { max-height: 60vh; overflow-y: auto; padding: .3rem; }
 .palette-results > p { padding: .5rem; margin: 0; }
 .results { list-style: none; margin: 0; padding: 0; }

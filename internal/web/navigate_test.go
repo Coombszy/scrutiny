@@ -70,6 +70,23 @@ func TestSymbolSearchListsMarkedResults(t *testing.T) {
 	mustContain(t, body, "parser.go", "ParseFile", "function", `class="result in-pr`, `data-nav-path="lib/parse_test.go"`, `data-nav-line="9"`)
 }
 
+func TestSymbolSearchHidesTheGroupsAsked(t *testing.T) {
+	a := newApp(t)
+	a.repos.Blobs[c2] = map[string]string{"parser.go": ""}
+	a.nav.AllSymbols = []navigator.Symbol{
+		{Name: "ParseFile", Kind: "function", Location: navigator.Location{Path: "lib/p.go", Line: 9}},
+		{Name: "ParseLimit", Kind: "constant", Location: navigator.Location{Path: "lib/p.go", Line: 3}},
+	}
+	page := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	mustContain(t, page, `data-search-filter="files"`, `data-search-filter="types"`, `data-search-filter="functions"`, `data-search-filter="values"`, `data-search-filter="other"`, `data-search-filters-set="all"`, `data-search-filters-set="none"`)
+
+	body := a.do(t, http.MethodGet, prPath+"/symbols?q=pars&hide=files,values", nil).Body.String()
+	mustContain(t, body, "ParseFile")
+	if strings.Contains(body, "parser.go") || strings.Contains(body, "ParseLimit") {
+		t.Errorf("hidden groups listed: %s", body)
+	}
+}
+
 func TestFileViewShowsTheWholeFileAtHead(t *testing.T) {
 	a := newApp(t)
 	a.do(t, http.MethodGet, prPath, nil)

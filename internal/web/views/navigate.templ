@@ -35,6 +35,13 @@ templ LSPStatus(langs []review.LanguageStatus, oob bool) {
 templ Palette(pr domain.PRRef) {
 	<dialog id="palette" class="palette" data-symbols={ pr.Path() + "/symbols" }>
 		<input type="search" placeholder="Search files and symbols" autocomplete="off" spellcheck="false"/>
+		<div class="search-filters">
+			for _, g := range review.SearchGroups {
+				<button type="button" data-search-filter={ string(g) } aria-pressed="true">{ searchGroupLabel(g) }</button>
+			}
+			<button type="button" class="search-filters-all" data-search-filters-set="all">All</button>
+			<button type="button" data-search-filters-set="none">None</button>
+		</div>
 		<div class="palette-results"></div>
 	</dialog>
 }

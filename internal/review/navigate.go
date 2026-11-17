@@ -387,6 +387,35 @@ type SearchResult struct {
 
 const searchLimit = 50
 
+// SearchGroup is a group of Symbol Search results a Search Filter hides.
+type SearchGroup string
+
+const (
+	GroupFiles     SearchGroup = "files"
+	GroupTypes     SearchGroup = "types"
+	GroupFunctions SearchGroup = "functions"
+	GroupValues    SearchGroup = "values"
+	GroupOther     SearchGroup = "other"
+)
+
+// SearchGroups are the groups in the order the Search Filters show them.
+var SearchGroups = []SearchGroup{GroupFiles, GroupTypes, GroupFunctions, GroupValues, GroupOther}
+
+// Group is the SearchGroup of a result's kind.
+func (r SearchResult) Group() SearchGroup {
+	switch r.Kind {
+	case "file":
+		return GroupFiles
+	case "class", "struct", "interface", "enum", "type parameter":
+		return GroupTypes
+	case "function", "method", "constructor", "operator":
+		return GroupFunctions
+	case "constant", "variable", "field", "property", "enum member":
+		return GroupValues
+	}
+	return GroupOther
+}
+
 // prWeighting is the score bonus for what the PR added or removed: more than
 // a match in a path's directories rather than its file name loses (100), but
 // less than three broken runs cost (60 each).
@@ -395,8 +424,9 @@ const prWeighting = 150
 // SymbolSearch fuzzy-matches query against the repo's files and symbols at
 // the PR's head, giving what the PR added or removed a bonus (PR Weighting)
 // and marking it. Among equal scores, shorter names and then anything else
-// the PR changed win.
-func (s *Service) SymbolSearch(ctx context.Context, ref domain.PRRef, query string) ([]SearchResult, error) {
+// the PR changed win. Results in the hidden groups are left out before the
+// list is cut short.
+func (s *Service) SymbolSearch(ctx context.Context, ref domain.PRRef, query string, hide []SearchGroup) ([]SearchResult, error) {
 	snap, err := s.snapshot(ctx, ref)
 	if err != nil {
 		return nil, err
@@ -411,6 +441,9 @@ func (s *Service) SymbolSearch(ctx context.Context, ref domain.PRRef, query stri
 	}
 	var results []SearchResult
 	add := func(r SearchResult, target string) {
+		if slices.Contains(hide, r.Group()) {
+			return
+		}
 		if score, ok := fuzzyScore(query, target); ok {
 			r.score = score
 			if r.Marker != MarkerNone {
@@ -432,12 +465,15 @@ func (s *Service) SymbolSearch(ctx context.Context, ref domain.PRRef, query stri
 			add(SearchResult{Name: c.Path, Kind: "file", Path: c.Path, InPR: true, Marker: MarkerRemoved}, c.Path)
 		}
 	}
-	symbols, err := s.prSymbols(ctx, ref, snap, changed, query)
-	if err != nil {
-		return nil, err
-	}
-	for _, sym := range symbols {
-		add(sym, sym.Name)
+	// Only ask the Language Servers when some symbol group is shown.
+	if slices.ContainsFunc(SearchGroups, func(g SearchGroup) bool { return g != GroupFiles && !slices.Contains(hide, g) }) {
+		symbols, err := s.prSymbols(ctx, ref, snap, changed, query)
+		if err != nil {
+			return nil, err
+		}
+		for _, sym := range symbols {
+			add(sym, sym.Name)
+		}
 	}
 
 	slices.SortFunc(results, func(a, b SearchResult) int {

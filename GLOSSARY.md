@@ -80,6 +80,10 @@ _Avoid_: Boost, priority
 The ctrl+k fuzzy finder over the repo's files and symbols at head, ordered by PR Weighting.
 _Avoid_: Global search, telescope, fuzzy finder
 
+**Search Filter**:
+A toggle under the Symbol Search box that hides one group of results: Files, Types, Functions, Values or Other. Which are off is remembered per browser.
+_Avoid_: Facet, category
+
 **PR Search**:
 The ctrl+p finder, on every page, that jumps to a PR from the Dashboard's lists and those recently opened, or one named by URL, owner/repo#123 or (on a PR's pages) #123.
 _Avoid_: PR switcher, quick open

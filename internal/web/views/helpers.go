@@ -289,6 +289,11 @@ func markerTitle(m review.Marker) string {
 	return ""
 }
 
+// searchGroupLabel names a Search Filter's button.
+func searchGroupLabel(g review.SearchGroup) string {
+	return strings.ToUpper(string(g[:1])) + string(g[1:])
+}
+
 func usages(n int) string {
 	if n == 1 {
 		return "1 usage"

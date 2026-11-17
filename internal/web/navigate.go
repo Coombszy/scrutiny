@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/Coombszy/scrutiny/internal/domain"
 	"github.com/Coombszy/scrutiny/internal/navigator"
+	"github.com/Coombszy/scrutiny/internal/review"
 	"github.com/Coombszy/scrutiny/internal/web/views"
 )
 
@@ -94,7 +96,13 @@ func (s *Server) symbols(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	results, err := s.review.SymbolSearch(r.Context(), ref, r.URL.Query().Get("q"))
+	var hide []review.SearchGroup
+	for g := range strings.SplitSeq(r.URL.Query().Get("hide"), ",") {
+		if g != "" {
+			hide = append(hide, review.SearchGroup(g))
+		}
+	}
+	results, err := s.review.SymbolSearch(r.Context(), ref, r.URL.Query().Get("q"), hide)
 	if err != nil {
 		s.fail(w, r, err)
 		return

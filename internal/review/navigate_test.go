@@ -3,6 +3,7 @@ package review_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 
@@ -105,7 +106,7 @@ func TestSymbolSearchWeightsThePRsFilesAndSymbolsFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := f.svc.SymbolSearch(context.Background(), ref, "pars")
+	got, err := f.svc.SymbolSearch(context.Background(), ref, "pars", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +202,7 @@ func TestSymbolSearchRanksAnExactMatchAboveAnUnchangedSymbolInAModifiedFile(t *t
 	if _, err := f.svc.PRPage(context.Background(), ref, review.ComparisonRequest{}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := f.svc.SymbolSearch(context.Background(), ref, "loader")
+	got, err := f.svc.SymbolSearch(context.Background(), ref, "loader", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +224,7 @@ func searchNames(t *testing.T, files []string, query string) []string {
 	if _, err := f.svc.PRPage(context.Background(), ref, review.ComparisonRequest{}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := f.svc.SymbolSearch(context.Background(), ref, query)
+	got, err := f.svc.SymbolSearch(context.Background(), ref, query, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +275,7 @@ func TestSymbolSearchRanksAnExactMatchAboveAWeakMatchThePRAdded(t *testing.T) {
 	if _, err := f.svc.PRPage(context.Background(), ref, review.ComparisonRequest{}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := f.svc.SymbolSearch(context.Background(), ref, "parse")
+	got, err := f.svc.SymbolSearch(context.Background(), ref, "parse", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,5 +347,62 @@ func TestWarmingAnnouncesTheStatusChanges(t *testing.T) {
 	f.loadPage(t)
 	if len(announced) < 2 || announced[0] != ref {
 		t.Errorf("announced %v, want the PR at least as preparation starts and ends", announced)
+	}
+}
+
+func TestSymbolSearchHidesTheFilteredGroups(t *testing.T) {
+	f := newFixture(t)
+	f.withDiff(mb, c3)
+	f.repos.Blobs[c3] = map[string]string{"parse.go": ""}
+	f.nav.AllSymbols = []navigator.Symbol{
+		{Name: "ParseError", Kind: "struct", Location: navigator.Location{Path: "lib/p.go", Line: 1}},
+		{Name: "ParseFile", Kind: "method", Location: navigator.Location{Path: "lib/p.go", Line: 2}},
+		{Name: "ParseLimit", Kind: "constant", Location: navigator.Location{Path: "lib/p.go", Line: 3}},
+		{Name: "parsekit", Kind: "package", Location: navigator.Location{Path: "lib/p.go", Line: 4}},
+	}
+	if _, err := f.svc.PRPage(context.Background(), ref, review.ComparisonRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		hide []review.SearchGroup
+		want []string
+	}{
+		{nil, []string{"parsekit", "parse.go", "ParseFile", "ParseError", "ParseLimit"}},
+		{[]review.SearchGroup{review.GroupFiles, review.GroupValues}, []string{"parsekit", "ParseFile", "ParseError"}},
+		{[]review.SearchGroup{review.GroupTypes, review.GroupFunctions, review.GroupOther}, []string{"parse.go", "ParseLimit"}},
+	} {
+		got, err := f.svc.SymbolSearch(context.Background(), ref, "parse", tc.hide)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var names []string
+		for _, r := range got {
+			names = append(names, r.Name)
+		}
+		if !slices.Equal(names, tc.want) {
+			t.Errorf("hiding %v: results = %v, want %v", tc.hide, names, tc.want)
+		}
+	}
+}
+
+func TestSymbolSearchFiltersBeforeCuttingTheResultsShort(t *testing.T) {
+	f := newFixture(t)
+	f.withDiff(mb, c3)
+	blobs := map[string]string{}
+	for i := range 60 {
+		blobs[fmt.Sprintf("lib/parse%d.go", i)] = ""
+	}
+	f.repos.Blobs[c3] = blobs
+	// A weaker match than every file, so it falls outside the first 50.
+	f.nav.AllSymbols = []navigator.Symbol{{Name: "PageArs", Kind: "function", Location: navigator.Location{Path: "lib/p.go", Line: 1}}}
+	if _, err := f.svc.PRPage(context.Background(), ref, review.ComparisonRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := f.svc.SymbolSearch(context.Background(), ref, "pars", []review.SearchGroup{review.GroupFiles})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Name != "PageArs" {
+		t.Errorf("results = %+v, want just the function", got)
 	}
 }
