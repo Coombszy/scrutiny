@@ -503,7 +503,7 @@ func PR(p review.PRPage, mode settings.ViewMode, tree settings.FileTree) templ.C
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<span class=\"comment-nav\"><button data-comment-nav=\"prev\" title=\"Previous comment\">↑ Comment</button> <button data-comment-nav=\"current\" title=\"Go to the selected comment\">Current</button> <button data-comment-nav=\"next\" title=\"Next comment\">↓ Comment</button> <label><input type=\"checkbox\" id=\"nav-include-resolved\" autocomplete=\"off\"> include resolved</label></span> <button class=\"primary\" data-open-dialog=\"submit-review\">Review ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<span class=\"comment-nav\"><button data-comment-nav=\"prev\" title=\"Previous comment\">↑ Comment</button> <button data-comment-nav=\"current\" title=\"Go to the selected comment\">Current</button> <button data-comment-nav=\"next\" title=\"Next comment\">↓ Comment</button> <label><input type=\"checkbox\" id=\"nav-include-resolved\" autocomplete=\"off\"> include resolved</label></span> <span class=\"review-home\"><button class=\"primary\" data-open-dialog=\"submit-review\" data-review-button>Review ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -511,7 +511,7 @@ func PR(p review.PRPage, mode settings.ViewMode, tree settings.FileTree) templ.C
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</button></span></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</button></span></span></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

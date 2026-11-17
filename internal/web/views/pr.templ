@@ -69,7 +69,7 @@ templ PR(p review.PRPage, mode settings.ViewMode, tree settings.FileTree) {
 					<button data-comment-nav="next" title="Next comment">↓ Comment</button>
 					<label><input type="checkbox" id="nav-include-resolved" autocomplete="off"/> include resolved</label>
 				</span>
-				<button class="primary" data-open-dialog="submit-review">Review @PendingCount(p.Review.Pending, false)</button>
+				<span class="review-home"><button class="primary" data-open-dialog="submit-review" data-review-button>Review @PendingCount(p.Review.Pending, false)</button></span>
 			</span>
 		</div>
 		for i, f := range p.Files {

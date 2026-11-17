@@ -1025,6 +1025,34 @@ window.Scrutiny = { actions: {} };
   update();
 })();
 
+// The Review button docks in the top bar once the files bar has scrolled up
+// under it, so a review can be submitted from anywhere on the PR page. It is
+// moved rather than copied, so the pending count's swaps still find it, and
+// fades in briefly wherever it lands.
+(() => {
+  "use strict";
+  const button = document.querySelector("[data-review-button]");
+  const home = button?.closest(".review-home");
+  const dock = document.querySelector(".topbar-end");
+  if (!button || !home || !dock) return;
+  let queued = false;
+  function update() {
+    queued = false;
+    const docked = home.getBoundingClientRect().bottom < Scrutiny.barBottom();
+    if (docked === (button.parentElement === dock)) return;
+    if (docked) dock.prepend(button);
+    else home.append(button);
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) button.animate([{ opacity: 0 }, { opacity: 1 }], 100);
+  }
+  const queue = () => {
+    if (!queued) requestAnimationFrame(update);
+    queued = true;
+  };
+  addEventListener("scroll", queue, { passive: true });
+  addEventListener("resize", queue);
+  update();
+})();
+
 // The File Tree. Its eye marks the Current File: the file section under
 // the mouse pointer, checked again on scroll since that moves the page under
 // a still pointer. Anywhere else keeps the last one, and the tree never
