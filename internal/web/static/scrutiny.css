@@ -66,10 +66,14 @@ main { padding: 1rem; max-width: 100%; }
    header would stick to it instead of below the top bar. */
 .file { border: 1px solid var(--bg2); border-radius: 6px; margin: 0 0 1rem; overflow: clip; }
 /* A stuck file header is a bar across the whole page, so its file lets it
-   overflow; the body's own scrolling clips the bottom corners instead. */
-.file:has(> .file-header.stuck) { overflow: visible; }
+   overflow; the body's own scrolling clips the bottom corners instead. The
+   bar fades in as a header sticks and out as it lets go between files, its
+   file kept unclipped (.unsticking, set by scrutiny.js) until it is gone. */
+.file:has(> .file-header:is(.stuck, .unsticking)) { overflow: visible; }
 .file-body { border-radius: 0 0 5px 5px; }
-.file-header.stuck::before { content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: var(--stuck-left); width: var(--stuck-width); background: var(--bg1); border-bottom: 1px solid var(--bg2); }
+.file-header::before { content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: var(--stuck-left); width: var(--stuck-width); background: var(--bg1); border-bottom: 1px solid var(--bg2); opacity: 0; pointer-events: none; transition: opacity .1s; }
+.file-header.stuck::before { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .file-header::before { transition: none; } }
 .file-header { display: flex; gap: .6rem; align-items: center; padding: .4rem .7rem; background: var(--bg1); position: sticky; top: var(--topbar-height, 0); z-index: 1; }
 .file-header .path { font-family: var(--mono); overflow-wrap: anywhere; }
 .copy-path { display: inline-flex; background: none; border: none; padding: .15rem; color: var(--gray); }

@@ -978,7 +978,7 @@ window.Scrutiny = { actions: {} };
 })();
 
 // The file header stuck below the top bar is marked .stuck and stretched
-// across the page; --stuck-height sizes the File Tree's head to match it.
+// across the page, its bar fading in and out (scrutiny.css); --stuck-height sizes the File Tree's head to match it.
 (() => {
   "use strict";
   const sections = [...document.querySelectorAll(".pr-files-main > .file")];
@@ -1000,7 +1000,8 @@ window.Scrutiny = { actions: {} };
     const section = sections[lo];
     const header = section && section.getBoundingClientRect().top < bar ? section.querySelector(":scope > .file-header") : null;
     if (header !== stuck) {
-      stuck?.classList.remove("stuck");
+      if (stuck) unstick(stuck);
+      header?.classList.remove("unsticking");
       header?.classList.add("stuck");
       stuck = header;
       sections[0].closest(".pr-files")?.classList.toggle("has-stuck", !!header);
@@ -1011,6 +1012,14 @@ window.Scrutiny = { actions: {} };
       header.style.setProperty("--stuck-width", `${root.clientWidth}px`);
     }
     if (header) root.style.setProperty("--stuck-height", `${header.offsetHeight}px`);
+  }
+  // unstick lets a header go, keeping its file unclipped while its bar
+  // fades away (scrutiny.css).
+  function unstick(h) {
+    h.classList.remove("stuck");
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    h.classList.add("unsticking");
+    setTimeout(() => h.classList.remove("unsticking"), 150);
   }
   const queue = () => {
     if (!queued) requestAnimationFrame(update);
