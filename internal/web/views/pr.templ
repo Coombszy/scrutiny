@@ -191,7 +191,7 @@ templ fileSection(p review.PRPage, i int, f review.FileEntry) {
 				<button class="full-toggle" data-full-toggle aria-pressed="false" title="Show the whole file, or only the changes">Full file</button>
 			}
 			<label class="viewed-toggle">
-				<input type="checkbox" name="viewed" value="true" autocomplete="off" checked?={ f.Viewed == "VIEWED" } hx-post={ p.PR.Ref.Path() + "/viewed" } hx-vals={ viewedVals(f.Path) } hx-swap="none"/>
+				<input type="checkbox" name="viewed" value="true" autocomplete="off" checked?={ f.Viewed == "VIEWED" } hx-post={ p.PR.Ref.Path() + "/viewed" } hx-disabled-elt="this" hx-vals={ viewedVals(f.Path) } hx-swap="none"/>
 				Viewed
 			</label>
 		</header>

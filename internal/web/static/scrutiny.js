@@ -363,14 +363,25 @@ window.Scrutiny = { actions: {} };
   });
 
   // Ticking Viewed collapses the file straight away, and unticking opens
-  // it; the checkbox posts via htmx.
+  // it; the checkbox posts via htmx. The File Tree follows the
+  // scrutiny:viewed event.
+  function showViewed(input, viewed) {
+    input.checked = viewed;
+    const file = input.closest(".file");
+    file?.classList.toggle("viewed", viewed);
+    setCollapsed(file, viewed);
+    input.dispatchEvent(new CustomEvent("scrutiny:viewed", { bubbles: true, detail: { viewed } }));
+  }
   document.addEventListener("change", (e) => {
-    if (e.target.matches(".viewed-toggle input")) {
-      const file = e.target.closest(".file");
-      file?.classList.toggle("viewed", e.target.checked);
-      setCollapsed(file, e.target.checked);
-    }
+    if (e.target.matches(".viewed-toggle input")) showViewed(e.target, e.target.checked);
   });
+  // A tick GitHub did not take is undone, so the page does not claim it.
+  for (const failed of ["htmx:responseError", "htmx:sendError"]) {
+    document.addEventListener(failed, (e) => {
+      const input = e.detail.elt;
+      if (input.matches(".viewed-toggle input")) showViewed(input, !input.checked);
+    });
+  }
 
   // Next/previous comment. Files load lazily (or, when large or generated,
   // on demand), so files with threads that have not loaded are loaded first.
@@ -1114,10 +1125,8 @@ window.Scrutiny = { actions: {} };
     setCurrent(section.id);
   });
 
-  document.addEventListener("change", (e) => {
-    if (!e.target.matches(".viewed-toggle input")) return;
-    const id = e.target.closest(".file")?.id;
-    rows.get(id)?.classList.toggle("viewed", e.target.checked);
+  document.addEventListener("scrutiny:viewed", (e) => {
+    rows.get(e.target.closest(".file")?.id)?.classList.toggle("viewed", e.detail.viewed);
   });
 
   // Collapsing is saved to the config file.

@@ -236,6 +236,12 @@ func TestViewedIsSynced(t *testing.T) {
 	}
 }
 
+func TestViewedCheckboxIsDisabledOnlyWhileItsOwnRequestRuns(t *testing.T) {
+	a := newApp(t)
+	body := a.do(t, http.MethodGet, prPath, nil).Body.String()
+	mustContain(t, body, `hx-post="/github.com/o/r/pull/7/viewed" hx-disabled-elt="this"`)
+}
+
 func TestWritesFinishWhenTheBrowserLeaves(t *testing.T) {
 	for _, tc := range []struct {
 		name, path string
